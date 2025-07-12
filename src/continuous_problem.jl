@@ -18,7 +18,9 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 
     objective::Function                     # (x,u,y) -> J
     g_noncvx::Union{Function,Nothing}
+    ∇g_noncvx::Union{Function,Nothing}
     h_noncvx::Union{Function,Nothing}
+    ∇h_noncvx::Union{Function,Nothing}
 
     model::Model
     model_nl_references::Vector{Symbol}
@@ -43,17 +45,6 @@ function Base.show(io::IO, prob::ContinuousProblem)
     @printf("  ODE method     : %s\n", prob.ode_method)
     @printf("  ODE reltol     : %1.4e\n", prob.ode_reltol)
     @printf("  ODE abstol     : %1.4e\n", prob.ode_abstol)
-end
-
-
-"""
-Remove non-convex constraints from model within `ContinuousProblem`'s JuMP model
-"""
-function delete_noncvx_referencs!(prob::ContinuousProblem, references::Vector{Symbol})
-    for ref in references
-        delete(prob.model, prob.model[ref])
-        unregister(prob.model, ref)
-    end
 end
 
 
@@ -128,44 +119,6 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref, u_ref, y_ref)
 end
 
 
-function evaluate_g_noncvx(prob::ContinuousProblem, x_ref, u_ref, y_ref)
-    g_noncvx = nothing
-    # FIXME
-    error("evaluate_g_noncvx not implemented")
-    return g_noncvx
-end
-
-
-function evaluate_h_noncvx(prob::ContinuousProblem, x_ref, u_ref, y_ref)
-    h_noncvx = nothing
-    # FIXME
-    error("evaluate_h_noncvx not implemented")
-    return h_noncvx
-end
-
-
-"""
-Set non-convex expressions
-"""
-function set_noncvx_expressions!(prob::ContinuousProblem, x_ref, u_ref, y_ref)
-    # set dynamics constraints
-    sols, g_dynamics = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
-    set_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
-    @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
-        prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
-    )
-
-    # set nonconvex equality constraints
-    g_noncvx = nothing
-    # FIXME
-
-    # set nonconvex inequality constraints
-    h_noncvx = nothing
-    # FIXME
-    return g_dynamics, g_noncvx, h_noncvx
-end
-
-
 """
 Construct a continuous control problem
 """
@@ -181,8 +134,10 @@ function ContinuousProblem(
     eom_aug! = nothing,
     ng::Int = 0,
     g_noncvx::Union{Function,Nothing} = nothing,
+    ∇g_noncvx::Union{Function,Nothing} = nothing,
     nh::Int = 0,
     h_noncvx::Union{Function,Nothing} = nothing,
+    ∇h_noncvx::Union{Function,Nothing} = nothing,
     ode_ensemble_method = EnsembleSerial(),
     ode_method = Tsit5(),
     ode_reltol = 1e-12,
@@ -193,12 +148,7 @@ function ContinuousProblem(
     @assert size(x_ref,2) == size(u_ref,2) + 1 == N
     nx, _ = size(x_ref)
     nu, _ = size(u_ref)
-
-    if !isnothing(y_ref)
-        ny = length(y_ref)
-    else
-        ny = 0
-    end
+    ny = isnothing(y_ref) ? 0 : length(y_ref)
 
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
@@ -211,8 +161,26 @@ function ContinuousProblem(
     # initialize linearization cache
     lincache = LinearizedCache(nx, nu, N, ng, nh)
 
+    # check if ∇g_noncvx is provided
+    if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
+        ∇g_noncvx = function (x,u,y)
+            return ForwardDiff.jacobian(z -> g_noncvx(unpack_flattened_variables(prob, z)...),
+                                        stack_flatten_variables(prob, x, u, y))
+        end
+    end
+
+    # check if ∇h_noncvx is provided
+    if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
+        ∇h_noncvx = function (x,u,y)
+            return ForwardDiff.jacobian(z -> h_noncvx(unpack_flattened_variables(prob, z)...),
+                                        stack_flatten_variables(prob, x, u, y))
+        end
+    end
+
     # construct problem
-    model_nl_references = [:constraint_dynamics, :constraint_trust_region_x_lb, :constraint_trust_region_x_ub]
+    model_nl_references = [:constraint_dynamics,
+                           :constraint_trust_region_x_lb,
+                           :constraint_trust_region_x_ub]
     prob = ContinuousProblem(
         nx,
         nu,
@@ -226,7 +194,9 @@ function ContinuousProblem(
         times,
         objective,
         g_noncvx,
+        ∇g_noncvx,
         h_noncvx,
+        ∇h_noncvx,
         Model(optimizer),
         model_nl_references,
         lincache,
@@ -243,12 +213,34 @@ function ContinuousProblem(
 
     if ng > 0
         @variable(prob.model, ξ[i=1:ng])
-        push!(prob.model_nl_references, :g_noncvx)
+        push!(prob.model_nl_references, :constraint_g_noncvx)
     end
 
     if nh > 0
-        @variable(prob.model, ζ[i=1:nh])
-        push!(prob.model_nl_references, :h_noncvx)
+        @variable(prob.model, ζ[i=1:nh] >= 0.0)
+        push!(prob.model_nl_references, :constraint_h_noncvx)
     end
     return prob
+end
+
+
+function stack_flatten_variables(prob, x, u, y)
+    Δz = [reshape(x, prob.nx * prob.N);
+          reshape(u, prob.nu * (prob.N-1))];
+    if prob.ny > 0
+        Δz = [Δz; y]
+    end
+    return Δz
+end
+
+
+function unpack_flattened_variables(prob, z)
+    x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
+    u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
+    if prob.ny > 0
+        y = z[prob.nx * prob.N + prob.nu * (prob.N-1) + 1:end]
+    else
+        y = nothing
+    end
+    return x, u, y
 end

@@ -15,3 +15,14 @@ function message_accept_step(accept::Bool)
         return "no "
     end
 end
+
+
+"""
+Remove non-convex constraints from model within `OptimalControlProblem`'s JuMP model
+"""
+function delete_noncvx_referencs!(prob::OptimalControlProblem, references::Vector{Symbol})
+    for ref in references
+        delete(prob.model, prob.model[ref])
+        unregister(prob.model, ref)
+    end
+end

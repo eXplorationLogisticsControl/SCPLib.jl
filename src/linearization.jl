@@ -35,11 +35,13 @@ function set_dynamics_cache!(lincache::LinearizedCache, x_ref, u_ref, sols::Unio
 end
 
 
-function set_g_noncvx_cache!()
-    error("Not Implemented!")
+function set_g_noncvx_cache!(lincache::LinearizedCache, ∇g_noncvx::Function, x_ref, u_ref, y_ref)
+    lincache.∇g[:,:] = ∇g_noncvx(x_ref, u_ref, y_ref)
+    return
 end
 
 
-function set_h_noncvx_cache!()
-    error("Not Implemented!")
+function set_h_noncvx_cache!(lincache::LinearizedCache, ∇h_noncvx::Function, x_ref, u_ref, y_ref)
+    lincache.∇h[:,:] = ∇h_noncvx(x_ref, u_ref, y_ref)
+    return
 end

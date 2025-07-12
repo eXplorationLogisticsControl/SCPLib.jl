@@ -10,6 +10,7 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 # end
 
 @testset "SCvxStar" begin
-    include("test_convex_subproblem.jl")
+    include("test_scvxstar_subproblem.jl")
     include("test_scvxstar_dynamics_only.jl")
+    include("test_scvxstar_h_noncvx.jl")
 end

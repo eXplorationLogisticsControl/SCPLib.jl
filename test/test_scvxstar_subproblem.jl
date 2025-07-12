@@ -70,8 +70,7 @@ function test_convex_subproblem()
         dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
         dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
     end
-
-
+    
     rv0 = [1.0809931218390707E+00,
         0.0000000000000000E+00,
         -2.0235953267405354E-01,
@@ -151,7 +150,7 @@ function test_convex_subproblem()
     # -------------------- instantiate algorithm -------------------- #
     algo = SCPLib.SCvxStar(nx, N;)
 
-    SCPLib.set_noncvx_expressions!(prob, x_ref, u_ref, y_ref)
+    SCPLib.set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
     SCPLib.set_trust_region_constraints!(algo, prob, 0.5, x_ref, u_ref)
 
     # try solving subproblem

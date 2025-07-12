@@ -82,7 +82,7 @@ prob = SCPLib.ContinuousProblem(
 
 set_silent(prob.model)
 
-# 3. instantiate algorithm
+# 3. instantiate an algorithm; here we use the SCvx* algorithm
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)   # as an example, setting `w0` to a non-default value
 
 # 4. solve problem

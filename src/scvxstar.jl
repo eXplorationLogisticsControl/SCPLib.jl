@@ -3,6 +3,20 @@
 
 """
 SCvx* algorithm
+
+# Arguments
+- `nx::Int`: number of states
+- `N::Int`: number of time steps
+- `ng::Int`: number of non-convex equality constraints
+- `nh::Int`: number of non-convex inequality constraints
+- `Δ0::Float64`: initial trust-region size
+- `w0::Float64`: initial penalty weight
+- `rhos::Tuple{Real,Real,Real}`: trust-region acceptance thresholds
+- `alphas::Tuple{Real,Real}`: trust-region size update factors
+- `Δ_bounds::Tuple{Float64,Float64}`: trust-region size bounds
+- `gamma::Float64`: stationarity tolerance update factor
+- `beta::Float64`: penalty weight update factor
+- `w_max::Float64`: maximum penalty weight
 """
 mutable struct SCvxStar <: SCPAlgorithm
     # storage
@@ -54,6 +68,20 @@ mutable struct SCvxStar <: SCPAlgorithm
 end
 
 
+function Base.show(io::IO, algo::SCvxStar)
+    println(io, "SCvx* algorithm")
+    @printf("   Trust-region size Δ                                : %1.2e\n", algo.Δ)
+    @printf("   Penalty weight w                                   : %1.2e\n", algo.w)
+    @printf("   Penalty weight update factor β                     : %1.2e\n", algo.beta)
+    @printf("   Maximum penalty weight w_max                       : %1.2e\n", algo.w_max)
+    @printf("   Trust-region acceptance thresholds (ρ_1, ρ_2, ρ_3) : %1.2e, %1.2e, %1.2e\n", algo.rhos[1], algo.rhos[2], algo.rhos[3])
+    @printf("   Trust-region size update factors (α_1, α_2)        : %1.2e, %1.2e\n", algo.alphas[1], algo.alphas[2])
+end
+
+
+"""
+Augmented Lagrangian penalty function
+"""
 function penalty(algo::SCvxStar, prob::ContinuousProblem, ξ_dyn, ξ, ζ)
     # dynamics violation
     P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)
@@ -71,10 +99,7 @@ function penalty(algo::SCvxStar, prob::ContinuousProblem, ξ_dyn, ξ, ζ)
 end
 
 
-function update_trust_region!(
-    algo::SCvxStar,
-    rho_i::Float64,
-)
+function update_trust_region!(algo::SCvxStar, rho_i::Float64)
     flag_trust_region = false
     if rho_i < algo.rhos[2]
         algo.Δ = max(algo.Δ / algo.alphas[1], algo.Δ_bounds[1])
@@ -90,7 +115,6 @@ end
 function set_trust_region_constraints!(
     algo::SCvxStar,
     prob::ContinuousProblem,
-    rho_i::Float64,
     x_ref,
     u_ref,
 )
@@ -122,6 +146,9 @@ function solve_convex_subproblem!(
 end
 
 
+"""
+Solution struct for SCvx* algorithm
+"""
 mutable struct SCvxStarSolution
     status::Symbol
     x::Matrix
@@ -148,37 +175,97 @@ mutable struct SCvxStarSolution
 end
 
 
+"""
+Set linearized non-convex constraints for scvx* algorithm
+"""
+function set_linearized_constraints!(prob::ContinuousProblem, x_ref, u_ref, y_ref)
+    # set dynamics constraints
+    sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
+    set_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
+    @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
+        prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
+    )
+
+    # define stacked flattened variables difference
+    if prob.ng > 0 || prob.nh > 0
+        _Δy = y_ref isa Nothing ? nothing : prob.model[:y] - y_ref
+        Δz = stack_flatten_variables(prob, prob.model[:x] - x_ref, prob.model[:u] - u_ref, _Δy)
+    end
+
+    # set nonconvex equality constraints
+    if prob.ng > 0
+        set_g_noncvx_cache!(prob.lincache, prob.∇g_noncvx, x_ref, u_ref, y_ref)
+        g_ref = prob.g_noncvx(x_ref, u_ref, y_ref)
+        @constraint(prob.model, constraint_g_noncvx[i in 1:prob.ng],
+            g_ref[i] + prob.lincache.∇g[i,:]' * Δz == prob.model[:ξ][i]
+        )
+    else
+        g_ref = nothing
+    end
+
+    # set nonconvex inequality constraints
+    if prob.nh > 0
+        set_h_noncvx_cache!(prob.lincache, prob.∇h_noncvx, x_ref, u_ref, y_ref)
+        h_ref = max.(prob.h_noncvx(x_ref, u_ref, y_ref), 0)
+        @constraint(prob.model, constraint_h_noncvx[i in 1:prob.nh],
+            h_ref[i] + prob.lincache.∇h[i,:]' * Δz <= prob.model[:ζ][i]
+        )
+    else
+        h_ref = nothing
+    end
+    return g_dynamics_ref, g_ref, h_ref
+end
+
+
+
+"""
+Solve non-convex OCP with SCvx* algorithm
+
+# Arguments
+- `algo::SCvxStar`: algorithm struct
+- `prob::ContinuousProblem`: problem struct
+- `x_ref`: reference state history, size `nx`-by-`N`
+- `u_ref`: reference control history, size `nu`-by-`N-1`
+- `y_ref`: reference other variables, size `ny`
+- `maxiter::Int`: maximum number of iterations
+- `tol_feas::Float64`: feasibility tolerance
+- `tol_opt::Float64`: optimality tolerance
+- `tol_J0::Real`: objective tolerance
+- `verbosity::Int`: verbosity level
+- `store_iterates::Bool`: whether to store iterates
+"""
 function solve!(
     algo::SCvxStar,
     prob::ContinuousProblem,
     x_ref, u_ref, y_ref;
-    maxiter::Int = 1,
+    maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-4,
     tol_J0::Real = -1e16,
     verbosity::Int = 1,
     store_iterates::Bool = true,
 )
-    # initialize
+    @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
+    @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
+    
+    # initialize algorithm hyperparameters
     rho_i = (algo.rhos[2] + algo.rhos[3]) / 2
     flag_reference    = true    # at initial iteraiton, we need to update reference
     flag_trust_region = true    # (redundant since `flag_reference = true`)
     δ_i = 1e16
     tcpu_start = time()
 
+    # initialize storage
     _x = similar(x_ref)
     _u = similar(u_ref)
     _y = y_ref isa Nothing ? nothing : similar(y_ref)
-    # _ξ_dyn = similar(prob.model[:ξ_dyn])
-    # _ξ = prob.ng > 0 ? similar(prob.model[:ξ]) : nothing
-    # _μ = prob.nh > 0 ? similar(prob.model[:μ]) : nothing 
     g_dyn_ref = zeros(prob.nx,prob.N-1)
     g_ref = prob.ng > 0 ? zeros(prob.ng) : nothing
     h_ref = prob.nh > 0 ? zeros(prob.nh) : nothing
 
     solution = SCvxStarSolution(prob)
 
-    header = "\nIter |     J0      |    ΔJ_i     |    ΔL_i     |     χ_i     |     ρ_i     |     r_i     |      w      |  step acpt. |"
+    header = "\nIter |      J0      |    ΔJ_i     |    ΔL_i     |     χ_i     |     ρ_i     |    r_i    |     w     |  acpt. |"
     if verbosity > 0
         println(header)
     end
@@ -189,13 +276,13 @@ function solve!(
             if it > 1
                 delete_noncvx_referencs!(prob, prob.model_nl_references)
             end
-            g_dyn_ref, g_ref, h_ref = set_noncvx_expressions!(prob, x_ref, u_ref, y_ref)
-            set_trust_region_constraints!(algo, prob, rho_i, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
+            g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
+            set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
         elseif flag_trust_region
             if it > 1
                 delete_noncvx_referencs!(prob, [:constraint_trust_region_x_lb, :constraint_trust_region_x_ub])
             end
-            set_trust_region_constraints!(algo, prob, rho_i, x_ref, u_ref)   # if ref is not updated but trsut region size changed
+            set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is not updated but trsut region size changed
         end
 
         # solve convex subproblem
@@ -222,8 +309,8 @@ function solve!(
 
         # evaluate nonlinear constraints
         _, g_dynamics = get_trajectory(prob, _x, _u, _y)
-        g_noncvx = prob.ng > 0 ? evaluate_g_noncvx(prob, _x, _u, _y) : nothing
-        h_noncvx = prob.nh > 0 ? evaluate_h_noncvx(prob, _x, _u, _y) : nothing
+        g_noncvx = prob.ng > 0 ? prob.g_noncvx(x_ref, u_ref, y_ref) : nothing
+        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(x_ref, u_ref, y_ref), 0) : nothing
 
         # check improvement
         J_ref = prob.objective(x_ref, u_ref, y_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
@@ -244,7 +331,10 @@ function solve!(
         end
 
         if verbosity > 0
-            @printf(" %3.0f | % 1.4e | % 1.4e | % 1.4e | % 1.4e | % 1.4e | % 1.4e | % 1.4e |     %s     |\n",
+            if mod(it, 20) == 0
+                println(header)
+            end
+            @printf(" %3.0f | % 1.5e | % 1.4e | % 1.4e | % 1.4e | % 1.4e | % 1.2e | % 1.2e |  %s   |\n",
                     it, J0, ΔJ, ΔL, χ, rho_i, algo.Δ, algo.w,
                     message_accept_step(rho_i >= algo.rhos[1]))
         end

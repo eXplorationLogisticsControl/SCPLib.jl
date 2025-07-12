@@ -99,6 +99,12 @@ sol_lpof = solve(
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 
+# -------------------- define objective -------------------- #
+function objective(x, u, y)
+    return sum(u[4,:])
+end
+
+
 # -------------------- create problem -------------------- #
 N = 60
 nx = 6
@@ -127,10 +133,6 @@ lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
 # scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
 
-function objective(x, u, y)
-    return sum(u[4,:])
-end
-
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
     Clarabel.Optimizer,
@@ -155,12 +157,6 @@ set_silent(prob.model)
     [prob.model[:u][4,k], prob.model[:u][1:3,k]...] in SecondOrderCone())
 @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
     prob.model[:u][4,k] <= umax)
-
-# # propagate initial guess
-# sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
-# for _sol in sols_ig
-#     lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
-# end
 
 # -------------------- instantiate algorithm -------------------- #
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
