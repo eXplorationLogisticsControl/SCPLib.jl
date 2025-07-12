@@ -151,7 +151,7 @@ function test_convex_subproblem()
     algo = SCPLib.SCvxStar(nx, N;)
 
     SCPLib.set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
-    SCPLib.set_trust_region_constraints!(algo, prob, 0.5, x_ref, u_ref)
+    SCPLib.set_trust_region_constraints!(algo, prob, x_ref, u_ref)
 
     # try solving subproblem
     SCPLib.solve_convex_subproblem!(algo, prob)

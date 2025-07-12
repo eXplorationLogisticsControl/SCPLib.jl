@@ -10,7 +10,7 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 # ODE parameters
 mutable struct QuadroptorParams
-    u::Vector{Float64}
+    u::Vector
 end
 
 
@@ -26,7 +26,7 @@ function test_scvxstar_h_noncvx()
     T_min = 1.0;                    # N, minimum thrust
     T_max = 4.0;                    # N, maximum thrust
     theta_max = pi/4;               # rad, maximum tilt angle
-    Nseg = 30;                      # number of segments
+    N = 30                          # number of nodes
     
     # initial and final states
     x_initial = [0, 0, 0, 0, 0.5, 0];
@@ -82,7 +82,7 @@ function test_scvxstar_h_noncvx()
         return sum(u[4,:])
     end
 
-    nh = 2 * prob.N    # two obstacles, enforced at each node
+    nh = 2 * N    # two obstacles, enforced at each node
     function h_noncvx(x,u,y)
         h = vcat(
             [R_obstacle_1 - norm(x[1:3,k] - p_obstacle_1) for k in 1:N],
@@ -92,7 +92,6 @@ function test_scvxstar_h_noncvx()
     end
 
     # -------------------- create problem -------------------- #
-    N = 30
     times = LinRange(0.0, t_N, N)
 
     x_ref = hcat([[el for el in LinRange(x_initial[i], x_final[i], N)] for i in 1:6]...)'
