@@ -1,17 +1,18 @@
 # `SCPLib.jl`: Sequential Convex Programming library
 
-The non-convex optimal control problem (OCP) of interest is of the form
+We are interested in solving the discretized non-convex optimal control problem (OCP)
 
 ```math
 \begin{aligned}
-\min_{x(t), u(t), y} \quad& \phi(x(t_f),u(t_f),t_f,y) + \int_{t_0}^{t_f} \mathcal{L}(x(t),u(t),t) \mathrm{d}t
+\min_{x, u, y} \quad& \phi(x(t_f),u(t_f),t_f,y) + \int_{t_0}^{t_f} \mathcal{L}(x(t),u(t),t) \mathrm{d}t
 \\ \mathrm{s.t.} \quad&     \dot{x}(t) = f(x(t),u(t),t)
-\\&     g(x(t),u(t),t,y) = 0
-\\&     h(x(t),u(t),t,y) \leq 0
-\\&     x(t_0) \in \mathcal{X}(t_0) ,\,\, x(t_f) \in \mathcal{X}(t_f)
-\\&     x(t) \in \mathcal{X}(t),\,\, u(t) \in \mathcal{U}(t)
+\\&     x_{k+1} = x_k + \int_{t_k}^{t_{k+1}} f(x_k, u_k) \mathrm{d}t \quad \forall k=1,\ldots,N-1
+\\&     g(x,u,y) = 0
+\\&     h(x,u,y) \leq 0
+\\&     x_1 \in \mathcal{X}(t_1) ,\,\, x_N \in \mathcal{X}(t_N)
+\\&     x_k \in \mathcal{X}(t_k),\,\, u_k \in \mathcal{U}(t_k) \quad \forall k=1,\ldots,N
 \end{aligned}
-```
+``` 
 
 Note:
 - A free-final time problem can be cast as the above OCP by including physical time as a state & adopting a time dilation.
@@ -25,9 +26,10 @@ For now, `git clone` the repo & add via `pkg> dev ./path/to/SCPLib.jl`.
 
 We first need to define a few things:
 
-- a parameter `mutable struct`, which includes a vector `u` (the control vector),
+- a `mutable struct` parameter for the ODE, which includes a vector `u` (the control vector),
 - the controlled equations of motion `eom!`, which takes as parameter the aforementioned `mutable struct`,
 - (optionally) the augmented equations of motion which propagates the state together with the STM's $\Phi_A$ and $\Phi_B$,
+- an objective function, dispatched for both JuMP variables and reals,
 - an array of time-stamps corresponding to the discretized nodes, and
 - initial guesses for state & control histories, `x_ref` and `u_ref`; if the problem also has other variables `y`, then we also need initial guess for those, i.e. `y_ref`.
 
@@ -45,12 +47,17 @@ params = MyODEParams(p, zeros(nu))
 
 eom! = function (dx, x, params, t)
     # compute derivative of state 
-    # ...
+    ...
 end
 
 eom_aug! = function (dx_aug, x_aug, params, t)
     # compute derivative of state & Phi_A & Phi_B
-    # ...
+    ...
+end
+
+objective = function (x, u, y)
+    # compute objective, must be dispatched for both JuMP variables and reals 
+    ...
 end
 
 N = 60                          # number of nodes
