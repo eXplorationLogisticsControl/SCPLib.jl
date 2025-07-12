@@ -1,6 +1,9 @@
 """SCvx* algorithm"""
 
 
+"""
+SCvx* algorithm
+"""
 mutable struct SCvxStar <: SCPAlgorithm
     # storage
     Δ::Float64
@@ -124,6 +127,24 @@ mutable struct SCvxStarSolution
     x::Matrix
     u::Matrix
     y::Union{Nothing,Matrix}
+    n_iter::Int
+    info::Dict
+
+    function SCvxStarSolution(prob::ContinuousProblem)
+        status = :Solving
+        x = zeros(prob.nx, prob.N)
+        u = zeros(prob.nu, prob.N-1)
+        y = prob.ny > 0 ? zeros(prob.ny) : nothing
+        
+        info = Dict(
+            :ΔJ => Float64[],
+            :χ => Float64[],
+            :w => Float64[],
+            :Δ => Float64[],
+            :accept => Bool[],
+        )
+        new(status, x, u, y, 0, info)
+    end
 end
 
 
@@ -133,15 +154,17 @@ function solve!(
     x_ref, u_ref, y_ref;
     maxiter::Int = 1,
     tol_feas::Float64 = 1e-5,
-    tol_opt::Float64 = 1e-4,
+    tol_opt::Float64 = 1e-3,
     tol_J0::Real = -1e16,
     verbosity::Int = 1,
+    store_iterates::Bool = true,
 )
     # initialize
     rho_i = (algo.rhos[2] + algo.rhos[3]) / 2
     flag_reference    = true    # at initial iteraiton, we need to update reference
     flag_trust_region = true    # (redundant since `flag_reference = true`)
     δ_i = 1e16
+    tcpu_start = time()
 
     _x = similar(x_ref)
     _u = similar(u_ref)
@@ -153,7 +176,7 @@ function solve!(
     g_ref = prob.ng > 0 ? zeros(prob.ng) : nothing
     h_ref = prob.nh > 0 ? zeros(prob.nh) : nothing
 
-    solution = SCvxStarSolution(:Solving, _x, _u, _y)
+    solution = SCvxStarSolution(prob)
 
     header = "\nIter |     J0      |    ΔJ_i     |    ΔL_i     |     χ_i     |     ρ_i     |     r_i     |      w      |  step acpt. |"
     if verbosity > 0
@@ -231,6 +254,15 @@ function solve!(
         solution.u[:,:] = _u
         solution.y = _y
 
+        if store_iterates
+            push!(solution.info[:ΔJ], ΔJ)
+            push!(solution.info[:χ], χ)
+            push!(solution.info[:w], algo.w)
+            push!(solution.info[:Δ], algo.Δ)
+            push!(solution.info[:accept], rho_i >= algo.rhos[1])
+            solution.n_iter += 1
+        end
+
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
             break
@@ -269,6 +301,18 @@ function solve!(
         if it == maxiter
             solution.status = :MaxIterReached
         end
+    end
+    tcpu_end = time()
+
+    # print exit results
+    if verbosity > 0
+        println()
+        @printf("   Status                   : %s\n", solution.status)
+        @printf("   Iterations               : %d\n", solution.n_iter)
+        @printf("   Total CPU time           : %1.2f sec\n", tcpu_end - tcpu_start)
+        @printf("   Objective improvement ΔJ : %1.4e (tol: %1.4e)\n", solution.info[:ΔJ][end], tol_opt)
+        @printf("   Max constraint violation : %1.4e (tol: %1.4e)\n", solution.info[:χ][end], tol_feas)
+        println()
     end
     return solution
 end

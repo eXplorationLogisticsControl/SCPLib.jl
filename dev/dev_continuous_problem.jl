@@ -55,16 +55,36 @@ function eom(rv, p, t)
     return drv
 end
 
+function cr3bp_dfdx(x, params)
+    r1vec = [x[1] + params.μ, x[2], x[3]]
+    r2vec = [x[1] - 1 + params.μ, x[2], x[3]]
+    G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
+    G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
+    Omega = [0 2 0; -2 0 0; 0 0 0]
+    dfdx = [zeros(3,3)                  I(3);
+            G1 + G2 + diagm([1,1,0])    Omega]
+    return dfdx
+end
 
-# cache for Jacobian
-sd = SymbolicsSparsityDetection()
-adtype = AutoSparse(AutoFiniteDiff())
-cache_jac_A = sparse_jacobian_cache(adtype, sd, (y,x) -> eom!(y, x, params, 1.0), zeros(6), zeros(6))
+
+# # cache for Jacobian
+# sd = SymbolicsSparsityDetection()
+# adtype = AutoSparse(AutoFiniteDiff())
+# cache_jac_A = sparse_jacobian_cache(adtype, sd, (y,x) -> eom!(y, x, params, 1.0), zeros(6), zeros(6))
 
 function eom_aug!(dx_aug, x_aug, p, t)
-    # compute state derivative with control
-    # eom!(dx_aug[1:6], x_aug[1:6], p, t)
-    dx_aug[1:6] = eom(x_aug[1:6], p, t)
+    x, y, z = x_aug[1:3]
+    vx, vy, vz = x_aug[4:6]
+    r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
+    r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+    dx_aug[1:3] = x_aug[4:6]
+    # derivatives of velocities
+    dx_aug[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
+    dx_aug[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
+    dx_aug[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+
+    # append controls
+    dx_aug[4:6] += p.u[1:3]
     
     # ForwardDiff.jacobian!(A, (y,x) -> eom!(y, x, p, t), dx_aug[1:6], x_aug[1:6])
     A = ForwardDiff.jacobian(x -> eom(x, p, t), x_aug[1:6])
@@ -134,7 +154,7 @@ u_ref = zeros(nu, N-1)
 y_ref = nothing
 
 # plot initial guess
-fig = Figure()
+fig = Figure(size=(1200,400))
 ax3d = Axis3(fig[1,1]; aspect=:data)
 lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
@@ -155,6 +175,7 @@ prob = SCPLib.ContinuousProblem(
     u_ref,
     y_ref;
     eom_aug! = eom_aug!,
+    ode_method = Vern7(),
 )
 set_silent(prob.model)
 
@@ -168,24 +189,46 @@ set_silent(prob.model)
 @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
     prob.model[:u][4,k] <= umax)
 
-# propagate initial guess
-sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
-for _sol in sols_ig
-    lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
-end
+# # propagate initial guess
+# sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
+# for _sol in sols_ig
+#     lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
+# end
 
 # -------------------- instantiate algorithm -------------------- #
 algo = SCPLib.SCvxStar(
     nx, N;
+    w0 = 1e4,
 )
 
 # solve problem
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 50)
 
 # propagate solution
-sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
-for _sol in sols_ig
-    lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:red)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+arc_colors = [
+    solution.u[4,i] > 1e-6 ? :red : :black for i in 1:N-1
+]
+for (i, _sol) in enumerate(sols_opt)
+    lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=arc_colors[i])
 end
+
+# plot controls
+ax_u = Axis(fig[1,2]; xlabel="Time", ylabel="Control")
+for i in 1:3
+    stairs!(ax_u, prob.times[1:end-1], solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
+end
+stairs!(ax_u, prob.times[1:end-1], solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
+axislegend(ax_u, position=:cc)
+
+# plot iterate information
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
+ax_χ = Axis(fig[1,3]; xlabel="Iteration", ylabel="χ", yscale=log10)
+scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+# ax_w = Axis(fig[2,3]; xlabel="Iteration", ylabel="w", yscale=log10)
+# scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+# ax_Δ = Axis(fig[3,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+# scatterlines!(ax_Δ, 1:length(solution.info[:accept]), solution.info[:Δ], color=colors_accept, marker=:circle, markersize=7)
+
 display(fig)
 println("Done!")
