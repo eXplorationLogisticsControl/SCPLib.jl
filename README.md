@@ -1,4 +1,4 @@
-# `SCPLib.jl`: Sequential Convex Programming library in Julia
+# `SCPLib.jl`: Sequential Convex Programming library
 
 The non-convex optimal control problem (OCP) of interest is of the form
 
