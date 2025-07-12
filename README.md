@@ -14,10 +14,10 @@ For now, `git clone` the repo & add via `pkg> dev ./path/to/SCPLib.jl`.
 
 We first need to define a few things:
 
-- a parameter `mutable struct`, which includes a vector `u` (the control vector);
-- the controlled equations of motion `eom!`, which takes as parameter the aforementioned `mutable struct`;
-- (optionally) the augmented equations of motion which propagates the state together with the STM's $\Phi_A$ and $\Phi_B$;
-- an array of time-stamps corresponding to the discretized nodes; and
+- a parameter `mutable struct`, which includes a vector `u` (the control vector),
+- the controlled equations of motion `eom!`, which takes as parameter the aforementioned `mutable struct`,
+- (optionally) the augmented equations of motion which propagates the state together with the STM's $\Phi_A$ and $\Phi_B$,
+- an array of time-stamps corresponding to the discretized nodes, and
 - initial guesses for state & control histories, `x_ref` and `u_ref`; if the problem also has other variables `y`, then we also need initial guess for those, i.e. `y_ref`.
 
 
