@@ -16,11 +16,11 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 
     times::Union{Vector,LinRange}
 
-    objective::Function                     # (x,u,y) -> J
-    g_noncvx::Union{Function,Nothing}
-    ∇g_noncvx::Union{Function,Nothing}
-    h_noncvx::Union{Function,Nothing}
-    ∇h_noncvx::Union{Function,Nothing}
+    objective::Function                     # (x,u,y) -> J0
+    g_noncvx::Union{Function,Nothing}       # (x,u,y) -> g
+    ∇g_noncvx::Union{Function,Nothing}      # (x,u,y) -> ∇g
+    h_noncvx::Union{Function,Nothing}       # (x,u,y) -> h
+    ∇h_noncvx::Union{Function,Nothing}      # (x,u,y) -> ∇h
 
     model::Model
     model_nl_references::Vector{Symbol}
@@ -152,10 +152,7 @@ function ContinuousProblem(
 
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
-        eom_aug! = function (dx_aug, x_aug, params, t)
-            # FIXME
-            error("AD definition of eom_aug! not yet implemented")
-        end
+        eom_aug! = get_continuous_augmented_eom(eom!, params, nx)
     end
 
     # initialize linearization cache
