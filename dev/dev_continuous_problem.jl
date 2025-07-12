@@ -41,37 +41,6 @@ function eom!(drv, rv, p, t)
 end
 
 
-function eom(rv, p, t)
-    x, y, z = rv[1:3]
-    vx, vy, vz = rv[4:6]
-    r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-    r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
-    drv = [
-        vx; vy; vz;
-         2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x) + p.u[1];
-        -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y + p.u[2];
-        -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z + p.u[3];
-    ]
-    return drv
-end
-
-function cr3bp_dfdx(x, params)
-    r1vec = [x[1] + params.μ, x[2], x[3]]
-    r2vec = [x[1] - 1 + params.μ, x[2], x[3]]
-    G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-    G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
-    Omega = [0 2 0; -2 0 0; 0 0 0]
-    dfdx = [zeros(3,3)                  I(3);
-            G1 + G2 + diagm([1,1,0])    Omega]
-    return dfdx
-end
-
-
-# # cache for Jacobian
-# sd = SymbolicsSparsityDetection()
-# adtype = AutoSparse(AutoFiniteDiff())
-# cache_jac_A = sparse_jacobian_cache(adtype, sd, (y,x) -> eom!(y, x, params, 1.0), zeros(6), zeros(6))
-
 function eom_aug!(dx_aug, x_aug, p, t)
     x, y, z = x_aug[1:3]
     vx, vy, vz = x_aug[4:6]

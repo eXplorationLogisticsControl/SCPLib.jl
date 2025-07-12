@@ -1,7 +1,6 @@
 """Dev for continuous problem"""
 
 using Clarabel
-using GLMakie
 using JuMP
 using OrdinaryDiffEq
 
@@ -128,13 +127,6 @@ function test_convex_subproblem()
     end
     u_ref = zeros(nu, N-1)
     y_ref = nothing
-
-    # plot initial guess
-    fig = Figure()
-    ax3d = Axis3(fig[1,1]; aspect=:data)
-    lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
-    lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
-    # scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
 
     function objective(x, u, y)
         return sum(u[4,:])
