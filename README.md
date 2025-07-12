@@ -75,11 +75,16 @@ prob = SCPLib.ContinuousProblem(
     y_ref;
     eom_aug! = eom_aug!,
 )
+
+# 2. append convex constraints to `prob.model` if any
+@constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)     # final boundary conditions
+@constraint(prob.model, constraint_final_rv,   prob.model[:x][:,end] == rvf)   # final boundary conditions
+
 set_silent(prob.model)
 
-# 2. instantiate algorithm
+# 3. instantiate algorithm
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)   # as an example, setting `w0` to a non-default value
 
-# 3. solve problem
+# 4. solve problem
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
 ```
