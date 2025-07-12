@@ -163,10 +163,7 @@ set_silent(prob.model)
 # end
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(
-    nx, N;
-    w0 = 1e4,
-)
+algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 50)
