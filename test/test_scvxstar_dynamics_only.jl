@@ -1,4 +1,4 @@
-"""Dev for continuous problem"""
+"""Test problem with non-convex dynamics only"""
 
 using Clarabel
 using JuMP
@@ -18,10 +18,12 @@ mutable struct ControlParams
     end
 end
 
-
-function test_convex_subproblem()
-    
+function test_scvxstar_dynamics_only()
     μ = 1.215058560962404e-02
+    DU = 389703     # km
+    TU = 382981     # sec
+    MU = 500.0      # kg
+    VU = DU/TU      # km/s
     params = ControlParams(μ)
 
     function eom!(drv, rv, p, t)
@@ -104,7 +106,9 @@ function test_convex_subproblem()
     nu = 4                              # [ux,uy,uz,Γ]
     tf = 2.6 
     times = LinRange(0.0, tf, N)
-    umax = 0.05                         # max control magnitudes
+
+    thrust = 0.35    # N
+    umax = thrust/MU/1e3 / (VU/TU)
 
     # create reference solution
     x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
@@ -132,6 +136,7 @@ function test_convex_subproblem()
         u_ref,
         y_ref;
         eom_aug! = eom_aug!,
+        ode_method = Vern7(),
     )
     set_silent(prob.model)
 
@@ -145,18 +150,23 @@ function test_convex_subproblem()
     @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
         prob.model[:u][4,k] <= umax)
 
-    # propagate initial guess
-    sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
+    # # propagate initial guess
+    # sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
+    # for _sol in sols_ig
+    #     lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
+    # end
 
     # -------------------- instantiate algorithm -------------------- #
-    algo = SCPLib.SCvxStar(nx, N;)
+    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
-    SCPLib.set_noncvx_expressions!(prob, x_ref, u_ref, y_ref)
-    SCPLib.set_trust_region_constraints!(algo, prob, 0.5, x_ref, u_ref)
+    # solve problem
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity = 0, maxiter = 50)
 
-    # try solving subproblem
-    SCPLib.solve_convex_subproblem!(algo, prob)
-    @test termination_status(prob.model) == OPTIMAL
+    # propagate solution
+    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+    @test maximum(abs.(g_dynamics_opt)) <= 1e-6
+    @test solution.status == :Optimal
 end
 
-test_convex_subproblem()
+
+test_scvxstar_dynamics_only()

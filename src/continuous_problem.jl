@@ -90,8 +90,8 @@ function get_trajectory(prob::ContinuousProblem, x_ref, u_ref, y_ref)
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
     )
-    for k in 1:prob.N-1
-        g_dynamics[:,k] = x_ref[:,k+1] - sols[k].u[end][1:prob.nx]
+    for (k,sol) in enumerate(sols)
+        g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
     end
     return sols, g_dynamics
 end
@@ -121,8 +121,8 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref, u_ref, y_ref)
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
     )
-    for k in 1:prob.N-1
-        g_dynamics[:,k] = x_ref[:,k+1] - sols[k].u[end][1:prob.nx]
+    for (k,sol) in enumerate(sols)
+        g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
     end
     return sols, g_dynamics
 end

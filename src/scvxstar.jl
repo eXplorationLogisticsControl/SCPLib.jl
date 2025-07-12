@@ -153,8 +153,8 @@ function solve!(
     prob::ContinuousProblem,
     x_ref, u_ref, y_ref;
     maxiter::Int = 1,
-    tol_feas::Float64 = 1e-5,
-    tol_opt::Float64 = 1e-3,
+    tol_feas::Float64 = 1e-6,
+    tol_opt::Float64 = 1e-4,
     tol_J0::Real = -1e16,
     verbosity::Int = 1,
     store_iterates::Bool = true,
