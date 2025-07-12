@@ -164,6 +164,7 @@ mutable struct SCvxStarSolution
         y = prob.ny > 0 ? zeros(prob.ny) : nothing
         
         info = Dict(
+            :J0 => Float64[],
             :ΔJ => Float64[],
             :χ => Float64[],
             :w => Float64[],
@@ -278,6 +279,8 @@ function solve!(
             end
             g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
+        
+        # only update trust-region constraints
         elseif flag_trust_region
             if it > 1
                 delete_noncvx_referencs!(prob, [:constraint_trust_region_x_lb, :constraint_trust_region_x_ub])
@@ -292,7 +295,6 @@ function solve!(
         if termination_status(prob.model) == SLOW_PROGRESS
             @warn("CP termination status: $(termination_status(prob.model))")
         elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL]
-            #!= OPTIMAL || (termination_status(prob.model) != ALMOST_OPTIMAL)
             if verbosity > 0
                 @warn("Exiting as CP termination status: $(termination_status(prob.model))")
             end
@@ -345,6 +347,7 @@ function solve!(
         solution.y = _y
 
         if store_iterates
+            push!(solution.info[:J0], J0)
             push!(solution.info[:ΔJ], ΔJ)
             push!(solution.info[:χ], χ)
             push!(solution.info[:w], algo.w)
@@ -353,9 +356,11 @@ function solve!(
             solution.n_iter += 1
         end
 
-        if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
-            solution.status = :Optimal
-            break
+        if rho_i >= algo.rhos[1]
+            if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
+                solution.status = :Optimal
+                break
+            end
         end
         
         # check step acceptance
@@ -400,6 +405,7 @@ function solve!(
         @printf("   Status                   : %s\n", solution.status)
         @printf("   Iterations               : %d\n", solution.n_iter)
         @printf("   Total CPU time           : %1.2f sec\n", tcpu_end - tcpu_start)
+        @printf("   Objective                : %1.4e\n", solution.info[:J0][end])
         @printf("   Objective improvement ΔJ : %1.4e (tol: %1.4e)\n", solution.info[:ΔJ][end], tol_opt)
         @printf("   Max constraint violation : %1.4e (tol: %1.4e)\n", solution.info[:χ][end], tol_feas)
         println()
