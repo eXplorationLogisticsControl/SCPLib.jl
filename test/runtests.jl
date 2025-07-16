@@ -11,6 +11,8 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 @testset "SCvxStar" begin
     include("test_scvxstar_subproblem.jl")
-    include("test_scvxstar_dynamics_only.jl")
+    include("test_scvxstar_dynamics_userdefined.jl")
     include("test_scvxstar_h_noncvx.jl")
+
+    include("test_scvxstar_impulsive_dynamics_only.jl")
 end

@@ -82,23 +82,19 @@ end
 """
 Augmented Lagrangian penalty function
 """
-function penalty(algo::SCvxStar, prob::ContinuousProblem, ξ_dyn, ξ, ζ)
-    # dynamics violation
-    P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)
-
-    # append equality constraints terms
+function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn, ξ, ζ)
+    P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
     if prob.ng > 0
-        P += dot(algo.λ, ξ) + algo.w/2 * dot(ξ,ξ)
+        P += dot(algo.λ, ξ) + algo.w/2 * dot(ξ,ξ)                   # append equality constraints terms
     end
-
-    # append inequality constraints terms
     if prob.nh > 0
-        P += dot(algo.μ, ζ) + algo.w/2 * dot(ζ,ζ)
+        P += dot(algo.μ, ζ) + algo.w/2 * dot(ζ,ζ)                   # append inequality constraints terms
     end
     return P
 end
 
 
+"""Update trust-region size"""
 function update_trust_region!(algo::SCvxStar, rho_i::Float64)
     flag_trust_region = false
     if rho_i < algo.rhos[2]
@@ -112,12 +108,7 @@ function update_trust_region!(algo::SCvxStar, rho_i::Float64)
 end
 
 
-function set_trust_region_constraints!(
-    algo::SCvxStar,
-    prob::ContinuousProblem,
-    x_ref,
-    u_ref,
-)
+function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref)
     # define trust-region constraints
     @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
         -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.Δ * ones(prob.nx))
@@ -127,10 +118,7 @@ function set_trust_region_constraints!(
 end
 
 
-function solve_convex_subproblem!(
-    algo::SCvxStar,
-    prob::ContinuousProblem,
-)
+function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
     # set objective with penalty
     _y = prob.ny > 0 ? prob.model[:y] : nothing
     _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
@@ -157,10 +145,10 @@ mutable struct SCvxStarSolution
     n_iter::Int
     info::Dict
 
-    function SCvxStarSolution(prob::ContinuousProblem)
+    function SCvxStarSolution(prob::OptimalControlProblem, Nu::Int)
         status = :Solving
         x = zeros(prob.nx, prob.N)
-        u = zeros(prob.nu, prob.N-1)
+        u = zeros(prob.nu, Nu)
         y = prob.ny > 0 ? zeros(prob.ny) : nothing
         
         info = Dict(
@@ -176,16 +164,32 @@ mutable struct SCvxStarSolution
 end
 
 
-"""
-Set linearized non-convex constraints for scvx* algorithm
-"""
-function set_linearized_constraints!(prob::ContinuousProblem, x_ref, u_ref, y_ref)
-    # set dynamics constraints
+function set_linearized_dynamics_constraints!(prob::ContinuousProblem, x_ref, u_ref, y_ref)
     sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
-    set_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
+    set_continuous_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
     @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
         prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
     )
+    return g_dynamics_ref
+end
+
+
+function set_linearized_dynamics_constraints!(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
+    sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
+    set_impulsive_dynamics_cache!(prob.lincache, x_ref, u_ref, sols, prob.dfdu)
+    @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
+        prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
+    )
+    return g_dynamics_ref
+end
+
+
+"""
+Set linearized non-convex constraints for scvx* algorithm
+"""
+function set_linearized_constraints!(prob::OptimalControlProblem, x_ref, u_ref, y_ref)
+    # set dynamics constraints
+    g_dynamics_ref = set_linearized_dynamics_constraints!(prob, x_ref, u_ref, y_ref)
 
     # define stacked flattened variables difference
     if prob.ng > 0 || prob.nh > 0
@@ -224,7 +228,7 @@ Solve non-convex OCP with SCvx* algorithm
 
 # Arguments
 - `algo::SCvxStar`: algorithm struct
-- `prob::ContinuousProblem`: problem struct
+- `prob::OptimalControlProblem`: problem struct
 - `x_ref`: reference state history, size `nx`-by-`N`
 - `u_ref`: reference control history, size `nu`-by-`N-1`
 - `y_ref`: reference other variables, size `ny`
@@ -237,7 +241,7 @@ Solve non-convex OCP with SCvx* algorithm
 """
 function solve!(
     algo::SCvxStar,
-    prob::ContinuousProblem,
+    prob::OptimalControlProblem,
     x_ref, u_ref, y_ref;
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
@@ -264,7 +268,7 @@ function solve!(
     g_ref = prob.ng > 0 ? zeros(prob.ng) : nothing
     h_ref = prob.nh > 0 ? zeros(prob.nh) : nothing
 
-    solution = SCvxStarSolution(prob)
+    solution = SCvxStarSolution(prob, size(u_ref,2))
 
     header = "\nIter |      J0      |    ΔJ_i     |    ΔL_i     |     χ_i     |     ρ_i     |    r_i    |     w     |  acpt. |"
     if verbosity > 0

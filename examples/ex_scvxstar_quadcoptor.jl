@@ -62,17 +62,15 @@ function quadrotor_rhs!(dx, x, p, t)
     return
 end
 
-# function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
-#     quadrotor_rhs!(dx_aug, x_aug, p, t)
+function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
+    quadrotor_rhs!(dx_aug, x_aug, p, t)
 
-#     # derivatives of Phi_A, Phi_B
-#     A = quadrotor_dfdx(x_aug[1:6], p.u, p, t)
-#     B = quadrotor_dfdu(x_aug[1:6], p.u, p, t)
-#     dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-#     dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
-# end
-
-eom_aug! = SCPLib.get_continuous_augmented_eom(quadrotor_rhs!, params, nx)
+    # derivatives of Phi_A, Phi_B
+    A = quadrotor_dfdx(x_aug[1:6], p.u, p, t)
+    B = quadrotor_dfdu(x_aug[1:6], p.u, p, t)
+    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
+    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
+end
 
 # -------------------- define objective & non-convex constraints -------------------- #
 function objective(x, u, y)
@@ -109,7 +107,7 @@ prob = SCPLib.ContinuousProblem(
     y_ref;
     nh = nh,
     h_noncvx = h_noncvx,
-    #eom_aug! = quadroptor_rhs_aug!,
+    #eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
     ode_method = Tsit5(),
 )
 set_silent(prob.model)

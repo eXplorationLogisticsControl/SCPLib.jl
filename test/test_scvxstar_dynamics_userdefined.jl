@@ -1,4 +1,4 @@
-"""Test problem with non-convex dynamics only"""
+"""Test problem with non-convex dynamics only, user-defined eom_aug!"""
 
 using Clarabel
 using JuMP
@@ -18,7 +18,7 @@ mutable struct ControlParams
     end
 end
 
-function test_scvxstar_dynamics_only()
+function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
     μ = 1.215058560962404e-02
     DU = 389703     # km
     TU = 382981     # sec
@@ -160,7 +160,7 @@ function test_scvxstar_dynamics_only()
     algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity = 0, maxiter = 50)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity = verbosity, maxiter = 50)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
@@ -169,4 +169,4 @@ function test_scvxstar_dynamics_only()
 end
 
 
-test_scvxstar_dynamics_only()
+test_scvxstar_dynamics_userdefined(verbosity = 1)

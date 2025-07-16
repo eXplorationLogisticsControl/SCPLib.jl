@@ -15,6 +15,7 @@ include("dynamics.jl")
 
 include("linearization.jl")
 include("continuous_problem.jl")
+include("impulsive_problem.jl")
 
 include("scvxstar.jl")
 include("proxlinear.jl")

@@ -1,7 +1,7 @@
-"""Continuous SCP problem"""
+"""Impulsive SCP problem"""
 
 
-mutable struct ContinuousProblem <: OptimalControlProblem
+mutable struct ImpulsiveProblem <: OptimalControlProblem
     nx::Int
     nu::Int
     ny::Int
@@ -12,6 +12,7 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 
     eom!::Function
     eom_aug!::Function
+    dfdu::Function
     params
 
     times::Union{Vector,LinRange}
@@ -34,8 +35,8 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 end
 
 
-function Base.show(io::IO, prob::ContinuousProblem)
-    @printf("Continuous optimal control problem\n")
+function Base.show(io::IO, prob::ImpulsiveProblem)
+    @printf("Impulsive optimal control problem\n")
     @printf("  nx             : %d\n", prob.nx)
     @printf("  nu             : %d\n", prob.nu)
     @printf("  N              : %d\n", prob.N)
@@ -51,20 +52,19 @@ end
 """
 Initialize augmented state for continuous dynamics
 """
-function init_continuous_dynamics_xaug(x0::Vector, nx::Int, nu::Int)
-    return [x0;
-            reshape(I(nx), nx^2);
-            zeros(nx * nu)];
+function init_impulsive_dynamics_xaug(t0::Real, x0::Vector, u0::Vector, nx::Int, dfdu::Function)
+    return [x0 + dfdu(x0, u0, t0)*u0;
+            reshape(I(nx), nx^2)];
 end
 
 
-function get_trajectory(prob::ContinuousProblem, x_ref, u_ref, y_ref)
+function get_trajectory(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
         _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,i]
-        remake(ode_problem, u0=x_ref[:,i], tspan=(prob.times[i], prob.times[i+1]), p=_params)
+        remake(ode_problem, u0=x_ref[:,i] + prob.dfdu(x_ref[:,i], u_ref[:,i], prob.times[i]) * u_ref[:,i],
+            tspan=(prob.times[i], prob.times[i+1]), p=_params)
     end
     base_ode_problem = ODEProblem(
         prob.eom!,
@@ -88,18 +88,19 @@ function get_trajectory(prob::ContinuousProblem, x_ref, u_ref, y_ref)
 end
 
 
-function get_trajectory_augmented(prob::ContinuousProblem, x_ref, u_ref, y_ref)
+function get_trajectory_augmented(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
-        _x0_aug = init_continuous_dynamics_xaug(x_ref[:,i], prob.nx, prob.nu)
+        _x0_aug = init_impulsive_dynamics_xaug(prob.times[i], x_ref[:,i], u_ref[:,i], prob.nx, prob.dfdu)
+        # [x_ref[:,i] + [zeros(3); u_ref[:,i]]; reshape(I(prob.nx), prob.nx^2)]
         _params = deepcopy(prob.params)
         _params.u[:] = u_ref[:,i]
         remake(ode_problem, u0=_x0_aug, tspan=(prob.times[i], prob.times[i+1]), p=_params)
     end
     base_ode_problem = ODEProblem(
         prob.eom_aug!,
-        init_continuous_dynamics_xaug(x_ref[:,1], prob.nx, prob.nu),
+        [x_ref[:,1]; reshape(I(prob.nx), prob.nx^2)],
         [0.0, 1.0],   # place holder
         prob.params,
     )
@@ -120,9 +121,9 @@ end
 
 
 """
-Construct a continuous optimal control problem
+Construct an impulsive optimal control problem
 """
-function ContinuousProblem(
+function ImpulsiveProblem(
     optimizer,
     eom!::Function,
     params,
@@ -132,6 +133,7 @@ function ContinuousProblem(
     u_ref,
     y_ref = nothing;
     eom_aug! = nothing,
+    dfdu::Function = (x,u,t) -> [zeros(3,4); I(3) zeros(3,1)],
     ng::Int = 0,
     g_noncvx::Union{Function,Nothing} = nothing,
     ∇g_noncvx::Union{Function,Nothing} = nothing,
@@ -145,7 +147,8 @@ function ContinuousProblem(
 )
     # get problem size from initial guess
     N = length(times)
-    @assert size(x_ref,2) == size(u_ref,2) + 1 == N
+    Nu = size(u_ref,2)
+    @assert Nu in [N-1, N]
     nx, _ = size(x_ref)
     nu, _ = size(u_ref)
     ny = isnothing(y_ref) ? 0 : length(y_ref)
@@ -153,7 +156,7 @@ function ContinuousProblem(
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
         @warn "AD-based eom may be erroneous for now!"
-        eom_aug! = get_continuous_augmented_eom(eom!, params, nx)
+        eom_aug! = get_impulsive_augmented_eom(eom!, params, nx)
     end
 
     # initialize linearization cache
@@ -179,7 +182,7 @@ function ContinuousProblem(
     model_nl_references = [:constraint_dynamics,
                            :constraint_trust_region_x_lb,
                            :constraint_trust_region_x_ub]
-    prob = ContinuousProblem(
+    prob = ImpulsiveProblem(
         nx,
         nu,
         ny,
@@ -188,6 +191,7 @@ function ContinuousProblem(
         nh,
         eom!,
         eom_aug!,
+        dfdu,
         params,
         times,
         objective,
@@ -206,7 +210,7 @@ function ContinuousProblem(
 
     # poopulate JuMP with variables
     @variable(prob.model, x[i=1:nx, k=1:N])
-    @variable(prob.model, u[i=1:nu, k=1:N-1])
+    @variable(prob.model, u[i=1:nu, k=1:Nu])
     @variable(prob.model, ξ_dyn[i=1:nx, k=1:N-1])
 
     if ng > 0
@@ -222,23 +226,3 @@ function ContinuousProblem(
 end
 
 
-function stack_flatten_variables(prob, x, u, y)
-    Δz = [reshape(x, prob.nx * prob.N);
-          reshape(u, prob.nu * (prob.N-1))];
-    if prob.ny > 0
-        Δz = [Δz; y]
-    end
-    return Δz
-end
-
-
-function unpack_flattened_variables(prob, z)
-    x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
-    u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
-    if prob.ny > 0
-        y = z[prob.nx * prob.N + prob.nu * (prob.N-1) + 1:end]
-    else
-        y = nothing
-    end
-    return x, u, y
-end

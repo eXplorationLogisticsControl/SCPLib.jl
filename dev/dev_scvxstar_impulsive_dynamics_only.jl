@@ -1,4 +1,4 @@
-"""Dev for continuous problem"""
+"""Dev for impulsive problem"""
 
 using Clarabel
 using GLMakie
@@ -36,8 +36,6 @@ function eom!(drv, rv, p, t)
     drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
     drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
     drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
-    # append controls
-    drv[4:6] += p.u[1:3]
     return
 end
 
@@ -56,9 +54,6 @@ function eom_aug!(dx_aug, x_aug, p, t)
     dx_aug[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
     dx_aug[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
     dx_aug[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
-
-    # append controls
-    dx_aug[4:6] += p.u[1:3]
     
     # Jacobian derivatives
     G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
@@ -66,11 +61,9 @@ function eom_aug!(dx_aug, x_aug, p, t)
     Omega = [0 2 0; -2 0 0; 0 0 0]
     A = [zeros(3,3)                  I(3);
          G1 + G2 + diagm([1,1,0])    Omega]
-    B = [zeros(3,4); I(3) zeros(3,1)]
 
     # derivatives of Phi_A, Phi_B
     dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
 end
 
 
@@ -124,7 +117,7 @@ alphas = LinRange(0,1,N)
 for (i,alpha) in enumerate(alphas)
     x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
 end
-u_ref = zeros(nu, N-1)
+u_ref = zeros(nu, N)
 y_ref = nothing
 
 # plot initial guess
@@ -135,7 +128,7 @@ lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:
 # scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
 
 # instantiate problem object    
-prob = SCPLib.ContinuousProblem(
+prob = SCPLib.ImpulsiveProblem(
     Clarabel.Optimizer,
     eom!,
     params,
@@ -151,19 +144,22 @@ set_silent(prob.model)
 
 # append boundary conditions
 @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)
-@constraint(prob.model, constraint_final_rv,   prob.model[:x][:,end] == rvf)
+@constraint(prob.model, constraint_final_r,    prob.model[:x][1:3,end] == rvf[1:3])
+@constraint(prob.model, constraint_final_v,    prob.model[:x][4:6,end] + prob.model[:u][1:3,end] == rvf[4:6])
 
 # append constraints on control magnitude
-@constraint(prob.model, constraint_associate_control[k in 1:N-1],
+@constraint(prob.model, constraint_associate_control[k in 1:N],
     [prob.model[:u][4,k], prob.model[:u][1:3,k]...] in SecondOrderCone())
-@constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
+@constraint(prob.model, constraint_control_magnitude[k in 1:N],
     prob.model[:u][4,k] <= umax)
 
 # -------------------- instantiate algorithm -------------------- #
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
+tol_opt = 1e-6
+tol_feas = 1e-8
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
@@ -176,10 +172,10 @@ end
 
 # plot controls
 ax_u = Axis(fig[2,1]; xlabel="Time", ylabel="Control")
+stem!(ax_u, prob.times, solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
 for i in 1:3
-    stairs!(ax_u, prob.times[1:end-1], solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
+    stem!(ax_u, prob.times, solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
 end
-stairs!(ax_u, prob.times[1:end-1], solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
