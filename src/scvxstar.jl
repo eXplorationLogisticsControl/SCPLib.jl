@@ -398,7 +398,11 @@ function solve!(
         flag_trust_region = update_trust_region!(algo, rho_i)
 
         if it == maxiter
-            solution.status = :MaxIterReached
+            if χ <= tol_feas
+                solution.status = :Feasible
+            else
+                solution.status = :MaxIterReached
+            end
         end
     end
     tcpu_end = time()
