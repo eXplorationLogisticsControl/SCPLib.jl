@@ -409,9 +409,11 @@ function solve!(
         @printf("   Status                   : %s\n", solution.status)
         @printf("   Iterations               : %d\n", solution.n_iter)
         @printf("   Total CPU time           : %1.2f sec\n", tcpu_end - tcpu_start)
-        @printf("   Objective                : %1.4e\n", solution.info[:J0][end])
-        @printf("   Objective improvement ΔJ : %1.4e (tol: %1.4e)\n", solution.info[:ΔJ][end], tol_opt)
-        @printf("   Max constraint violation : %1.4e (tol: %1.4e)\n", solution.info[:χ][end], tol_feas)
+        if solution.n_iter > 0
+            @printf("   Objective                : %1.4e\n", solution.info[:J0][end])
+            @printf("   Objective improvement ΔJ : %1.4e (tol: %1.4e)\n", solution.info[:ΔJ][end], tol_opt)
+            @printf("   Max constraint violation : %1.4e (tol: %1.4e)\n", solution.info[:χ][end], tol_feas)
+        end
         println()
     end
     return solution
