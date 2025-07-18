@@ -118,7 +118,7 @@ set_silent(prob.model)
 @constraint(prob.model, constraint_initial_u, prob.model[:u][1:3,1] == -m * g)
 @constraint(prob.model, constraint_final_u, prob.model[:u][1:3,end] == -m * g)
 
-# append path constraints
+# append convex path constraints
 @constraint(prob.model, constraint_x, prob.model[:x][1,:] == 0)
 
 # append constraints on control magnitude
