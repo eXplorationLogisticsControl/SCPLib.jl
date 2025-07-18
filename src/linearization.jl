@@ -10,13 +10,13 @@ mutable struct LinearizedCache
     ∇g::Array{Float64, 2}
     ∇h::Array{Float64, 2}
 
-    function LinearizedCache(nx::Int, nu::Int, N::Int, ng::Int, nh::Int)
+    function LinearizedCache(nx::Int, nu::Int, N::Int, Nu::Int, ng::Int, nh::Int)
         return new(
             zeros(nx, nx, N-1),
             zeros(nx, nu, N-1),
             zeros(nx, N-1),
-            zeros(ng, nx*N + nu*(N-1)),
-            zeros(nh, nx*N + nu*(N-1)),
+            zeros(ng, nx*N + nu*Nu),
+            zeros(nh, nx*N + nu*Nu),
         )
     end
 end
