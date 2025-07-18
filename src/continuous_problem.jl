@@ -6,6 +6,7 @@ mutable struct ContinuousProblem <: OptimalControlProblem
     nu::Int
     ny::Int
     N::Int
+    Nu::Int
 
     ng::Int
     nh::Int
@@ -58,7 +59,7 @@ function init_continuous_dynamics_xaug(x0::Vector, nx::Int, nu::Int)
 end
 
 
-function get_trajectory(prob::ContinuousProblem, x_ref, u_ref, y_ref)
+function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
@@ -88,7 +89,7 @@ function get_trajectory(prob::ContinuousProblem, x_ref, u_ref, y_ref)
 end
 
 
-function get_trajectory_augmented(prob::ContinuousProblem, x_ref, u_ref, y_ref)
+function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
@@ -157,7 +158,7 @@ function ContinuousProblem(
     end
 
     # initialize linearization cache
-    lincache = LinearizedCache(nx, nu, N, ng, nh)
+    lincache = LinearizedCache(nx, nu, N, N-1, ng, nh)
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
@@ -184,6 +185,7 @@ function ContinuousProblem(
         nu,
         ny,
         N,
+        N-1,
         ng,
         nh,
         eom!,
@@ -222,7 +224,7 @@ function ContinuousProblem(
 end
 
 
-function stack_flatten_variables(prob, x, u, y)
+function stack_flatten_variables(prob::ContinuousProblem, x, u, y)
     Δz = [reshape(x, prob.nx * prob.N);
           reshape(u, prob.nu * (prob.N-1))];
     if prob.ny > 0
@@ -232,7 +234,7 @@ function stack_flatten_variables(prob, x, u, y)
 end
 
 
-function unpack_flattened_variables(prob, z)
+function unpack_flattened_variables(prob::ContinuousProblem, z)
     x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
     u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
     if prob.ny > 0

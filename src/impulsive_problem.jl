@@ -6,6 +6,7 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
     nu::Int
     ny::Int
     N::Int
+    Nu::Int
 
     ng::Int
     nh::Int
@@ -160,7 +161,7 @@ function ImpulsiveProblem(
     end
 
     # initialize linearization cache
-    lincache = LinearizedCache(nx, nu, N, ng, nh)
+    lincache = LinearizedCache(nx, nu, N, Nu, ng, nh)
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
@@ -178,15 +179,18 @@ function ImpulsiveProblem(
         end
     end
 
-    # construct problem
+    # non-convex JuMP references
     model_nl_references = [:constraint_dynamics,
                            :constraint_trust_region_x_lb,
                            :constraint_trust_region_x_ub]
+
+    # construct problem struct
     prob = ImpulsiveProblem(
         nx,
         nu,
         ny,
         N,
+        Nu,
         ng,
         nh,
         eom!,
@@ -223,6 +227,28 @@ function ImpulsiveProblem(
         push!(prob.model_nl_references, :constraint_h_noncvx)
     end
     return prob
+end
+
+
+function stack_flatten_variables(prob::ImpulsiveProblem, x, u, y)
+    Δz = [reshape(x, prob.nx * prob.N);
+          reshape(u, prob.nu * prob.Nu)];
+    if prob.ny > 0
+        Δz = [Δz; y]
+    end
+    return Δz
+end
+
+
+function unpack_flattened_variables(prob::ImpulsiveProblem, z)
+    x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
+    u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * prob.Nu], prob.nu, prob.Nu)
+    if prob.ny > 0
+        y = z[prob.nx * prob.N + prob.nu * prob.Nu + 1:end]
+    else
+        y = nothing
+    end
+    return x, u, y
 end
 
 
