@@ -162,14 +162,14 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
     algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity = verbosity, maxiter = 2)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity = verbosity, maxiter = 100)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
-    # @test maximum(abs.(g_dynamics_opt)) <= 1e-6
-    # @test solution.status == :Optimal
+    @test maximum(abs.(g_dynamics_opt)) <= 1e-6
+    @test solution.status == :Optimal
     return solution
 end
 
 
-test_scvxstar_dynamics_userdefined(verbosity = 2)
+test_scvxstar_dynamics_userdefined(verbosity = 0)
