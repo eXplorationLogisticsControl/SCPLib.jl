@@ -108,7 +108,7 @@ function update_trust_region!(algo::SCvxStar, rho_i::Float64)
 end
 
 
-function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref)
+function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     # define trust-region constraints
     @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
         -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.Δ * ones(prob.nx))
@@ -164,7 +164,15 @@ mutable struct SCvxStarSolution
 end
 
 
-function set_linearized_dynamics_constraints!(prob::ContinuousProblem, x_ref, u_ref, y_ref)
+function Base.show(io::IO, solution::SCvxStarSolution)
+    println(io, "SCvx* solution")
+    @printf("   Status                   : %s\n", solution.status)
+    @printf("   Iterations               : %d\n", solution.n_iter)
+    @printf("   Objective                : %1.4e\n", solution.info[:J0][end])
+end
+
+
+function set_linearized_dynamics_constraints!(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
     sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
     set_continuous_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
     @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
@@ -174,7 +182,7 @@ function set_linearized_dynamics_constraints!(prob::ContinuousProblem, x_ref, u_
 end
 
 
-function set_linearized_dynamics_constraints!(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
+function set_linearized_dynamics_constraints!(prob::ImpulsiveProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
     sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
     set_impulsive_dynamics_cache!(prob.lincache, x_ref, u_ref, sols, prob.dfdu)
     @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
@@ -187,7 +195,7 @@ end
 """
 Set linearized non-convex constraints for scvx* algorithm
 """
-function set_linearized_constraints!(prob::OptimalControlProblem, x_ref, u_ref, y_ref)
+function set_linearized_constraints!(prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
     # set dynamics constraints
     g_dynamics_ref = set_linearized_dynamics_constraints!(prob, x_ref, u_ref, y_ref)
 
@@ -274,8 +282,15 @@ function solve!(
     if verbosity > 0
         println(header)
     end
+    cpu_times = Dict(
+        :time_subproblem => 0.0,
+        :time_update_reference => 0.0,
+        :time_total => 0.0,
+    )
 
     for it in 1:maxiter
+        tcpu_start_iter = time()
+
         # re-set non-convex expression according to reference
         if flag_reference
             if it > 1
@@ -291,9 +306,12 @@ function solve!(
             end
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is not updated but trsut region size changed
         end
+        cpu_times[:time_update_reference] = time() - tcpu_start_iter
 
         # solve convex subproblem
+        tstart_cp = time()
         solve_convex_subproblem!(algo, prob)
+        cpu_times[:time_subproblem] = time() - tstart_cp
 
         # check termination status
         if termination_status(prob.model) == SLOW_PROGRESS
@@ -396,6 +414,16 @@ function solve!(
 
         # update trust-region 
         flag_trust_region = update_trust_region!(algo, rho_i)
+        cpu_times[:time_total] = time() - tcpu_start_iter
+
+        if verbosity >= 2
+            # extra information when verbosity >= 2
+            println()
+            @printf("       CPU time on iteration        : %1.2f sec\n", cpu_times[:time_total])
+            @printf("       CPU time on subproblem       : %1.2f sec\n", cpu_times[:time_subproblem])
+            @printf("       CPU time on update reference : %1.2f sec\n", cpu_times[:time_update_reference])
+            println()
+        end
 
         if it == maxiter
             if χ <= tol_feas
