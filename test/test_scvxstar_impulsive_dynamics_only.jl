@@ -146,7 +146,8 @@ function test_scvxstar_impulsive_dynamics_only()
         prob.model[:u][4,k] <= umax)
 
     # -------------------- instantiate algorithm -------------------- #
-    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
+    Δ0 = [0.05, 0.05, 0.05, 0.1, 0.1, 0.1]
+    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4, Δ0 = Δ0)
 
     # solve problem
     tol_opt = 1e-6
