@@ -12,7 +12,7 @@ end
 
 function solve!(
     algo::ProxLinear,
-    prob::ContinuousProblem,
+    prob::OptimalControlProblem,
     x_ref, u_ref, y_ref;
     maxiter::Int = 1,
 )
