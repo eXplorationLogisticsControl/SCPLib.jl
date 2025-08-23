@@ -10,10 +10,10 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
-mutable struct ControlParams
+mutable struct ControlParams_dynamics_ad
     μ::Float64
     u::Vector
-    function ControlParams(μ::Float64)
+    function ControlParams_dynamics_ad(μ::Float64)
         new(μ, zeros(4))
     end
 end
@@ -24,7 +24,7 @@ function test_scvxstar_dynamics_ad(;verbosity::Int = 0)
     TU = 382981     # sec
     MU = 500.0      # kg
     VU = DU/TU      # km/s
-    params = ControlParams(μ)
+    params = ControlParams_dynamics_ad(μ)
 
     function eom!(drv, rv, p, t)
         x, y, z = rv[1:3]
