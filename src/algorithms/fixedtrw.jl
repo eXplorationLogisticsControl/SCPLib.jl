@@ -3,19 +3,20 @@
 
 mutable struct FixedTRWSCP <: SCPAlgorithm
     # algorithm hyperparameters
-    Δ::Float64
+    tr::TrustRegions
     w::Float64
 
-    function FixedTRWSCP(Δ::Float64, w::Float64)
-        new(Δ, w)
+    function FixedTRWSCP(Δ::Union{Float64,Vector{Float64},Matrix{Float64}}, w::Float64)
+        tr = TrustRegions(Δ)
+        new(tr, w)
     end
 end
 
 
 function Base.show(io::IO, algo::FixedTRWSCP)
     println(io, "Fixed trust-region SCP algorithm")
-    @printf("   Trust-region size Δ                                : %1.2e\n", algo.Δ)
-    @printf("   Penalty weight w                                   : %1.2e\n", algo.w)
+    @printf("   Trust-region size Δ : %1.2e\n", algo.tr.Δ[1,1])
+    @printf("   Penalty weight w    : %1.2e\n", algo.w)
 end
 
 
@@ -53,9 +54,9 @@ end
 function set_trust_region_constraints!(algo::FixedTRWSCP, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     # define trust-region constraints
     @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
-        -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.Δ * ones(prob.nx))
+        -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
     @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
-          prob.model[:x][:,k] - x_ref[:,k]  <= algo.Δ * ones(prob.nx))
+          prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
     return
 end
 
@@ -134,7 +135,7 @@ function solve!(
     if verbosity > 0
         println()
         @printf(" Solving OCP with Fixed Trust-Region & Weight SCP Algorithm (`・ω・´)\n\n")
-        @printf("   Trust-region size Δ            : % 1.2e\n", algo.Δ)
+        @printf("   Trust-region size Δ            : % 1.2e\n", algo.tr.Δ[1,1])
         @printf("   Penalty weight w               : % 1.2e\n", algo.w)
         @printf("   Feasibility tolerance tol_feas : % 1.2e\n", tol_feas)
         @printf("   Optimality tolerance tol_opt   : % 1.2e\n", tol_opt)

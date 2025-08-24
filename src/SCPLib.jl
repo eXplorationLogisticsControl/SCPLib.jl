@@ -17,6 +17,7 @@ include("linearization.jl")
 include("continuous_problem.jl")
 include("impulsive_problem.jl")
 include("constraints.jl")
+include("trust_region.jl")
 
 include("algorithms/scvxstar.jl")
 include("algorithms/fixedtrw.jl")

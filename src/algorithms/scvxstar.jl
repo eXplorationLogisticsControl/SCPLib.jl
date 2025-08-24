@@ -20,7 +20,7 @@ SCvx* algorithm
 """
 mutable struct SCvxStar <: SCPAlgorithm
     # storage
-    Δ::Float64
+    tr::TrustRegions
     w::Float64
     λ_dyn::Matrix
     λ::Vector
@@ -39,7 +39,7 @@ mutable struct SCvxStar <: SCPAlgorithm
         N::Int;
         ng::Int = 0,
         nh::Int = 0,
-        Δ0::Float64 = 0.05,
+        Δ0::Union{Float64,Vector{Float64},Matrix{Float64}} = 0.05,
         w0::Float64 = 1e2,
         rhos::Tuple{Real,Real,Real} = (0.0, 0.25, 0.7),
         alphas::Tuple{Real,Real} = (2.0, 3.0),
@@ -51,8 +51,9 @@ mutable struct SCvxStar <: SCPAlgorithm
         λ_dyn = zeros(nx, N-1)
         λ = zeros(ng)
         μ = zeros(nh)
+        tr = TrustRegions(nx, N, Δ0)
         new(
-            Δ0,
+            tr,
             w0,
             λ_dyn,
             λ,
@@ -70,7 +71,7 @@ end
 
 function Base.show(io::IO, algo::SCvxStar)
     println(io, "SCvx* algorithm")
-    @printf("   Trust-region size Δ                                : %1.2e\n", algo.Δ)
+    @printf("   Trust-region size Δ                                : %1.2e\n", algo.tr.Δ[1,1])
     @printf("   Penalty weight w                                   : %1.2e\n", algo.w)
     @printf("   Penalty weight update factor β                     : %1.2e\n", algo.beta)
     @printf("   Maximum penalty weight w_max                       : %1.2e\n", algo.w_max)
@@ -98,10 +99,10 @@ end
 function update_trust_region!(algo::SCvxStar, rho_i::Float64)
     flag_trust_region = false
     if rho_i < algo.rhos[2]
-        algo.Δ = max(algo.Δ / algo.alphas[1], algo.Δ_bounds[1])
+        algo.tr.Δ = max.(algo.tr.Δ / algo.alphas[1], algo.Δ_bounds[1])
         flag_trust_region = true
     elseif rho_i >= algo.rhos[3]
-        algo.Δ = min(algo.Δ * algo.alphas[2], algo.Δ_bounds[2])
+        algo.tr.Δ = min.(algo.tr.Δ * algo.alphas[2], algo.Δ_bounds[2])
         flag_trust_region = true
     end
     return flag_trust_region
@@ -111,9 +112,9 @@ end
 function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     # define trust-region constraints
     @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
-        -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.Δ * ones(prob.nx))
+        -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
     @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
-          prob.model[:x][:,k] - x_ref[:,k]  <= algo.Δ * ones(prob.nx))
+          prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
     return
 end
 
@@ -156,7 +157,7 @@ mutable struct SCvxStarSolution
             :ΔJ => Float64[],
             :χ => Float64[],
             :w => Float64[],
-            :Δ => Float64[],
+            :Δ => Matrix{Float64}[],
             :accept => Bool[],
         )
         new(status, x, u, y, 0, info)
@@ -309,7 +310,7 @@ function solve!(
                 println(header)
             end
             @printf(" %3.0f | % 1.5e | % 1.4e | % 1.4e | % 1.4e | % 1.4e | % 1.2e | % 1.2e |  %s   |\n",
-                    it, J0, ΔJ, ΔL, χ, rho_i, algo.Δ, algo.w,
+                    it, J0, ΔJ, ΔL, χ, rho_i, algo.tr.Δ[1,1], algo.w,
                     message_accept_step(rho_i >= algo.rhos[1]))
         end
 
@@ -323,7 +324,7 @@ function solve!(
             push!(solution.info[:ΔJ], ΔJ)
             push!(solution.info[:χ], χ)
             push!(solution.info[:w], algo.w)
-            push!(solution.info[:Δ], algo.Δ)
+            push!(solution.info[:Δ], algo.tr.Δ)
             push!(solution.info[:accept], rho_i >= algo.rhos[1])
             solution.n_iter += 1
         end
