@@ -33,6 +33,7 @@ mutable struct SCvxStar <: SCPAlgorithm
     gamma::Float64
     beta::Float64
     w_max::Float64
+    l1_penalty::Bool
 
     function SCvxStar(
         nx::Int,
@@ -47,6 +48,7 @@ mutable struct SCvxStar <: SCPAlgorithm
         gamma::Float64 = 0.9,
         beta::Float64 = 2.0,
         w_max::Float64 = 1e16,
+        l1_penalty::Bool = false,
     )
         λ_dyn = zeros(nx, N-1)
         λ = zeros(ng)
@@ -64,6 +66,7 @@ mutable struct SCvxStar <: SCPAlgorithm
             gamma,
             beta,
             w_max,
+            l1_penalty,
         )
     end
 end
@@ -74,6 +77,7 @@ function Base.show(io::IO, algo::SCvxStar)
     @printf("   Trust-region size Δ                                : %1.2e\n", algo.tr.Δ[1,1])
     @printf("   Penalty weight w                                   : %1.2e\n", algo.w)
     @printf("   Penalty weight update factor β                     : %1.2e\n", algo.beta)
+    @printf("   Use L1 penalty                                     : %s\n", algo.l1_penalty ? "Yes" : "No")
     @printf("   Maximum penalty weight w_max                       : %1.2e\n", algo.w_max)
     @printf("   Trust-region acceptance thresholds (ρ_1, ρ_2, ρ_3) : %1.2e, %1.2e, %1.2e\n", algo.rhos[1], algo.rhos[2], algo.rhos[3])
     @printf("   Trust-region size update factors (α_1, α_2)        : %1.2e, %1.2e\n", algo.alphas[1], algo.alphas[2])
@@ -83,13 +87,46 @@ end
 """
 Augmented Lagrangian penalty function
 """
-function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn, ξ, ζ)
+function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Float64}, ξ, ζ)
     P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
     if prob.ng > 0
         P += dot(algo.λ, ξ) + algo.w/2 * dot(ξ,ξ)                   # append equality constraints terms
     end
     if prob.nh > 0
         P += dot(algo.μ, ζ) + algo.w/2 * dot(ζ,ζ)                   # append inequality constraints terms
+    end
+
+    if algo.l1_penalty
+        P += sqrt(algo.w) * norm(ξ_dyn,1)
+        if prob.ng > 0
+            P += sqrt(algo.w) * norm(ξ,1)
+        end
+        if prob.nh > 0
+            P += sqrt(algo.w) * norm(ζ,1)
+        end
+    end
+    return P
+end
+
+
+function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slack_L1)
+    P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
+    if prob.ng > 0
+        P += dot(algo.λ, ξ) + algo.w/2 * dot(ξ,ξ)                   # append equality constraints terms
+    end
+    if prob.nh > 0
+        P += dot(algo.μ, ζ) + algo.w/2 * dot(ζ,ζ)                   # append inequality constraints terms
+    end
+
+    if algo.l1_penalty
+        P += sqrt(algo.w) * sum(slack_L1)
+        @constraint(prob.model, [slack_L1[1]; vec(ξ_dyn)] in MOI.NormOneCone(1 + prod(size(ξ_dyn))))
+        if prob.ng > 0
+            @constraint(prob.model, [slack_L1[1+prob.ng]; ξ] in MOI.NormOneCone(1 + length(ξ)))
+        end
+        if prob.nh > 0
+            @constraint(prob.model, [slack_L1[1+prob.ng+prob.nh]; ζ] in MOI.NormOneCone(1 + length(ζ)))
+        end
     end
     return P
 end
@@ -125,8 +162,15 @@ function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
     _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
     _ζ = prob.nh > 0 ? prob.model[:ζ] : nothing
 
+    # append slack variable for l1 penalty term
+    if algo.l1_penalty
+        slack_L1 = @variable(prob.model, [1:1+prob.ng+prob.nh])  # anonymous construction of variable
+    else
+        slack_L1 = nothing
+    end
+
     J = prob.objective(prob.model[:x], prob.model[:u], _y)
-    P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ)
+    P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ, slack_L1)
     @objective(prob.model, Min, J + P)
 
     # solve convex subproblem
