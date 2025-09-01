@@ -109,7 +109,7 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Flo
 end
 
 
-function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slack_L1)
+function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1)
     P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
     if prob.ng > 0
         P += dot(algo.λ, ξ) + algo.w/2 * dot(ξ,ξ)                   # append equality constraints terms
@@ -119,13 +119,15 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Var
     end
 
     if algo.l1_penalty
-        P += sqrt(algo.w) * sum(slack_L1)
-        @constraint(prob.model, [slack_L1[1]; vec(ξ_dyn)] in MOI.NormOneCone(1 + prod(size(ξ_dyn))))
+        P += sqrt(algo.w) * sum(slacks_L1[:slack_gdyn])
+        @constraint(prob.model, [slacks_L1[:slack_gdyn]; vec(ξ_dyn)] in MOI.NormOneCone(1 + prod(size(ξ_dyn))))
         if prob.ng > 0
-            @constraint(prob.model, [slack_L1[1+prob.ng]; ξ] in MOI.NormOneCone(1 + length(ξ)))
+            P += sqrt(algo.w) * sum(slacks_L1[:slack_gnoncvx])
+            @constraint(prob.model, [slacks_L1[:slack_gnoncvx]; ξ] in MOI.NormOneCone(1 + length(ξ)))
         end
         if prob.nh > 0
-            @constraint(prob.model, [slack_L1[1+prob.ng+prob.nh]; ζ] in MOI.NormOneCone(1 + length(ζ)))
+            P += sqrt(algo.w) * sum(slacks_L1[:slack_hnoncvx])
+            @constraint(prob.model, [slacks_L1[:slack_hnoncvx]; ζ] in MOI.NormOneCone(1 + length(ζ)))
         end
     end
     return P
@@ -164,13 +166,18 @@ function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
 
     # append slack variable for l1 penalty term
     if algo.l1_penalty
-        slack_L1 = @variable(prob.model, [1:1+prob.ng+prob.nh])  # anonymous construction of variable
+        slacks_L1 = Dict(
+            :slack_gdyn => @variable(prob.model),
+            :slack_gnoncvx => prob.ng > 0 ? @variable(prob.model) : nothing,
+            :slack_hnoncvx => prob.nh > 0 ? @variable(prob.model) : nothing,
+        )
+        #@variable(prob.model, [1:1+prob.ng+prob.nh])  # anonymous construction of variable
     else
-        slack_L1 = nothing
+        slacks_L1 = nothing
     end
 
     J = prob.objective(prob.model[:x], prob.model[:u], _y)
-    P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ, slack_L1)
+    P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ, slacks_L1)
     @objective(prob.model, Min, J + P)
 
     # solve convex subproblem
