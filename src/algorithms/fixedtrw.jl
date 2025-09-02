@@ -6,8 +6,8 @@ mutable struct FixedTRWSCP <: SCPAlgorithm
     tr::TrustRegions
     w::Float64
 
-    function FixedTRWSCP(Δ::Union{Float64,Vector{Float64},Matrix{Float64}}, w::Float64)
-        tr = TrustRegions(Δ)
+    function FixedTRWSCP(nx::Int, N::Int, Δ::Union{Float64,Vector{Float64},Matrix{Float64}}, w::Float64)
+        tr = TrustRegions(nx, N, Δ)
         new(tr, w)
     end
 end

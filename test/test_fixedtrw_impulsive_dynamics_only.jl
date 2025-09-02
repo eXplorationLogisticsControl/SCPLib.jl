@@ -147,7 +147,7 @@ function test_scvxstar_impulsive_dynamics_only(;get_plot::Bool = false)
 
     # -------------------- instantiate algorithm -------------------- #
     # algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
-    algo = SCPLib.FixedTRWSCP(0.05, 1e10)
+    algo = SCPLib.FixedTRWSCP(nx, N, 0.05, 1e10)
 
     # solve problem
     tol_opt = 1e-6
@@ -178,4 +178,4 @@ function test_scvxstar_impulsive_dynamics_only(;get_plot::Bool = false)
 end
 
 
-test_scvxstar_impulsive_dynamics_only(;get_plot = true)
+test_scvxstar_impulsive_dynamics_only(;get_plot = get_plot)

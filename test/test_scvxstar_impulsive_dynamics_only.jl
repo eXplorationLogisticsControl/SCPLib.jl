@@ -18,7 +18,7 @@ mutable struct ControlParams_impulsive_dynamics_only
     end
 end
 
-function test_scvxstar_impulsive_dynamics_only()
+function test_scvxstar_impulsive_dynamics_only(;get_plot::Bool = false)
     μ = 1.215058560962404e-02
     DU = 389703     # km
     TU = 382981     # sec
@@ -147,7 +147,7 @@ function test_scvxstar_impulsive_dynamics_only()
 
     # -------------------- instantiate algorithm -------------------- #
     Δ0 = [0.05, 0.05, 0.05, 0.1, 0.1, 0.1]
-    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4, Δ0 = Δ0)
+    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4, Δ0 = Δ0, l1_penalty = true)
 
     # solve problem
     tol_opt = 1e-6
@@ -158,6 +158,23 @@ function test_scvxstar_impulsive_dynamics_only()
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
+
+    # -------------------- plot -------------------- #
+    if get_plot
+        fig = Figure(size=(800, 500))
+        ax3d = Axis3(fig[1,1]; aspect=:equal, xlabel="x", ylabel="y", zlabel="z")
+        for (isol, _sol) in enumerate(sols_opt)
+            lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
+            scatter!(ax3d, Array(_sol)[1,1], Array(_sol)[2,1], Array(_sol)[3,1], color=:black)
+            scatter!(ax3d, Array(_sol)[1,end], Array(_sol)[2,end], Array(_sol)[3,end], color=:black)
+        end
+        lines!(ax3d, Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
+        lines!(ax3d, Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
+        
+        axu = Axis(fig[1,2], xlabel="Time", ylabel="Control magnitude")
+        stem!(axu, times, solution.u[4,:], color=:black)
+        display(fig)
+    end
 end
 
-test_scvxstar_impulsive_dynamics_only()
+test_scvxstar_impulsive_dynamics_only(get_plot=get_plot)

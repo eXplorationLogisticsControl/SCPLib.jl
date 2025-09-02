@@ -9,6 +9,8 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 #     include("test_ad_dynamics.jl")
 # end
 
+get_plot = false
+
 @testset "SCvxStar" begin
     include("test_scvxstar_subproblem.jl")
     include("test_scvxstar_dynamics_userdefined.jl")
