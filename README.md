@@ -1,5 +1,7 @@
 # `SCPLib.jl`: Sequential Convex Programming library
 
+![test-scocp workflow](https://github.com/Yuricst/SCPLib.jl/actions/workflows/test.yml/badge.svg)
+
 We are interested in solving the discretized non-convex optimal control problem (OCP)
 
 ```math
