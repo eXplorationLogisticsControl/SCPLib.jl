@@ -32,6 +32,9 @@ mutable struct ContinuousProblem <: OptimalControlProblem
     ode_method
     ode_reltol
     ode_abstol
+
+    fun_get_trajectory::Union{Function,Nothing}
+    set_dynamics_cache!::Union{Function,Nothing}
 end
 
 
@@ -89,6 +92,11 @@ function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u
 end
 
 
+"""
+Propagate augmented dynamics with continuous control
+This function also constructs state-transition matrices and 
+evaluates dynamics residuals.
+"""
 function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
@@ -143,6 +151,8 @@ function ContinuousProblem(
     ode_method = Tsit5(),
     ode_reltol = 1e-12,
     ode_abstol = 1e-12,
+    fun_get_trajectory::Union{Function,Nothing} = nothing,
+    set_dynamics_cache!::Union{Function,Nothing} = nothing,
 )
     # get problem size from initial guess
     N = length(times)
@@ -204,6 +214,8 @@ function ContinuousProblem(
         ode_method,
         ode_reltol,
         ode_abstol,
+        fun_get_trajectory,
+        set_dynamics_cache!,
     )
 
     # poopulate JuMP with variables

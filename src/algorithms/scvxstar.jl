@@ -334,7 +334,11 @@ function solve!(
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
 
         # evaluate nonlinear constraints
-        _, g_dynamics = get_trajectory(prob, _x, _u, _y)
+        if isnothing(prob.fun_get_trajectory)
+            _, g_dynamics = get_trajectory(prob, _x, _u, _y)
+        else
+            _, g_dynamics = prob.fun_get_trajectory(prob, _x, _u, _y)
+        end
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u, _y) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u, _y), 0) : nothing
 
