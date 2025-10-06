@@ -1,6 +1,5 @@
 """Run tests"""
 
-
 using Test
 
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
