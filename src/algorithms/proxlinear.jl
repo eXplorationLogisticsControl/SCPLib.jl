@@ -32,36 +32,6 @@ function Base.show(io::IO, algo::ProxLinear)
 end
 
 
-"""
-Solution struct for prox-linear algorithm
-"""
-mutable struct ProxLinearSolution <: SCPSolution
-    status::Symbol
-    x::Matrix
-    u::Matrix
-    y::Union{Nothing,Matrix}
-    n_iter::Int
-    info::Dict
-
-    function ProxLinearSolution(prob::OptimalControlProblem, Nu::Int)
-        status = :Solving
-        x = zeros(prob.nx, prob.N)
-        u = zeros(prob.nu, Nu)
-        y = prob.ny > 0 ? zeros(prob.ny) : nothing
-        
-        info = Dict(
-            :J0 => Float64[],
-            :ΔJ => Float64[],
-            :χ => Float64[],
-            :w => Float64[],
-            :Δ => Matrix{Float64}[],
-            :accept => Bool[],
-        )
-        new(status, x, u, y, 0, info)
-    end
-end
-
-
 function solve_convex_subproblem!(
     algo::ProxLinear, prob::OptimalControlProblem,
     x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing}
@@ -110,6 +80,52 @@ function solve_convex_subproblem!(
 end
 
 
+"""
+Solution struct for prox-linear algorithm
+"""
+mutable struct ProxLinearSolution <: SCPSolution
+    status::Symbol
+    x::Matrix
+    u::Matrix
+    y::Union{Nothing,Matrix}
+    n_iter::Int
+    info::Dict
+
+    function ProxLinearSolution(prob::OptimalControlProblem, Nu::Int)
+        status = :Solving
+        x = zeros(prob.nx, prob.N)
+        u = zeros(prob.nu, Nu)
+        y = prob.ny > 0 ? zeros(prob.ny) : nothing
+        
+        info = Dict(
+            :J0 => Float64[],
+            :ΔJ => Float64[],
+            :χ => Float64[],
+            :w => Float64[],
+            :Δ => Matrix{Float64}[],
+            :accept => Bool[],
+        )
+        new(status, x, u, y, 0, info)
+    end
+end
+
+
+"""
+Solve non-convex OCP with prox-linear algorithm
+
+# Arguments
+- `algo::ProxLinear`: algorithm struct
+- `prob::OptimalControlProblem`: problem struct
+- `x_ref`: reference state history, size `nx`-by-`N`
+- `u_ref`: reference control history, size `nu`-by-`N-1`
+- `y_ref`: reference other variables, size `ny`
+- `maxiter::Int`: maximum number of iterations
+- `tol_feas::Float64`: feasibility tolerance
+- `tol_opt::Float64`: optimality tolerance
+- `tol_J0::Real`: objective tolerance
+- `verbosity::Int`: verbosity level
+- `store_iterates::Bool`: whether to store iterates
+"""
 function solve!(
     algo::ProxLinear,
     prob::OptimalControlProblem,
