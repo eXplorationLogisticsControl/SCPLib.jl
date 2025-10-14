@@ -9,6 +9,7 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 #     include("test_ad_dynamics.jl")
 # end
 
+verbosity = 0
 get_plot = false
 
 @testset "SCvxStar" begin
@@ -17,4 +18,8 @@ get_plot = false
     include("test_scvxstar_h_noncvx.jl")
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
+end
+
+@testset "ProxLinear" begin
+    include("test_proxlinear_dynamics_only.jl")
 end
