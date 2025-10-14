@@ -6,15 +6,18 @@ mutable struct ProxLinear <: SCPAlgorithm
     w_ep::Float64           # non-convex linearization weight
     w_prox::Float64         # proximal term weight
     proximal_u::Bool
+    proximal_y::Bool
 
     function ProxLinear(
         w_ep::Float64,
         w_prox::Float64;
         proximal_u::Bool = false,
+        proximal_y::Bool = false,
     )
         new(
             w_ep, w_prox,
             proximal_u,
+            proximal_y,
         )
     end
 end
@@ -25,6 +28,7 @@ function Base.show(io::IO, algo::ProxLinear)
     @printf("   L1 penalization weight w_ep      : %1.4e\n", algo.w_ep)
     @printf("   Proximal term weight w_prox      : %1.4e\n", algo.w_prox)
     @printf("   Enforce proximal constraint on u : %s\n", algo.proximal_u ? "Yes" : "No")
+    @printf("   Enforce proximal constraint on y : %s\n", algo.proximal_y ? "Yes" : "No")
 end
 
 
@@ -66,26 +70,34 @@ function solve_convex_subproblem!(
     _y = prob.ny > 0 ? prob.model[:y] : nothing
 
     # prepare slack for proximal term
+    Δvars = [
+        reshape(prob.model[:x] - x_ref, prod(size(prob.model[:x])));
+    ]
     if algo.proximal_u
-        Δvars = [
-            reshape(prob.model[:x] - x_ref, prod(size(prob.model[:x])));
-            reshape(prob.model[:u] - u_ref, prod(size(prob.model[:u])));
-        ]
-    else
-        Δvars = [
-            reshape(prob.model[:x] - x_ref, prod(size(prob.model[:x])));
-        ]
+        append!(Δvars, reshape(prob.model[:u] - u_ref, prod(size(prob.model[:u]))))
+    end
+    if algo.proximal_y && !isnothing(_y)
+        append!(Δvars, reshape(prob.model[:y] - y_ref, prod(size(prob.model[:y]))))
     end
     ϵ_proximal = @variable(prob.model)
     @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
 
     # L1 penalty on non-convex constraints
-    ng_dyn = prod(size(prob.model[:ξ_dyn]))
+    ng_noncvx = prod(size(prob.model[:ξ_dyn]))
     ϵ_dynamics = @variable(prob.model)
+    _g_noncvx = vec(prob.model[:ξ_dyn])
+    if prob.ng > 0
+        append!(_g_noncvx, vec(prob.model[:ξ]))
+        ng_noncvx += prod(size(prob.model[:ξ]))
+    end
+    if prob.nh > 0
+        append!(_g_noncvx, vec(prob.model[:ζ]))
+        ng_noncvx += prod(size(prob.model[:ζ]))
+    end
     @constraint(prob.model, ϵ_dynamics >= 0)
     @constraint(prob.model,
-        [ϵ_dynamics; vec(prob.model[:ξ_dyn])]
-        in MOI.NormOneCone(1 + ng_dyn)
+        [ϵ_dynamics; _g_noncvx]
+        in MOI.NormOneCone(1 + ng_noncvx)
     )
 
     # combine into objective function
@@ -141,13 +153,16 @@ function solve!(
         :time_total => 0.0,
     )
 
+    # remove constraint_trust_region_x_lb and constraint_trust_region_x_ub
+    filter!(e->e≠:constraint_trust_region_x_lb, prob.model_nl_references)
+    filter!(e->e≠:constraint_trust_region_x_ub, prob.model_nl_references)
+
     for it in 1:maxiter
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference
         if flag_reference
             if it > 1
-                # delete_noncvx_referencs!(prob, prob.model_nl_references)
-                delete_noncvx_referencs!(prob, [:constraint_dynamics,])
+                delete_noncvx_referencs!(prob, prob.model_nl_references)
             end
             g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
         end
@@ -200,16 +215,16 @@ function solve!(
                     "yes") #message_accept_step(rho_i >= algo.rhos[1]))
         end
 
+        # update current solution
+        solution.x[:,:] = _x
+        solution.u[:,:] = _u
+        solution.y = _y
+
         # check for convergence
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
             break
         end
-
-        # update current solution
-        solution.x[:,:] = _x
-        solution.u[:,:] = _u
-        solution.y = _y
 
         if store_iterates
             push!(solution.info[:J0], J0)
