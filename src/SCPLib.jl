@@ -9,6 +9,7 @@ using SparseDiffTools
 
 abstract type OptimalControlProblem end
 abstract type SCPAlgorithm end
+abstract type SCPSolution end
 
 include("utils.jl")
 include("dynamics.jl")
@@ -24,10 +25,16 @@ include("algorithms/fixedtrw.jl")
 include("algorithms/proxlinear.jl")
 
 export get_continuous_augmented_eom
+export get_impulsive_augmented_eom
 
 export ContinuousProblem
+export ImpulsiveProblem
 export get_trajectory, get_trajectory_augmented
+export stack_flatten_variables, unpack_flattened_variables
 
-export SCvxStarSolution, solve_convex_subproblem!, solve!
+export SCvxStar, SCvxStarSolution
+export FixedTRWSCP, FixedTRWSCPSolution
+export ProxLinear, ProxLinearSolution
+export solve_convex_subproblem!, solve!
 
 end # module SCPLib
