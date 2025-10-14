@@ -139,7 +139,7 @@ function test_scvxstar_h_noncvx()
     algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0)   # don't forget to pass `nh` to the algorithm as well!
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity=0, tol_opt = 1e-6, tol_feas = 1e-6)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity=1, tol_opt = 1e-6, tol_feas = 1e-6)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
