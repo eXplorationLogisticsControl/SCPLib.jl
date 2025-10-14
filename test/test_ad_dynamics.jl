@@ -7,7 +7,9 @@ using SparseDiffTools
 using ForwardDiff
 using Test
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+if !@isdefined SCPLib
+    include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
 
 
 mutable struct ControlParams
