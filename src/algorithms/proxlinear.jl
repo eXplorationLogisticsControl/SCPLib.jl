@@ -26,8 +26,8 @@ mutable struct ProxLinear <: SCPAlgorithm
     proximal_y::Bool
 
     function ProxLinear(
-        w_ep::Float64,
-        w_prox::Float64;
+        w_ep::Float64 = 1e2,
+        w_prox::Float64 = 1e0;
         proximal_u::Bool = false,
         proximal_y::Bool = false,
     )
