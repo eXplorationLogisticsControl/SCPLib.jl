@@ -177,7 +177,7 @@ ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
 scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
 
 ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
-scatterlines!(ax_Δ, 1:length(solution.info[:accept]), solution.info[:Δ], color=colors_accept, marker=:circle, markersize=7)
+scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
 display(fig)
 println("Done!")
