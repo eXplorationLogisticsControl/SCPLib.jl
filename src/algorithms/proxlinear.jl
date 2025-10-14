@@ -1,6 +1,23 @@
 """Prox-linear algorithm"""
 
 
+"""
+Prox-linear algorithm
+
+The weights are defined such that the penalized objective of the subproblems are:
+
+```math
+L(Z) + w_ep * ||G(Z) + ∇G(Z_ref)*(Z - Z_ref)||_1 + w_prox/2 * ||Z - Z_ref||_2^2
+```
+
+where `L(Z)` is the original objective function, `G(Z)` are the non-convex constraints.
+
+# Arguments
+- `w_ep::Float64`: non-convex linearization weight
+- `w_prox::Float64`: proximal term weight
+- `proximal_u::Bool`: whether to enforce proximal constraint on u
+- `proximal_y::Bool`: whether to enforce proximal constraint on y
+"""
 mutable struct ProxLinear <: SCPAlgorithm
     # hyperparameters
     w_ep::Float64           # non-convex linearization weight
