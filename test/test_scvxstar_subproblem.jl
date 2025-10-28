@@ -5,7 +5,9 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+if !@isdefined SCPLib
+    include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
 
 
 # -------------------- setup problem -------------------- #
@@ -19,7 +21,7 @@ mutable struct ControlParams
 end
 
 
-function test_convex_subproblem()
+function test_convex_subproblem(;verbosity::Int = 0)
     
     μ = 1.215058560962404e-02
     params = ControlParams(μ)
@@ -132,7 +134,9 @@ function test_convex_subproblem()
         y_ref;
         eom_aug! = eom_aug!,
     )
-    set_silent(prob.model)
+    if verbosity == 0
+        set_silent(prob.model)
+    end
 
     # append boundary conditions
     @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)
@@ -158,4 +162,4 @@ function test_convex_subproblem()
     @test termination_status(prob.model) == OPTIMAL
 end
 
-test_convex_subproblem()
+test_convex_subproblem(verbosity = verbosity)

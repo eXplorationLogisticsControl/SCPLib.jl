@@ -61,7 +61,7 @@ function set_trust_region_constraints!(algo::FixedTRWSCP, prob::OptimalControlPr
 end
 
 
-mutable struct FixedTRWSCPSolution
+mutable struct FixedTRWSCPSolution <: SCPSolution
     status::Symbol
     x::Matrix
     u::Matrix
