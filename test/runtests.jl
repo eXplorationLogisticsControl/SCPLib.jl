@@ -20,6 +20,11 @@ get_plot = false
     include("test_scvxstar_custom_propagate_func.jl")
 end
 
+@testset "Biased control" begin
+    include("test_scvxstar_impulsive_u_bias.jl")
+    include("test_scvxstar_continuous_u_bias.jl")
+end
+
 @testset "ProxLinear" begin
     include("test_proxlinear_dynamics_only.jl")
 end

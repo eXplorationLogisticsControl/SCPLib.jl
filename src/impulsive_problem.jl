@@ -36,6 +36,8 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
 
     fun_get_trajectory::Union{Function,Nothing}
     set_dynamics_cache!::Union{Function,Nothing}
+
+    u_bias::Matrix
 end
 
 
@@ -67,7 +69,7 @@ function get_trajectory(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
         _params = deepcopy(prob.params)
-        remake(ode_problem, u0=x_ref[:,i] + prob.dfdu(x_ref[:,i], u_ref[:,i], prob.times[i]) * u_ref[:,i],
+        remake(ode_problem, u0=x_ref[:,i] + prob.dfdu(x_ref[:,i], u_ref[:,i], prob.times[i]) * (u_ref[:,i] + prob.u_bias[:,i]),
             tspan=(prob.times[i], prob.times[i+1]), p=_params)
     end
     base_ode_problem = ODEProblem(
@@ -101,10 +103,9 @@ function get_trajectory_augmented(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
-        _x0_aug = init_impulsive_dynamics_xaug(prob.times[i], x_ref[:,i], u_ref[:,i], prob.nx, prob.dfdu)
-        # [x_ref[:,i] + [zeros(3); u_ref[:,i]]; reshape(I(prob.nx), prob.nx^2)]
+        _x0_aug = init_impulsive_dynamics_xaug(prob.times[i], x_ref[:,i], u_ref[:,i] + prob.u_bias[:,i], prob.nx, prob.dfdu)
         _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,i]
+        _params.u[:] = u_ref[:,i] + prob.u_bias[:,i]
         remake(ode_problem, u0=_x0_aug, tspan=(prob.times[i], prob.times[i+1]), p=_params)
     end
     base_ode_problem = ODEProblem(
@@ -166,6 +167,7 @@ function ImpulsiveProblem(
     ode_abstol = 1e-12,
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
+    u_bias::Union{Matrix,Nothing} = nothing,
 )
     # get problem size from initial guess
     N = length(times)
@@ -205,6 +207,12 @@ function ImpulsiveProblem(
                            :constraint_trust_region_x_lb,
                            :constraint_trust_region_x_ub]
 
+    if isnothing(u_bias)
+        u_bias = zeros(nu,N)
+    else
+        @assert size(u_bias) == (nu,N)
+    end
+
     # construct problem struct
     prob = ImpulsiveProblem(
         nx,
@@ -233,6 +241,7 @@ function ImpulsiveProblem(
         ode_abstol,
         fun_get_trajectory,
         set_dynamics_cache!,
+        u_bias,
     )
 
     # poopulate JuMP with variables

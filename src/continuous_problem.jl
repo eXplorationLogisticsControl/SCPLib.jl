@@ -35,6 +35,8 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 
     fun_get_trajectory::Union{Function,Nothing}
     set_dynamics_cache!::Union{Function,Nothing}
+
+    u_bias::Matrix
 end
 
 
@@ -67,7 +69,7 @@ function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
         _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,i]
+        _params.u[:] = u_ref[:,i] + prob.u_bias[:,i]
         remake(ode_problem, u0=x_ref[:,i], tspan=(prob.times[i], prob.times[i+1]), p=_params)
     end
     base_ode_problem = ODEProblem(
@@ -103,7 +105,7 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,A
     prob_func = function(ode_problem, i, repeat)
         _x0_aug = init_continuous_dynamics_xaug(x_ref[:,i], prob.nx, prob.nu)
         _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,i]
+        _params.u[:] = u_ref[:,i] + prob.u_bias[:,i]
         remake(ode_problem, u0=_x0_aug, tspan=(prob.times[i], prob.times[i+1]), p=_params)
     end
     base_ode_problem = ODEProblem(
@@ -153,6 +155,7 @@ function ContinuousProblem(
     ode_abstol = 1e-12,
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
+    u_bias::Union{Matrix,Nothing} = nothing,
 )
     # get problem size from initial guess
     N = length(times)
@@ -186,10 +189,19 @@ function ContinuousProblem(
         end
     end
 
-    # construct problem
+    # non-convex JuMP references
     model_nl_references = [:constraint_dynamics,
                            :constraint_trust_region_x_lb,
                            :constraint_trust_region_x_ub]
+
+
+    if isnothing(u_bias)
+        u_bias = zeros(nu,N)
+    else
+        @assert size(u_bias) == (nu,N)
+    end
+
+    # construct problem
     prob = ContinuousProblem(
         nx,
         nu,
@@ -216,6 +228,7 @@ function ContinuousProblem(
         ode_abstol,
         fun_get_trajectory,
         set_dynamics_cache!,
+        u_bias,
     )
 
     # poopulate JuMP with variables
