@@ -56,8 +56,8 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         dx_aug[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
         
         # Jacobian derivatives
-        G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-        G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
+        G1 = (1 - p.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
+        G2 = p.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
         Omega = [0 2 0; -2 0 0; 0 0 0]
         A = [zeros(3,3)                  I(3);
             G1 + G2 + diagm([1,1,0])    Omega]
@@ -82,7 +82,6 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
 
         @views for i in 1:N_spacecraft
             eom!(dx_aug[1+6(i-1):6i], x_aug[1+6(i-1):6i], p, t)
-            # dx[1+6(i-1):6i] = HighFidelityEphemerisModel.eom_NbodySH_Interp(x[1+6(i-1):6i], p, t)
         end
         
         Phi_aug = reshape(x_aug[nx+1:end], (nx,nx))'
@@ -96,8 +95,8 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
             r2 = norm(r2vec)
 
             # Jacobian derivatives
-            G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-            G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
+            G1 = (1 - p.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
+            G2 = p.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
             Omega = [0 2 0; -2 0 0; 0 0 0]
             A = [zeros(3,3)                  I(3);
                 G1 + G2 + diagm([1,1,0])    Omega]
@@ -283,7 +282,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         verbosity = verbosity, maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
 
     # propagate solution
-    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+    sols_opt, g_dynamics_opt = custom_get_trajectory(prob, solution.x, solution.u, solution.y)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
 
