@@ -6,7 +6,9 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+if !@isdefined SCPLib
+    include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
 
 # ODE parameters
 mutable struct QuadroptorParams
@@ -14,7 +16,7 @@ mutable struct QuadroptorParams
 end
 
 
-function test_scvxstar_h_noncvx()
+function test_scvxstar_h_noncvx(;verbosity::Int = 0)
     # -------------------- setup problem -------------------- #
     # system parameters
     nx = 6
@@ -139,7 +141,8 @@ function test_scvxstar_h_noncvx()
     algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0)   # don't forget to pass `nh` to the algorithm as well!
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity=0, tol_opt = 1e-6, tol_feas = 1e-6)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref;
+        verbosity = verbosity, tol_opt = 1e-6, tol_feas = 1e-6)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
@@ -148,4 +151,4 @@ function test_scvxstar_h_noncvx()
 end
 
 
-test_scvxstar_h_noncvx()
+test_scvxstar_h_noncvx(verbosity = verbosity)

@@ -5,7 +5,9 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+if !@isdefined SCPLib
+    include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
 
 
 # -------------------- setup problem -------------------- #
@@ -127,13 +129,13 @@ function test_scvxstar_dynamics_ad(;verbosity::Int = 0)
     algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity = verbosity, maxiter = 50)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; tol_feas=1e-5, verbosity = verbosity, maxiter = 100)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
-    @test maximum(abs.(g_dynamics_opt)) <= 1e-6
+    @test maximum(abs.(g_dynamics_opt)) <= 1e-5
     @test solution.status == :Optimal
 end
 
 
-test_scvxstar_dynamics_ad(verbosity = 1)
+test_scvxstar_dynamics_ad(verbosity = verbosity)

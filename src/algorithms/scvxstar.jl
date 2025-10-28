@@ -189,7 +189,7 @@ end
 """
 Solution struct for SCvx* algorithm
 """
-mutable struct SCvxStarSolution
+mutable struct SCvxStarSolution <: SCPSolution
     status::Symbol
     x::Matrix
     u::Matrix
@@ -261,16 +261,6 @@ function solve!(
     δ_i = 1e16
     tcpu_start = time()
 
-    # print initial information
-    if verbosity > 0
-        println()
-        @printf(" Solving OCP with SCvx* Algorithm (`・ω・´)\n\n")
-        @printf("   Feasibility tolerance tol_feas : % 1.2e\n", tol_feas)
-        @printf("   Optimality tolerance tol_opt   : % 1.2e\n", tol_opt)
-        @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
-        println()
-    end
-
     # initialize storage
     _x = similar(x_ref)
     _u = similar(u_ref)
@@ -279,10 +269,17 @@ function solve!(
     g_ref = prob.ng > 0 ? zeros(prob.ng) : nothing
     h_ref = prob.nh > 0 ? zeros(prob.nh) : nothing
 
+    # initialize solution object
     solution = SCvxStarSolution(prob, size(u_ref,2))
 
-    header = "\nIter |      J0      |    ΔJ_i     |    ΔL_i     |     χ_i     |     ρ_i     |    r_i    |     w     |  acpt. |"
+    # print initial information
+    header = "\nIter |     J0     |    ΔJ_i   |    ΔL_i    |     χ_i    |   ρ_i    |   r_i    |    w     |  acpt. |"
     if verbosity > 0
+        println()
+        @printf(" Solving OCP with SCvx* Algorithm (`・ω・´)\n\n")
+        @printf("   Feasibility tolerance tol_feas : % 1.2e\n", tol_feas)
+        @printf("   Optimality tolerance tol_opt   : % 1.2e\n", tol_opt)
+        @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
         println(header)
     end
     cpu_times = Dict(
@@ -360,7 +357,7 @@ function solve!(
             if mod(it, 20) == 0
                 println(header)
             end
-            @printf(" %3.0f | % 1.5e | % 1.4e | % 1.4e | % 1.4e | % 1.4e | % 1.2e | % 1.2e |  %s   |\n",
+            @printf(" %3.0f | % 1.3e |% 1.3e | % 1.3e | % 1.3e |% 1.2e |% 1.2e |% 1.2e |  %s   |\n",
                     it, J0, ΔJ, ΔL, χ, rho_i, algo.tr.Δ[1,1], algo.w,
                     message_accept_step(rho_i >= algo.rhos[1]))
         end

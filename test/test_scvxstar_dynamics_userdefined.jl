@@ -5,7 +5,9 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+if !@isdefined SCPLib
+    include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
 
 
 # -------------------- setup problem -------------------- #
@@ -172,4 +174,4 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
 end
 
 
-test_scvxstar_dynamics_userdefined(verbosity = 0)
+test_scvxstar_dynamics_userdefined(;verbosity = verbosity)

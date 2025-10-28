@@ -1,4 +1,4 @@
-"""Dev for continuous problem"""
+"""Dev for continuous problem with prox-linear method"""
 
 using Clarabel
 using GLMakie
@@ -160,10 +160,13 @@ set_silent(prob.model)
     prob.model[:u][4,k] <= umax)
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
+w_ep = 1e2
+w_prox = 1e0
+algo = SCPLib.ProxLinear(w_ep, w_prox)
+println(algo)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 30)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
@@ -183,18 +186,17 @@ stairs!(ax_u, prob.times[1:end-1], solution.u[4,:], label="||u||", step=:pre, li
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
-colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
 ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
-scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+scatterlines!(ax_χ, 1:length(solution.info[:χ]), solution.info[:χ], color=:black, marker=:circle, markersize=7)
 
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="J0", yscale=log10)
+scatterlines!(ax_w, 1:length(solution.info[:χ]), solution.info[:J0], color=:black, marker=:circle, markersize=7)
 
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
-scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
+scatterlines!(ax_J, 1:length(solution.info[:χ]), abs.(solution.info[:ΔJ]), color=:black, marker=:circle, markersize=7)
 
-ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
-scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
+# ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+# scatterlines!(ax_Δ, 1:length(solution.info[:χ]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
 display(fig)
 println("Done!")

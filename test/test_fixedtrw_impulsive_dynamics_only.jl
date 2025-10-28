@@ -5,7 +5,9 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+if !@isdefined SCPLib
+    include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
 
 
 # -------------------- setup problem -------------------- #
@@ -18,7 +20,7 @@ mutable struct ControlParams_fixedtrw_impulsive_dynamics_only
     end
 end
 
-function test_scvxstar_impulsive_dynamics_only(;get_plot::Bool = false)
+function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bool = false)
     μ = 1.215058560962404e-02
     DU = 389703     # km
     TU = 382981     # sec
@@ -152,7 +154,7 @@ function test_scvxstar_impulsive_dynamics_only(;get_plot::Bool = false)
     # solve problem
     tol_opt = 1e-6
     tol_feas = 1e-8
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; verbosity = verbosity, maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
@@ -178,4 +180,4 @@ function test_scvxstar_impulsive_dynamics_only(;get_plot::Bool = false)
 end
 
 
-test_scvxstar_impulsive_dynamics_only(;get_plot = get_plot)
+test_scvxstar_impulsive_dynamics_only(;verbosity = verbosity, get_plot = get_plot)
