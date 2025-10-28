@@ -1,6 +1,5 @@
 """Run tests"""
 
-
 using Test
 
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
@@ -18,6 +17,7 @@ get_plot = false
     include("test_scvxstar_h_noncvx.jl")
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
+    include("test_scvxstar_custom_propagate_func.jl")
 end
 
 @testset "ProxLinear" begin

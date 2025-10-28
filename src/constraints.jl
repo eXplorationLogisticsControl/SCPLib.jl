@@ -4,12 +4,14 @@
 """
 Set linearized dynamics constraints for continuous problem
 """
-function set_linearized_dynamics_constraints!(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
+function set_dynamics_cache!(
+    prob::ContinuousProblem,
+    x_ref::Union{Matrix,Adjoint},
+    u_ref::Union{Matrix,Adjoint}, 
+    y_ref::Union{Matrix,Nothing},
+)
     sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
     set_continuous_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
-    @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
-        prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
-    )
     return g_dynamics_ref
 end
 
@@ -17,22 +19,36 @@ end
 """
 Set linearized dynamics constraints for impulsive problem
 """
-function set_linearized_dynamics_constraints!(prob::ImpulsiveProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
+function set_dynamics_cache!(
+    prob::ImpulsiveProblem,
+    x_ref::Union{Matrix,Adjoint},
+    u_ref::Union{Matrix,Adjoint},
+    y_ref::Union{Matrix,Nothing},
+)
     sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref, y_ref)
     set_impulsive_dynamics_cache!(prob.lincache, x_ref, u_ref, sols, prob.dfdu)
-    @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
-        prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
-    )
     return g_dynamics_ref
 end
 
 
 """
-Set linearized constraints
+Set linearized constraints for non-convex constraints
 """
-function set_linearized_constraints!(prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
+function set_linearized_constraints!(
+    prob::OptimalControlProblem,
+    x_ref::Union{Matrix,Adjoint},
+    u_ref::Union{Matrix,Adjoint},
+    y_ref::Union{Matrix,Nothing},
+)
     # set dynamics constraints
-    g_dynamics_ref = set_linearized_dynamics_constraints!(prob, x_ref, u_ref, y_ref)
+    if isnothing(prob.set_dynamics_cache!)
+        g_dynamics_ref = set_dynamics_cache!(prob, x_ref, u_ref, y_ref)         # default implementation
+    else
+        g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref, y_ref)    # user-defined implementation
+    end
+    @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
+        prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
+    )
 
     # define stacked flattened variables difference
     if prob.ng > 0 || prob.nh > 0

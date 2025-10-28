@@ -10,7 +10,7 @@ if !@isdefined SCPLib
 end
 
 
-# -------------------- setup problem -------------------- #
+# -------------------- setup parameters -------------------- #
 # create parameters with `u` entry
 mutable struct ControlParams_impulsive_dynamics_only
     μ::Float64

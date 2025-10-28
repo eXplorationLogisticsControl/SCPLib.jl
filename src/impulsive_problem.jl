@@ -33,6 +33,9 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
     ode_method
     ode_reltol
     ode_abstol
+
+    fun_get_trajectory::Union{Function,Nothing}
+    set_dynamics_cache!::Union{Function,Nothing}
 end
 
 
@@ -89,6 +92,11 @@ function get_trajectory(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
 end
 
 
+"""
+Propagate augmented dynamics with continuous control
+This function also constructs state-transition matrices and 
+evaluates dynamics residuals.
+"""
 function get_trajectory_augmented(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
@@ -123,6 +131,17 @@ end
 
 """
 Construct an impulsive optimal control problem
+
+If `set_dynamics_cache!` is provided, it will be used to set STM's to `prob.lincache`.
+
+The signature of `set_dynamics_cache!` should be:
+
+```
+set_dynamics_cache!(prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
+```
+
+and the function should return the dynamics residuals. 
+See `set_dynamics_cache!` for more details.
 """
 function ImpulsiveProblem(
     optimizer,
@@ -145,6 +164,8 @@ function ImpulsiveProblem(
     ode_method = Tsit5(),
     ode_reltol = 1e-12,
     ode_abstol = 1e-12,
+    fun_get_trajectory::Union{Function,Nothing} = nothing,
+    set_dynamics_cache!::Union{Function,Nothing} = nothing,
 )
     # get problem size from initial guess
     N = length(times)
@@ -210,6 +231,8 @@ function ImpulsiveProblem(
         ode_method,
         ode_reltol,
         ode_abstol,
+        fun_get_trajectory,
+        set_dynamics_cache!,
     )
 
     # poopulate JuMP with variables
