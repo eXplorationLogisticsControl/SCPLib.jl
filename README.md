@@ -58,7 +58,7 @@ eom! = function (dx, x, params, t)
     ...
 end
 
-eom_aug! = function (dx_aug, x_aug, params, t)
+eom_aug! = function (dx_aug, x_aug, params, t)              # optional
     # compute derivative of state & Phi_A & Phi_B
     ...
 end
@@ -88,7 +88,7 @@ prob = SCPLib.ContinuousProblem(
     x_ref,
     u_ref,
     y_ref;
-    eom_aug! = eom_aug!,
+    eom_aug! = eom_aug!,                # optional
 )
 
 # 2. append convex constraints to `prob.model` if any
