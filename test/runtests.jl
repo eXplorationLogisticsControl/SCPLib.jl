@@ -4,10 +4,7 @@ using Test
 
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
-# @testset "AD dynamics" begin
-#     include("test_ad_dynamics.jl")
-# end
-
+# test setting
 verbosity = 0
 get_plot = false
 
