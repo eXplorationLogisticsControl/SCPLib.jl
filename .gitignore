@@ -29,3 +29,4 @@ JuliaLocalPreferences.toml
 
 # Mac tmp file
 .DS_Store
+*.so
