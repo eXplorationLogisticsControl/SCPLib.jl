@@ -85,7 +85,7 @@ function objective(x, u, y)
 end
 
 # -------------------- create problem -------------------- #
-N = 50
+N = 100
 nx = 7
 nu = 5                              # [ux,uy,uz,Γ,tf]
 tf = 1.0                            # fixed to unity
@@ -99,7 +99,8 @@ alphas = LinRange(0,1,N)
 for (i,alpha) in enumerate(alphas)
     x_ref[1:6,i] = (1-alpha)*x_along_lpo0[1:6,i] + alpha*x_along_lpof[1:6,i]
 end
-u_ref = [zeros(nu-1, N-1); tf*ones(1,N-1)];
+tf_guess = 3.0
+u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)];
 y_ref = nothing
 
 # plot initial guess
