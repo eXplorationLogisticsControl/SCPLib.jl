@@ -179,7 +179,6 @@ function ImpulsiveProblem(
 
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
-        @warn "AD-based eom may be erroneous for now!"
         eom_aug! = get_impulsive_augmented_eom(eom!, params, nx)
     end
 

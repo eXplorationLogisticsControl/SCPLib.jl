@@ -1,6 +1,7 @@
 """Dev for continuous problem"""
 
 using Clarabel
+using ForwardDiff
 using GLMakie
 using JuMP
 using LinearAlgebra
@@ -41,27 +42,7 @@ function eom!(drv, rv, p, t)
     return
 end
 
-
-function eom_aug!(dx_aug, x_aug, p, t)
-    # state derivatives
-    eom!(view(dx_aug, 1:6), x_aug[1:6], p, t)
-    
-    # STM derivatives
-    r1vec = [x_aug[1] + p.μ, x_aug[2], x_aug[3]]
-    r2vec = [x_aug[1] - 1 + p.μ, x_aug[2], x_aug[3]]
-    G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-    G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
-    Omega = [0 2 0; -2 0 0; 0 0 0]
-    A = [zeros(3,3)                  I(3);
-         G1 + G2 + diagm([1,1,0])    Omega]
-    B = [zeros(3,4); I(3) zeros(3,1)]
-
-    # derivatives of Phi_A, Phi_B
-    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
-end
-
-
+# boundary conditions
 rv0 = [1.0809931218390707E+00,
     0.0000000000000000E+00,
     -2.0235953267405354E-01,
@@ -120,7 +101,6 @@ fig = Figure(size=(1200,800))
 ax3d = Axis3(fig[1,1]; aspect=:data)
 lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
-# scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
@@ -132,7 +112,6 @@ prob = SCPLib.ContinuousProblem(
     x_ref,
     u_ref,
     y_ref;
-    eom_aug! = eom_aug!,
     ode_method = Vern7(),
 )
 set_silent(prob.model)

@@ -1,6 +1,7 @@
 """Dev for continuous problem"""
 
 using Clarabel
+using ForwardDiff
 using GLMakie
 using JuMP
 using LinearAlgebra
@@ -15,7 +16,7 @@ mutable struct ControlParams
     μ::Float64
     u::Vector
     function ControlParams(μ::Float64)
-        new(μ, zeros(4))
+        new(μ, zeros(5))
     end
 end
 
@@ -38,30 +39,12 @@ function eom!(drv, rv, p, t)
     drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
     # append controls
     drv[4:6] += p.u[1:3]
+    # multiply by time factor
+    drv[1:6] *= p.u[5]
     return
 end
 
-
-function eom_aug!(dx_aug, x_aug, p, t)
-    # state derivatives
-    eom!(view(dx_aug, 1:6), x_aug[1:6], p, t)
-    
-    # STM derivatives
-    r1vec = [x_aug[1] + p.μ, x_aug[2], x_aug[3]]
-    r2vec = [x_aug[1] - 1 + p.μ, x_aug[2], x_aug[3]]
-    G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-    G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
-    Omega = [0 2 0; -2 0 0; 0 0 0]
-    A = [zeros(3,3)                  I(3);
-         G1 + G2 + diagm([1,1,0])    Omega]
-    B = [zeros(3,4); I(3) zeros(3,1)]
-
-    # derivatives of Phi_A, Phi_B
-    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
-end
-
-
+# boundary conditions
 rv0 = [1.0809931218390707E+00,
     0.0000000000000000E+00,
     -2.0235953267405354E-01,
@@ -79,12 +62,14 @@ rvf = [1.1648780946517576,
 period_f = 3.3031221822879884
 
 # initial & final LPO
+params.u[5] = period_0
 sol_lpo0 = solve(
-    ODEProblem(eom!, rv0, [0.0, period_0], params),
+    ODEProblem(eom!, rv0, [0.0, 1.0], params),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
+params.u[5] = period_f
 sol_lpof = solve(
-    ODEProblem(eom!, rvf, [0.0, period_f], params),
+    ODEProblem(eom!, rvf, [0.0, 1.0], params),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 
@@ -93,26 +78,25 @@ function objective(x, u, y)
     return sum(u[4,:])
 end
 
-
 # -------------------- create problem -------------------- #
 N = 100
 nx = 6
-nu = 4                              # [ux,uy,uz,Γ]
-tf = 2.6 
+nu = 5                              # [ux,uy,uz,Γ,tf]
+tf = 1.0                            # fixed to unity
 times = LinRange(0.0, tf, N)
 
 thrust = 0.35    # N
 umax = thrust/MU/1e3 / (VU/TU)
 
 # create reference solution
-x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
-x_along_lpof = sol_lpof(LinRange(0.0, period_f, N))
+x_along_lpo0 = sol_lpo0(LinRange(0.0, 1.0, N))
+x_along_lpof = sol_lpof(LinRange(0.0, 1.0, N))
 x_ref = zeros(nx,N)
 alphas = LinRange(0,1,N)
 for (i,alpha) in enumerate(alphas)
     x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
 end
-u_ref = zeros(nu, N-1)
+u_ref = [zeros(nu-1, N-1); tf*ones(1,N-1)];
 y_ref = nothing
 
 # plot initial guess
@@ -120,7 +104,6 @@ fig = Figure(size=(1200,800))
 ax3d = Axis3(fig[1,1]; aspect=:data)
 lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
-# scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
@@ -132,7 +115,6 @@ prob = SCPLib.ContinuousProblem(
     x_ref,
     u_ref,
     y_ref;
-    eom_aug! = eom_aug!,
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -146,6 +128,14 @@ set_silent(prob.model)
     [prob.model[:u][4,k], prob.model[:u][1:3,k]...] in SecondOrderCone())
 @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
     prob.model[:u][4,k] <= umax)
+
+# append constraints on time factor
+tf_span = [2.0, 4.0]
+@constraint(prob.model, constraint_tf_lb, prob.model[:u][5,1] >= tf_span[1])
+@constraint(prob.model, constraint_tf_ub, prob.model[:u][5,end] <= tf_span[2])
+@constraint(prob.model, constraint_tf_uniform[k in 1:N-2],
+    prob.model[:u][5,k] == prob.model[:u][5,k+1])
+
 
 # -------------------- instantiate algorithm -------------------- #
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
@@ -165,9 +155,9 @@ end
 # plot controls
 ax_u = Axis(fig[2,1]; xlabel="Time", ylabel="Control")
 for i in 1:3
-    stairs!(ax_u, prob.times[1:end-1], solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
+    stairs!(ax_u, prob.times[1:end-1] .* solution.u[5,:], solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
 end
-stairs!(ax_u, prob.times[1:end-1], solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
+stairs!(ax_u, prob.times[1:end-1] .* solution.u[5,:], solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
