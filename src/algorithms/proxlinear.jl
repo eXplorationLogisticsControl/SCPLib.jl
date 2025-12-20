@@ -16,25 +16,21 @@ where `L(Z)` is the original objective function, `G(Z)` are the non-convex const
 - `w_ep::Float64`: exact penalty term weight
 - `w_prox::Float64`: proximal term weight
 - `proximal_u::Bool`: whether to enforce proximal constraint on u
-- `proximal_y::Bool`: whether to enforce proximal constraint on y
 """
 mutable struct ProxLinear <: SCPAlgorithm
     # hyperparameters
     w_ep::Float64           # exact penalty term weight
     w_prox::Float64         # proximal term weight
     proximal_u::Bool
-    proximal_y::Bool
 
     function ProxLinear(
         w_ep::Float64 = 1e2,
         w_prox::Float64 = 1e0;
         proximal_u::Bool = false,
-        proximal_y::Bool = false,
     )
         new(
             w_ep, w_prox,
             proximal_u,
-            proximal_y,
         )
     end
 end
@@ -45,16 +41,13 @@ function Base.show(io::IO, algo::ProxLinear)
     @printf("   Exact penalty term weight w_ep   : %1.4e\n", algo.w_ep)
     @printf("   Proximal term weight w_prox      : %1.4e\n", algo.w_prox)
     @printf("   Enforce proximal constraint on u : %s\n", algo.proximal_u ? "Yes" : "No")
-    @printf("   Enforce proximal constraint on y : %s\n", algo.proximal_y ? "Yes" : "No")
 end
 
 
 function solve_convex_subproblem!(
     algo::ProxLinear, prob::OptimalControlProblem,
-    x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing}
+    x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint},
 )
-    # define additional variables if they do not exist already
-    _y = prob.ny > 0 ? prob.model[:y] : nothing
 
     # prepare slack for proximal term
     Δvars = [
@@ -62,9 +55,6 @@ function solve_convex_subproblem!(
     ]
     if algo.proximal_u
         append!(Δvars, reshape(prob.model[:u] - u_ref, prod(size(prob.model[:u]))))
-    end
-    if algo.proximal_y && !isnothing(_y)
-        append!(Δvars, reshape(prob.model[:y] - y_ref, prod(size(prob.model[:y]))))
     end
     ϵ_proximal = @variable(prob.model)
     @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
@@ -88,7 +78,7 @@ function solve_convex_subproblem!(
     )
 
     # combine into objective function
-    J = prob.objective(prob.model[:x], prob.model[:u], _y)      # original objective function
+    J = prob.objective(prob.model[:x], prob.model[:u])    # original objective function
     @objective(prob.model, Min, J + algo.w_ep*ϵ_dynamics + algo.w_prox/2*ϵ_proximal^2)
 
     # solve convex subproblem
@@ -104,7 +94,6 @@ mutable struct ProxLinearSolution <: SCPSolution
     status::Symbol
     x::Matrix
     u::Matrix
-    y::Union{Nothing,Matrix}
     n_iter::Int
     info::Dict
 
@@ -112,7 +101,6 @@ mutable struct ProxLinearSolution <: SCPSolution
         status = :Solving
         x = zeros(prob.nx, prob.N)
         u = zeros(prob.nu, Nu)
-        y = prob.ny > 0 ? zeros(prob.ny) : nothing
         
         info = Dict(
             :J0 => Float64[],
@@ -122,7 +110,7 @@ mutable struct ProxLinearSolution <: SCPSolution
             :Δ => Matrix{Float64}[],
             :accept => Bool[],
         )
-        new(status, x, u, y, 0, info)
+        new(status, x, u, 0, info)
     end
 end
 
@@ -135,7 +123,6 @@ Solve non-convex OCP with prox-linear algorithm
 - `prob::OptimalControlProblem`: problem struct
 - `x_ref`: reference state history, size `nx`-by-`N`
 - `u_ref`: reference control history, size `nu`-by-`N-1`
-- `y_ref`: reference other variables, size `ny`
 - `maxiter::Int`: maximum number of iterations
 - `tol_feas::Float64`: feasibility tolerance
 - `tol_opt::Float64`: optimality tolerance
@@ -146,7 +133,7 @@ Solve non-convex OCP with prox-linear algorithm
 function solve!(
     algo::ProxLinear,
     prob::OptimalControlProblem,
-    x_ref, u_ref, y_ref = nothing;
+    x_ref, u_ref;
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-4,
@@ -162,7 +149,6 @@ function solve!(
     # initialize storage
     _x = similar(x_ref)
     _u = similar(u_ref)
-    _y = y_ref isa Nothing ? nothing : similar(y_ref)
     g_dyn_ref = zeros(prob.nx,prob.N-1)
     g_ref = prob.ng > 0 ? zeros(prob.ng) : nothing
     h_ref = prob.nh > 0 ? zeros(prob.nh) : nothing
@@ -197,13 +183,13 @@ function solve!(
             if it > 1
                 delete_noncvx_referencs!(prob, prob.model_nl_references)
             end
-            g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
+            g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
         end
         cpu_times[:time_update_reference] = time() - tcpu_start_iter
 
         # solve convex subproblem
         tstart_cp = time()
-        _ϵ_dynamics, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref, y_ref)
+        _ϵ_dynamics, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref)
         cpu_times[:time_subproblem] = time() - tstart_cp
 
         # check termination status
@@ -219,16 +205,15 @@ function solve!(
 
         _x = value.(prob.model[:x])
         _u = value.(prob.model[:u])
-        _y = y_ref isa Nothing ? nothing : value.(prob.model[:y])
 
         # evaluate objective
-        J0 = prob.objective(_x, _u, _y)
+        J0 = prob.objective(_x, _u)
         ΔJ = J0 - J0_ref
 
         # evaluate nonlinear constraints
-        _, g_dynamics = get_trajectory(prob, _x, _u, _y)
-        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u, _y) : nothing
-        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u, _y), 0) : nothing
+        _, g_dynamics = get_trajectory(prob, _x, _u)
+        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u) : nothing
+        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u), 0) : nothing
 
         # check nonlinear convergence
         χ = norm(g_dynamics,Inf)
@@ -251,7 +236,6 @@ function solve!(
         # update current solution
         solution.x[:,:] = _x
         solution.u[:,:] = _u
-        solution.y = _y
 
         # check for convergence
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
@@ -270,9 +254,6 @@ function solve!(
         flag_reference = true
         x_ref[:,:] = _x
         u_ref[:,:] = _u
-        if prob.ny > 0
-            y_ref[:] = _y
-        end
         J0_ref = J0
         
         if it == maxiter

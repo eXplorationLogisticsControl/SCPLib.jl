@@ -84,7 +84,7 @@ mutable struct FixedTRWSCPSolution <: SCPSolution
             :accept => Bool[],
         )
 
-        new(status, x, u, y, 0, info)
+        new(status, x, u, 0, info)
     end
 end
 

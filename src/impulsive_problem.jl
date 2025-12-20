@@ -4,7 +4,6 @@
 mutable struct ImpulsiveProblem <: OptimalControlProblem
     nx::Int
     nu::Int
-    ny::Int
     N::Int
     Nu::Int
 
@@ -64,7 +63,7 @@ function init_impulsive_dynamics_xaug(t0::Real, x0::Vector, u0::Vector, nx::Int,
 end
 
 
-function get_trajectory(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
+function get_trajectory(prob::ImpulsiveProblem, x_ref, u_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
@@ -99,7 +98,7 @@ Propagate augmented dynamics with continuous control
 This function also constructs state-transition matrices and 
 evaluates dynamics residuals.
 """
-function get_trajectory_augmented(prob::ImpulsiveProblem, x_ref, u_ref, y_ref)
+function get_trajectory_augmented(prob::ImpulsiveProblem, x_ref, u_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
@@ -151,8 +150,7 @@ function ImpulsiveProblem(
     objective::Function,
     times,
     x_ref,
-    u_ref,
-    y_ref = nothing;
+    u_ref;
     eom_aug! = nothing,
     dfdu::Function = (x,u,t) -> [zeros(3,4); I(3) zeros(3,1)],
     ng::Int = 0,
@@ -175,7 +173,6 @@ function ImpulsiveProblem(
     @assert Nu in [N-1, N]
     nx, _ = size(x_ref)
     nu, _ = size(u_ref)
-    ny = isnothing(y_ref) ? 0 : length(y_ref)
 
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
@@ -187,17 +184,17 @@ function ImpulsiveProblem(
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
-        ∇g_noncvx = function (x,u,y)
+        ∇g_noncvx = function (x,u)
             return ForwardDiff.jacobian(z -> g_noncvx(unpack_flattened_variables(prob, z)...),
-                                        stack_flatten_variables(prob, x, u, y))
+                                        stack_flatten_variables(prob, x, u))
         end
     end
 
     # check if ∇h_noncvx is provided
     if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
-        ∇h_noncvx = function (x,u,y)
+        ∇h_noncvx = function (x,u)
             return ForwardDiff.jacobian(z -> h_noncvx(unpack_flattened_variables(prob, z)...),
-                                        stack_flatten_variables(prob, x, u, y))
+                                        stack_flatten_variables(prob, x, u))
         end
     end
 
@@ -216,7 +213,6 @@ function ImpulsiveProblem(
     prob = ImpulsiveProblem(
         nx,
         nu,
-        ny,
         N,
         Nu,
         ng,
@@ -261,12 +257,9 @@ function ImpulsiveProblem(
 end
 
 
-function stack_flatten_variables(prob::ImpulsiveProblem, x, u, y)
+function stack_flatten_variables(prob::ImpulsiveProblem, x, u)
     Δz = [reshape(x, prob.nx * prob.N);
           reshape(u, prob.nu * prob.Nu)];
-    if prob.ny > 0
-        Δz = [Δz; y]
-    end
     return Δz
 end
 
@@ -279,7 +272,7 @@ function unpack_flattened_variables(prob::ImpulsiveProblem, z)
     else
         y = nothing
     end
-    return x, u, y
+    return x, u
 end
 
 
