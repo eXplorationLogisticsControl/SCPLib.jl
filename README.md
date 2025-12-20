@@ -12,7 +12,7 @@ We are interested in solving the discretized non-convex optimal control problem 
 
 ```math
 \begin{aligned}
-\min_{x, u, y} \quad& \phi(x(t_f),u(t_f),t_f,y) + \int_{t_0}^{t_f} \mathcal{L}(x(t),u(t),t) \mathrm{d}t
+\min_{x, u} \quad& \phi(x(t_f),u(t_f),t_f,y) + \int_{t_0}^{t_f} \mathcal{L}(x(t),u(t),t) \mathrm{d}t
 \\ \mathrm{s.t.} \quad&     \dot{x}(t) = f(x(t),u(t),t)
 \\&     x_{k+1} = x_k + \int_{t_k}^{t_{k+1}} f(x_k, u_k) \mathrm{d}t \quad \forall k=1,\ldots,N-1
 \\&     g(x,u,y) = 0
@@ -63,7 +63,7 @@ eom_aug! = function (dx_aug, x_aug, params, t)              # optional
     ...
 end
 
-objective = function (x, u, y)
+objective = function (x, u)
     # compute objective, must be dispatched for both JuMP variables and reals 
     ...
 end
@@ -101,5 +101,5 @@ set_silent(prob.model)
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)   # as an example, setting `w0` to a non-default value
 
 # 4. solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 ```

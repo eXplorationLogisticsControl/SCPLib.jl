@@ -80,12 +80,12 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
     end
 
     # -------------------- define objective & non-convex constraints -------------------- #
-    function objective(x, u, y)
+    function objective(x, u)
         return sum(u[4,:])
     end
 
     nh = 2 * N    # two obstacles, enforced at each node
-    function h_noncvx(x,u,y)
+    function h_noncvx(x,u)
         h = vcat(
             [R_obstacle_1 - norm(x[1:3,k] - p_obstacle_1) for k in 1:N],
             [R_obstacle_2 - norm(x[1:3,k] - p_obstacle_2) for k in 1:N]
@@ -110,8 +110,7 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
         objective,
         times,
         x_ref,
-        u_ref,
-        y_ref;
+        u_ref;
         nh = nh,
         h_noncvx = h_noncvx,
         eom_aug! = quadroptor_rhs_aug!,
@@ -141,11 +140,11 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
     algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0)   # don't forget to pass `nh` to the algorithm as well!
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref;
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
         verbosity = verbosity, tol_opt = 1e-6, tol_feas = 1e-6)
 
     # propagate solution
-    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
 end

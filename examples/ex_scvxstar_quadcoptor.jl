@@ -73,12 +73,12 @@ function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
 end
 
 # -------------------- define objective & non-convex constraints -------------------- #
-function objective(x, u, y)
+function objective(x, u)
     return sum(u[4,:])
 end
 
 nh = 2 * N    # two obstacles, enforced at each node
-function h_noncvx(x,u,y)
+function h_noncvx(x,u)
     h = vcat(
         [R_obstacle_1 - norm(x[1:3,k] - p_obstacle_1) for k in 1:N],
         [R_obstacle_2 - norm(x[1:3,k] - p_obstacle_2) for k in 1:N]
@@ -137,7 +137,7 @@ solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt = 1e-6, tol_feas = 1e
 
 # -------------------- analysis of solution -------------------- #
 # propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 
 # get obstacles x[2] & x[3] values for plotting
 coord_obstacle_1 = R_obstacle_1 * [cos.(LinRange(0, 2*pi, 100)) sin.(LinRange(0, 2*pi, 100))]' .+ p_obstacle_1[2:3]

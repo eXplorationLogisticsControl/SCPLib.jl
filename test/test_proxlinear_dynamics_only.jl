@@ -103,7 +103,7 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
     )
 
     # -------------------- define objective -------------------- #
-    function objective(x, u, y)
+    function objective(x, u)
         return sum(u[4,:])
     end
 
@@ -137,8 +137,7 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
         objective,
         times,
         x_ref,
-        u_ref,
-        y_ref;
+        u_ref;
         eom_aug! = eom_aug!,
         ode_method = Vern7(),
     )
@@ -161,11 +160,11 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
 
     # solve problem
     tol_feas = 1e-6
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; 
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref; 
         verbosity = verbosity, maxiter = 30, tol_feas = tol_feas)
 
     # propagate solution
-    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
     @test solution.status == :Optimal

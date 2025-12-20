@@ -66,7 +66,7 @@ sol_orbitf = solve(
 )
 
 # -------------------- define objective -------------------- #
-function objective(x, u, y) return -x[7,end] end
+function objective(x, u) return -x[7,end] end
 
 # -------------------- create problem -------------------- #
 N = 100
@@ -137,7 +137,7 @@ algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, w_max=1e20)
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 
 # propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 arc_colors = [
     solution.u[4,i] > 1e-6 ? :red : :black for i in 1:N-1
 ]

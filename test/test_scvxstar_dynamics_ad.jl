@@ -91,7 +91,7 @@ function test_scvxstar_dynamics_ad(;verbosity::Int = 0)
     u_ref = zeros(nu, N-1)
     y_ref = nothing
 
-    function objective(x, u, y)
+    function objective(x, u)
         return sum(u[4,:])
     end
 
@@ -103,8 +103,7 @@ function test_scvxstar_dynamics_ad(;verbosity::Int = 0)
         objective,
         times,
         x_ref,
-        u_ref,
-        y_ref;
+        u_ref;
         ode_method = Vern7(),
     )
     set_silent(prob.model)
@@ -129,10 +128,10 @@ function test_scvxstar_dynamics_ad(;verbosity::Int = 0)
     algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; tol_feas=1e-5, verbosity = verbosity, maxiter = 100)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_feas=1e-5, verbosity = verbosity, maxiter = 100)
 
     # propagate solution
-    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-5
     @test solution.status == :Optimal
 end
