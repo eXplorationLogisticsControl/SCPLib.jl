@@ -243,7 +243,7 @@ Solve non-convex OCP with SCvx* algorithm
 function solve!(
     algo::SCvxStar,
     prob::OptimalControlProblem,
-    x_ref, u_ref, y_ref;
+    x_ref, u_ref, y_ref = nothing;
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-4,

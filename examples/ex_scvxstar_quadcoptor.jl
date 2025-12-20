@@ -93,7 +93,6 @@ x_ref = hcat([[el for el in LinRange(x_initial[i], x_final[i], N)] for i in 1:6]
 u_ref = zeros(nu, N-1)
 u_ref[1:3,:] = repeat(-m*g, outer=[1,N-1])
 u_ref[4,:] = norm.(eachcol(u_ref[1:3,:]))
-y_ref = nothing
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
@@ -103,8 +102,7 @@ prob = SCPLib.ContinuousProblem(
     objective,
     times,
     x_ref,
-    u_ref,
-    y_ref;
+    u_ref;
     nh = nh,
     h_noncvx = h_noncvx,
     #eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
@@ -134,7 +132,7 @@ set_silent(prob.model)
 algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0)   # don't forget to pass `nh` to the algorithm as well!
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; tol_opt = 1e-6, tol_feas = 1e-6)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt = 1e-6, tol_feas = 1e-6)
 
 
 # -------------------- analysis of solution -------------------- #

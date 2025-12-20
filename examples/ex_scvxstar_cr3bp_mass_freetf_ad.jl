@@ -100,8 +100,7 @@ for (i,alpha) in enumerate(alphas)
     x_ref[1:6,i] = (1-alpha)*x_along_lpo0[1:6,i] + alpha*x_along_lpof[1:6,i]
 end
 tf_guess = 3.0
-u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)];
-y_ref = nothing
+u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)]
 
 # plot initial guess
 fig = Figure(size=(1600,800))
@@ -117,8 +116,7 @@ prob = SCPLib.ContinuousProblem(
     objective,
     times,
     x_ref,
-    u_ref,
-    y_ref;
+    u_ref;
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -146,7 +144,7 @@ tf_span = [2.0, 4.0]
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
