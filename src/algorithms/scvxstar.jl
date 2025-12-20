@@ -160,7 +160,6 @@ end
 
 function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
     # set objective with penalty
-    _y = prob.ny > 0 ? prob.model[:y] : nothing
     _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
     _ζ = prob.nh > 0 ? prob.model[:ζ] : nothing
 
@@ -176,7 +175,7 @@ function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
         slacks_L1 = nothing
     end
 
-    J = prob.objective(prob.model[:x], prob.model[:u], _y)
+    J = prob.objective(prob.model[:x], prob.model[:u])
     P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ, slacks_L1)
     @objective(prob.model, Min, J + P)
 
@@ -193,7 +192,6 @@ mutable struct SCvxStarSolution <: SCPSolution
     status::Symbol
     x::Matrix
     u::Matrix
-    y::Union{Nothing,Matrix}
     n_iter::Int
     info::Dict
 
@@ -201,7 +199,6 @@ mutable struct SCvxStarSolution <: SCPSolution
         status = :Solving
         x = zeros(prob.nx, prob.N)
         u = zeros(prob.nu, Nu)
-        y = prob.ny > 0 ? zeros(prob.ny) : nothing
         
         info = Dict(
             :J0 => Float64[],
@@ -211,7 +208,7 @@ mutable struct SCvxStarSolution <: SCPSolution
             :Δ => Matrix{Float64}[],
             :accept => Bool[],
         )
-        new(status, x, u, y, 0, info)
+        new(status, x, u, 0, info)
     end
 end
 
@@ -232,7 +229,6 @@ Solve non-convex OCP with SCvx* algorithm
 - `prob::OptimalControlProblem`: problem struct
 - `x_ref`: reference state history, size `nx`-by-`N`
 - `u_ref`: reference control history, size `nu`-by-`N-1`
-- `y_ref`: reference other variables, size `ny`
 - `maxiter::Int`: maximum number of iterations
 - `tol_feas::Float64`: feasibility tolerance
 - `tol_opt::Float64`: optimality tolerance
@@ -243,7 +239,7 @@ Solve non-convex OCP with SCvx* algorithm
 function solve!(
     algo::SCvxStar,
     prob::OptimalControlProblem,
-    x_ref, u_ref, y_ref = nothing;
+    x_ref, u_ref;
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-4,
@@ -264,7 +260,6 @@ function solve!(
     # initialize storage
     _x = similar(x_ref)
     _u = similar(u_ref)
-    _y = y_ref isa Nothing ? nothing : similar(y_ref)
     g_dyn_ref = zeros(prob.nx,prob.N-1)
     g_ref = prob.ng > 0 ? zeros(prob.ng) : nothing
     h_ref = prob.nh > 0 ? zeros(prob.nh) : nothing
@@ -295,7 +290,7 @@ function solve!(
             if it > 1
                 delete_noncvx_referencs!(prob, prob.model_nl_references)
             end
-            g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
+            g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
         
         # only update trust-region constraints
@@ -325,23 +320,22 @@ function solve!(
 
         _x = value.(prob.model[:x])
         _u = value.(prob.model[:u])
-        _y = y_ref isa Nothing ? nothing : value.(prob.model[:y])
         _ξ_dyn = value.(prob.model[:ξ_dyn])
         _ξ = prob.ng > 0 ? value.(prob.model[:ξ]) : nothing
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
 
         # evaluate nonlinear constraints
         if isnothing(prob.fun_get_trajectory)
-            _, g_dynamics = get_trajectory(prob, _x, _u, _y)
+            _, g_dynamics = get_trajectory(prob, _x, _u)
         else
-            _, g_dynamics = prob.fun_get_trajectory(prob, _x, _u, _y)
+            _, g_dynamics = prob.fun_get_trajectory(prob, _x, _u)
         end
-        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u, _y) : nothing
-        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u, _y), 0) : nothing
+        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u) : nothing
+        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u), 0) : nothing
 
         # check improvement
-        J_ref = prob.objective(x_ref, u_ref, y_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
-        J0 = prob.objective(_x, _u, _y)
+        J_ref = prob.objective(x_ref, u_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
+        J0 = prob.objective(_x, _u)
         J = J0 + penalty(algo, prob, g_dynamics, g_noncvx, h_noncvx)
         L = J0 + penalty(algo, prob, _ξ_dyn, _ξ, _ζ)
         ΔJ = J_ref - J            # actual cost reduction, eqn (13a)
@@ -369,7 +363,6 @@ function solve!(
         # update current solution
         solution.x[:,:] = _x
         solution.u[:,:] = _u
-        solution.y = _y
 
         if store_iterates
             push!(solution.info[:J0], J0)
@@ -393,9 +386,6 @@ function solve!(
             flag_reference = true
             x_ref[:,:] = _x
             u_ref[:,:] = _u
-            if prob.ny > 0
-                y_ref[:] = _y
-            end
 
             # stationarity check
             if abs(ΔJ) < δ_i
