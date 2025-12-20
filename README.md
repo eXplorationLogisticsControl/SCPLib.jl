@@ -15,8 +15,8 @@ We are interested in solving the discretized non-convex optimal control problem 
 \min_{x, u} \quad& \phi(x(t_f),u(t_f),t_f,y) + \int_{t_0}^{t_f} \mathcal{L}(x(t),u(t),t) \mathrm{d}t
 \\ \mathrm{s.t.} \quad&     \dot{x}(t) = f(x(t),u(t),t)
 \\&     x_{k+1} = x_k + \int_{t_k}^{t_{k+1}} f(x_k, u_k) \mathrm{d}t \quad \forall k=1,\ldots,N-1
-\\&     g(x,u,y) = 0
-\\&     h(x,u,y) \leq 0
+\\&     g(x,u) = 0
+\\&     h(x,u) \leq 0
 \\&     x_1 \in \mathcal{X}(t_1) ,\,\, x_N \in \mathcal{X}(t_N)
 \\&     x_k \in \mathcal{X}(t_k),\,\, u_k \in \mathcal{U}(t_k) \quad \forall k=1,\ldots,N
 \end{aligned}
@@ -72,7 +72,6 @@ N = 60                          # number of nodes
 times = LinRange(0.0, tf, N)    # time-stamp at nodes
 x_ref = ...                     # initial guess for state history
 u_ref = ...                     # initial guess for control history
-y_ref = nothing                 # unless there are variables other than states & controls, set to nothing
 ```
 
 Now we can use `SCPLib` to construct & solve our optimal control problem!
@@ -80,14 +79,13 @@ Now we can use `SCPLib` to construct & solve our optimal control problem!
 ```julia
 # 1. instantiate problem    
 prob = SCPLib.ContinuousProblem(
-    Clarabel.Optimizer,
+    Clarabel.Optimizer,                 # solver for convex subproblems
     eom!,
     params,
     objective,
     times,
     x_ref,
-    u_ref,
-    y_ref;
+    u_ref;
     eom_aug! = eom_aug!,                # optional
 )
 
