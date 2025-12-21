@@ -126,6 +126,7 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Var
             @constraint(prob.model, [slacks_L1[:slack_gnoncvx]; ξ] in MOI.NormOneCone(1 + length(ξ)))
         end
         if prob.nh > 0
+            # this penalization works because ζ is defined to be non-negative
             P += sqrt(algo.w) * sum(slacks_L1[:slack_hnoncvx])
             @constraint(prob.model, [slacks_L1[:slack_hnoncvx]; ζ] in MOI.NormOneCone(1 + length(ζ)))
         end
