@@ -59,31 +59,38 @@ function solve_convex_subproblem!(
     ϵ_proximal = @variable(prob.model)
     @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
 
-    # L1 penalty on non-convex constraints
-    ng_noncvx = prod(size(prob.model[:ξ_dyn]))
-    ϵ_dynamics = @variable(prob.model)
-    _g_noncvx = vec(prob.model[:ξ_dyn])
+    # L1 penalty on non-convex equality constraints
+    ϵ_noncvx_g = @variable(prob.model)              # slack for L1 norm of non-convex equality constraints violation
+    _g_noncvx = vec(prob.model[:ξ_dyn])             # stacked non-convex equality constraints violations
     if prob.ng > 0
         append!(_g_noncvx, vec(prob.model[:ξ]))
-        ng_noncvx += prod(size(prob.model[:ξ]))
     end
-    if prob.nh > 0
-        append!(_g_noncvx, vec(prob.model[:ζ]))
-        ng_noncvx += prod(size(prob.model[:ζ]))
-    end
-    @constraint(prob.model, ϵ_dynamics >= 0)
+    @constraint(prob.model, ϵ_noncvx_g >= 0)
     @constraint(prob.model,
-        [ϵ_dynamics; _g_noncvx]
-        in MOI.NormOneCone(1 + ng_noncvx)
+        [ϵ_noncvx_g; _g_noncvx]
+        in MOI.NormOneCone(1 + prod(size(prob.model[:ξ_dyn])) + prob.ng)
     )
+
+    # max(0, h(x,u)) penalty on non-convex inequality constraints
+    if prob.nh > 0
+        slack_h_eval = @variable(prob.model, [1:prob.nh])           # slack equated to each max(0, h(x,u))
+        @constraint(prob.model, slack_h_eval .>= 0.0)               # make sure slack is non-negative
+        @constraint(prob.model, slack_h_eval .>= prob.model[:ζ])    # make sure slack is greater than ζ if there is violation
+    else
+        slack_h_eval = [0.0]
+    end
 
     # combine into objective function
     J = prob.objective(prob.model[:x], prob.model[:u])    # original objective function
-    @objective(prob.model, Min, J + algo.w_ep*ϵ_dynamics + algo.w_prox/2*ϵ_proximal^2)
+    @objective(prob.model, Min, J + algo.w_ep*(ϵ_noncvx_g + sum(slack_h_eval)) + algo.w_prox/2*ϵ_proximal^2)
 
     # solve convex subproblem
     optimize!(prob.model)
-    return value(ϵ_dynamics), value(ϵ_proximal)
+    if prob.nh > 0
+        return value(ϵ_noncvx_g), sum(value.(slack_h_eval)), value(ϵ_proximal)
+    else
+        return value(ϵ_noncvx_g),0.0, value(ϵ_proximal)
+    end
 end
 
 
@@ -157,7 +164,7 @@ function solve!(
     solution = ProxLinearSolution(prob, size(u_ref,2))
 
     # print initial information
-    header = "\nIter |     J0     |  nrm(G,1)  |  nrm(ΔZ,2) |    χ_i    |  acpt. |"
+    header = "\nIter |     J0     |  nrm(G,1)  |  nrm(H,1)  |  nrm(ΔZ,2) |    χ_i    |  acpt. |"
     if verbosity > 0
         println()
         @printf(" Solving OCP with prox-linear Algorithm (`・ω・´)\n\n")
@@ -189,7 +196,7 @@ function solve!(
 
         # solve convex subproblem
         tstart_cp = time()
-        _ϵ_dynamics, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref)
+        _ϵ_noncvx_g, _ϵ_noncvx_h, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref)
         cpu_times[:time_subproblem] = time() - tstart_cp
 
         # check termination status
@@ -228,8 +235,8 @@ function solve!(
             if mod(it, 20) == 0
                 println(header)
             end
-            @printf(" %3.0f | % 1.3e | % 1.3e | % 1.3e |% 1.3e |  %s   |\n",
-                    it, J0, _ϵ_dynamics, _ϵ_proximal, χ,
+            @printf(" %3.0f | % 1.3e | % 1.3e | % 1.3e | % 1.3e |% 1.3e |  %s   |\n",
+                    it, J0, _ϵ_noncvx_g, _ϵ_noncvx_h, _ϵ_proximal, χ,
                     "yes") #message_accept_step(rho_i >= algo.rhos[1]))
         end
 
