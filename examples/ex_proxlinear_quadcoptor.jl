@@ -21,7 +21,7 @@ m = 0.3;                        # kg, mass of quadrotor
 T_min = 1.0;                    # N, minimum thrust
 T_max = 4.0;                    # N, maximum thrust
 theta_max = pi/4;               # rad, maximum tilt angle
-N = 30;                         # number of nodes
+N = 50;                         # number of nodes
 
 # initial and final states
 x_initial = [0, 0, 0, 0, 0.5, 0];
@@ -105,7 +105,7 @@ prob = SCPLib.ContinuousProblem(
     u_ref;
     nh = nh,
     h_noncvx = h_noncvx,
-    #eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
+    eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
     ode_method = Tsit5(),
 )
 set_silent(prob.model)
@@ -134,7 +134,9 @@ w_prox = 1e0
 algo = SCPLib.ProxLinear(w_ep, w_prox)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt = 1e-6, tol_feas = 1e-6)
+tol_feas = 1e-8
+tol_opt = 1e-6
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt = tol_opt, tol_feas = tol_feas)
 
 
 # -------------------- analysis of solution -------------------- #

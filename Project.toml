@@ -1,7 +1,7 @@
 name = "SCPLib"
 uuid = "372d3413-d610-491c-84c4-e7782b0b6c35"
-authors = ["Yuri <yuri.shimane@gmail.com>"]
 version = "0.1.0"
+authors = ["Yuri <yuri.shimane@gmail.com>"]
 
 [deps]
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
@@ -13,8 +13,12 @@ OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 SparseDiffTools = "47a9eef4-7e08-11e9-0b38-333d64bd3804"
 
+[compat]
+IJulia = "1.33.0"
+
 [extras]
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
+IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
