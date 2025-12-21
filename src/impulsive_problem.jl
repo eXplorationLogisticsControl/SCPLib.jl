@@ -267,11 +267,6 @@ end
 function unpack_flattened_variables(prob::ImpulsiveProblem, z)
     x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
     u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * prob.Nu], prob.nu, prob.Nu)
-    if prob.ny > 0
-        y = z[prob.nx * prob.N + prob.nu * prob.Nu + 1:end]
-    else
-        y = nothing
-    end
     return x, u
 end
 
