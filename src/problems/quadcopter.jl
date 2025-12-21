@@ -1,7 +1,12 @@
-"""Quadcoptor problem"""
+"""Quadcopter problem"""
 
 
-function get_quadcoptor_problem()
+mutable struct QuadcopterParams
+    u::Vector
+end
+
+
+function get_quadcopter_problem(optimizer, N::Int=50)
     # system parameters
     nx = 6
     nu = 4                              # [ux,uy,uz,Γ]
@@ -12,7 +17,6 @@ function get_quadcoptor_problem()
     T_min = 1.0;                    # N, minimum thrust
     T_max = 4.0;                    # N, maximum thrust
     theta_max = pi/4;               # rad, maximum tilt angle
-    N = 50;                         # number of nodes
     
     # initial and final states
     x_initial = [0, 0, 0, 0, 0.5, 0];
@@ -25,14 +29,10 @@ function get_quadcoptor_problem()
     p_obstacle_2 = [0, 7, -0.45]    # m, position of obstacle 2
     
     # ODE parameters
-    mutable struct QuadroptorParams
-        u::Vector
-    end
-    
-    params = QuadroptorParams(zeros(nu))
+    params = QuadcopterParams(zeros(nu))
     
     # rhs and jacobian expressions for quadrotor dynamics
-    function quadrotor_dfdx(x, u, p, t)
+    function quadcopter_dfdx(x, u, p, t)
         v = x[4:6]
         v_norm = norm(v)
         dfdx = [zeros(3,3) I(3);
@@ -40,25 +40,25 @@ function get_quadcoptor_problem()
         return dfdx
     end
     
-    function quadrotor_dfdu(x, u, p, t)
+    function quadcopter_dfdu(x, u, p, t)
         dfdu = [zeros(3,4); 1/m * I(3) zeros(3,1)];
         return dfdu
     end
     
-    function quadrotor_rhs!(dx, x, p, t)
+    function quadcopter_rhs!(dx, x, p, t)
         dx[1:3] = x[4:6]
         dx[4:6] = -k_D*norm(x[4:6])*x[4:6] + g
-        B = quadrotor_dfdu(x[1:6], p.u, p, t)
+        B = quadcopter_dfdu(x[1:6], p.u, p, t)
         dx[1:6] += B * p.u
         return
     end
     
-    function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
-        quadrotor_rhs!(dx_aug, x_aug, p, t)
+    function quadcopter_rhs_aug!(dx_aug, x_aug, p, t)
+        quadcopter_rhs!(dx_aug, x_aug, p, t)
     
         # derivatives of Phi_A, Phi_B
-        A = quadrotor_dfdx(x_aug[1:6], p.u, p, t)
-        B = quadrotor_dfdu(x_aug[1:6], p.u, p, t)
+        A = quadcopter_dfdx(x_aug[1:6], p.u, p, t)
+        B = quadcopter_dfdu(x_aug[1:6], p.u, p, t)
         dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
         dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
     end
@@ -87,8 +87,8 @@ function get_quadcoptor_problem()
     
     # instantiate problem object    
     prob = SCPLib.ContinuousProblem(
-        Clarabel.Optimizer,
-        quadrotor_rhs!,
+        optimizer,
+        quadcopter_rhs!,
         params,
         objective,
         times,
@@ -96,7 +96,7 @@ function get_quadcoptor_problem()
         u_ref;
         nh = nh,
         h_noncvx = h_noncvx,
-        eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
+        eom_aug! = quadcopter_rhs_aug!,   # uncomment to use the user-defined eom_aug!
         ode_method = Tsit5(),
     )
     set_silent(prob.model)
@@ -117,6 +117,6 @@ function get_quadcoptor_problem()
         prob.model[:u][4,k] >= T_min)
     @constraint(prob.model, constraint_control_magnitude_max[k in 1:N-1],
         prob.model[:u][4,k] <= T_max)
-        
+
     return prob, x_ref, u_ref
 end

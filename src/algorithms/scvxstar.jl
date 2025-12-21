@@ -247,6 +247,7 @@ function solve!(
     tol_J0::Real = -1e16,
     verbosity::Int = 1,
     store_iterates::Bool = true,
+    callback::Union{Nothing,Function} = nothing,
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
@@ -276,6 +277,7 @@ function solve!(
         @printf("   Feasibility tolerance tol_feas : % 1.2e\n", tol_feas)
         @printf("   Optimality tolerance tol_opt   : % 1.2e\n", tol_opt)
         @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
+        @printf("   Use L1 penalty                 : %s\n", algo.l1_penalty ? "Yes" : "No")
         println(header)
     end
     cpu_times = Dict(
@@ -373,6 +375,10 @@ function solve!(
             push!(solution.info[:Δ], algo.tr.Δ)
             push!(solution.info[:accept], rho_i >= algo.rhos[1])
             solution.n_iter += 1
+        end
+
+        if !isnothing(callback)
+            callback(solution)
         end
 
         if rho_i >= algo.rhos[1]

@@ -147,6 +147,7 @@ function solve!(
     tol_J0::Real = -1e16,
     verbosity::Int = 1,
     store_iterates::Bool = true,
+    callback::Union{Nothing,Function} = nothing,
 )
     # initialize algorithm hyperparameters
     flag_reference    = true    # at initial iteraiton, we need to update reference
@@ -255,6 +256,10 @@ function solve!(
             push!(solution.info[:ΔJ], ΔJ)
             push!(solution.info[:χ], χ)
             solution.n_iter += 1
+        end
+
+        if !isnothing(callback)
+            callback(solution)
         end
 
         # update reference solution
