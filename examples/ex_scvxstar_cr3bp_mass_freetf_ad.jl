@@ -45,8 +45,10 @@ function eom!(drvm, rvm, p, t)
     drvm[7] = -p.u[4] * p.c2
     # append controls
     drvm[4:6] += p.u[1:3] * p.c1 / rvm[7]
+    # time derivative
+    drvm[8] = 1.0
     # multiply by time factor
-    drvm[1:7] *= p.u[5]
+    drvm[1:8] *= p.u[5]
     return
 end
 
@@ -70,23 +72,23 @@ period_f = 3.3031221822879884
 # initial & final LPO
 params.u[5] = period_0
 sol_lpo0 = solve(
-    ODEProblem(eom!, [rv0; 1.0], [0.0, 1.0], params),
+    ODEProblem(eom!, [rv0; 1.0; 0.0], [0.0, 1.0], params),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 params.u[5] = period_f
 sol_lpof = solve(
-    ODEProblem(eom!, [rvf; 1.0], [0.0, 1.0], params),
+    ODEProblem(eom!, [rvf; 1.0; 0.0], [0.0, 1.0], params),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 
 # -------------------- define objective -------------------- #
-function objective(x, u, y)
+function objective(x, u)
     return -x[7,end] #sum(u[4,:])
 end
 
 # -------------------- create problem -------------------- #
 N = 100
-nx = 7
+nx = 8                              # [x,y,z,vx,vy,vz,mass,time]
 nu = 5                              # [ux,uy,uz,Γ,tf]
 tf = 1.0                            # fixed to unity
 times = LinRange(0.0, tf, N)
@@ -100,8 +102,8 @@ for (i,alpha) in enumerate(alphas)
     x_ref[1:6,i] = (1-alpha)*x_along_lpo0[1:6,i] + alpha*x_along_lpof[1:6,i]
 end
 tf_guess = 3.0
-u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)];
-y_ref = nothing
+x_ref[8,:] = LinRange(0.0, tf_guess, N)
+u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)]
 
 # plot initial guess
 fig = Figure(size=(1600,800))
@@ -117,8 +119,7 @@ prob = SCPLib.ContinuousProblem(
     objective,
     times,
     x_ref,
-    u_ref,
-    y_ref;
+    u_ref;
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -136,20 +137,24 @@ set_silent(prob.model)
 
 # append constraints on time factor
 tf_span = [2.0, 4.0]
-@constraint(prob.model, constraint_tf_lb, prob.model[:u][5,1] >= tf_span[1])
-@constraint(prob.model, constraint_tf_ub, prob.model[:u][5,end] <= tf_span[2])
-@constraint(prob.model, constraint_tf_uniform[k in 1:N-2],
-    prob.model[:u][5,k] == prob.model[:u][5,k+1])
+# @constraint(prob.model, constraint_tf_lb, prob.model[:u][5,1] >= tf_span[1])
+# @constraint(prob.model, constraint_tf_ub, prob.model[:u][5,end] <= tf_span[2])
+# @constraint(prob.model, constraint_tf_uniform[k in 1:N-2],
+#     prob.model[:u][5,k] == prob.model[:u][5,k+1])
+@constraint(prob.model, constraint_tscale_lb[k in 1:N-1], prob.model[:u][5,k] >= tf_span[1])
+@constraint(prob.model, constraint_tscale_ub[k in 1:N-1], prob.model[:u][5,k] <= tf_span[2])
+@constraint(prob.model, constraint_tf_lb, prob.model[:x][8,end] >= tf_span[1])
+@constraint(prob.model, constraint_tf_ub, prob.model[:x][8,end] <= tf_span[2])
 
 
 # -------------------- instantiate algorithm -------------------- #
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 
 # propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 arc_colors = [
     solution.u[4,i] > 1e-6 ? :red : :black for i in 1:N-1
 ]
@@ -159,10 +164,20 @@ end
 
 # plot controls
 ax_u = Axis(fig[2,1]; xlabel="Time", ylabel="Control")
-for i in 1:3
-    stairs!(ax_u, prob.times[1:end-1] .* solution.u[5,:], solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
+times_u = []
+umags = []
+udirs = []
+for (i, _sol) in enumerate(sols_opt)
+    u_zoh = solution.u[4,i] * ones(length(_sol.t))
+    append!(times_u, Array(_sol)[8,:])
+    append!(umags, u_zoh)
+    push!(udirs, [solution.u[1,i] * ones(1,length(_sol.t)); solution.u[2,i] * ones(1,length(_sol.t)); solution.u[3,i] * ones(1,length(_sol.t))])
 end
-stairs!(ax_u, prob.times[1:end-1] .* solution.u[5,:], solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
+udirs = hcat(udirs...)
+for i in 1:3
+    stairs!(ax_u, times_u, udirs[i,:], label="u[$i]", step=:pre, linewidth=1.0)
+end
+stairs!(ax_u, times_u, umags, label="||u||", step=:pre, linewidth=0.5, color=:black)
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
@@ -181,7 +196,7 @@ scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in 
 
 ax_m = Axis(fig[1,4]; xlabel="Time", ylabel="mass")
 for (i, _sol) in enumerate(sols_opt)
-    lines!(ax_m, _sol.t * solution.u[5,i], Array(_sol)[7,:], color=arc_colors[i])
+    lines!(ax_m, Array(_sol)[8,:], Array(_sol)[7,:], color=arc_colors[i])
 end
 
 display(fig)

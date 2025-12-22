@@ -4,7 +4,6 @@
 mutable struct ContinuousProblem <: OptimalControlProblem
     nx::Int
     nu::Int
-    ny::Int
     N::Int
     Nu::Int
 
@@ -64,7 +63,7 @@ function init_continuous_dynamics_xaug(x0::Vector, nx::Int, nu::Int)
 end
 
 
-function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
+function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
@@ -99,7 +98,7 @@ Propagate augmented dynamics with continuous control
 This function also constructs state-transition matrices and 
 evaluates dynamics residuals.
 """
-function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
+function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     g_dynamics = zeros(prob.nx, prob.N-1)
     # set dynamics constraints
     prob_func = function(ode_problem, i, repeat)
@@ -140,8 +139,7 @@ function ContinuousProblem(
     objective::Function,
     times,
     x_ref,
-    u_ref,
-    y_ref = nothing;
+    u_ref;
     eom_aug! = nothing,
     ng::Int = 0,
     g_noncvx::Union{Function,Nothing} = nothing,
@@ -162,7 +160,6 @@ function ContinuousProblem(
     @assert size(x_ref,2) == size(u_ref,2) + 1 == N
     nx, _ = size(x_ref)
     nu, _ = size(u_ref)
-    ny = isnothing(y_ref) ? 0 : length(y_ref)
 
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
@@ -174,17 +171,17 @@ function ContinuousProblem(
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
-        ∇g_noncvx = function (x,u,y)
+        ∇g_noncvx = function (x,u)
             return ForwardDiff.jacobian(z -> g_noncvx(unpack_flattened_variables(prob, z)...),
-                                        stack_flatten_variables(prob, x, u, y))
+                                        stack_flatten_variables(prob, x, u))
         end
     end
 
     # check if ∇h_noncvx is provided
     if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
-        ∇h_noncvx = function (x,u,y)
+        ∇h_noncvx = function (x,u)
             return ForwardDiff.jacobian(z -> h_noncvx(unpack_flattened_variables(prob, z)...),
-                                        stack_flatten_variables(prob, x, u, y))
+                                        stack_flatten_variables(prob, x, u))
         end
     end
 
@@ -192,7 +189,7 @@ function ContinuousProblem(
     model_nl_references = [:constraint_dynamics,
                            :constraint_trust_region_x_lb,
                            :constraint_trust_region_x_ub]
-
+    
 
     if isnothing(u_bias)
         u_bias = zeros(nu,N)
@@ -204,7 +201,6 @@ function ContinuousProblem(
     prob = ContinuousProblem(
         nx,
         nu,
-        ny,
         N,
         N-1,
         ng,
@@ -248,12 +244,9 @@ function ContinuousProblem(
 end
 
 
-function stack_flatten_variables(prob::ContinuousProblem, x, u, y)
+function stack_flatten_variables(prob::ContinuousProblem, x, u)
     Δz = [reshape(x, prob.nx * prob.N);
           reshape(u, prob.nu * (prob.N-1))];
-    if prob.ny > 0
-        Δz = [Δz; y]
-    end
     return Δz
 end
 
@@ -261,10 +254,5 @@ end
 function unpack_flattened_variables(prob::ContinuousProblem, z)
     x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
     u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
-    if prob.ny > 0
-        y = z[prob.nx * prob.N + prob.nu * (prob.N-1) + 1:end]
-    else
-        y = nothing
-    end
-    return x, u, y
+    return x, u
 end

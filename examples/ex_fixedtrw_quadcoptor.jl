@@ -1,4 +1,4 @@
-"""Quadcoptor example with SCvx*"""
+"""Quadcoptor example with fixed trust-region algorithm"""
 
 using Clarabel
 using ForwardDiff
@@ -21,7 +21,7 @@ m = 0.3;                        # kg, mass of quadrotor
 T_min = 1.0;                    # N, minimum thrust
 T_max = 4.0;                    # N, maximum thrust
 theta_max = pi/4;               # rad, maximum tilt angle
-N = 50;                         # number of nodes
+N = 30;                         # number of nodes
 
 # initial and final states
 x_initial = [0, 0, 0, 0, 0.5, 0];
@@ -105,7 +105,7 @@ prob = SCPLib.ContinuousProblem(
     u_ref;
     nh = nh,
     h_noncvx = h_noncvx,
-    eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
+    #eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
     ode_method = Tsit5(),
 )
 set_silent(prob.model)
@@ -129,11 +129,13 @@ set_silent(prob.model)
 
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0, l1_penalty=true)
+tol_opt = 1e-6
+tol_feas = 1e-6
+w = 1 * 1/tol_feas
+Δ = 0.05
+algo = SCPLib.FixedTRWSCP(nx, N, Δ, w)
 
 # solve problem
-tol_feas = 1e-8
-tol_opt = 1e-6
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt = tol_opt, tol_feas = tol_feas)
 
 
@@ -166,18 +168,17 @@ hlines!(ax_u, [-T_max, T_max], color=:red, linestyle=:dot, label="||u|| bounds")
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
-colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
 ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
-scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+scatterlines!(ax_χ, 1:length(solution.info[:χ]), solution.info[:χ], color=:black, marker=:circle, markersize=7)
 
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="J0", yscale=log10)
+scatterlines!(ax_w, 1:length(solution.info[:χ]), solution.info[:J0], color=:black, marker=:circle, markersize=7)
 
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
-scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
+scatterlines!(ax_J, 1:length(solution.info[:χ]), abs.(solution.info[:ΔJ]), color=:black, marker=:circle, markersize=7)
 
-ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
-scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
+# ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+# scatterlines!(ax_Δ, 1:length(solution.info[:χ]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
 display(fig)
 println("Done!")

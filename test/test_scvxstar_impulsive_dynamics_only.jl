@@ -58,8 +58,8 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
         dx_aug[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
         
         # Jacobian derivatives
-        G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-        G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
+        G1 = (1 - p.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
+        G2 = p.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
         Omega = [0 2 0; -2 0 0; 0 0 0]
         A = [zeros(3,3)                  I(3);
             G1 + G2 + diagm([1,1,0])    Omega]
@@ -96,7 +96,7 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
     )
 
     # -------------------- define objective -------------------- #
-    function objective(x, u, y)
+    function objective(x, u)
         return sum(u[4,:])
     end
 
@@ -129,8 +129,7 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
         objective,
         times,
         x_ref,
-        u_ref,
-        y_ref;
+        u_ref;
         eom_aug! = eom_aug!,
         ode_method = Vern7(),
     )
@@ -154,11 +153,11 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
     # solve problem
     tol_opt = 1e-6
     tol_feas = 1e-8
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref;
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
         verbosity = verbosity, maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
 
     # propagate solution
-    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
 

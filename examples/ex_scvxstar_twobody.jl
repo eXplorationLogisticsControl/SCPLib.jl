@@ -66,7 +66,7 @@ sol_orbitf = solve(
 )
 
 # -------------------- define objective -------------------- #
-function objective(x, u, y) return -x[7,end] end
+function objective(x, u) return -x[7,end] end
 
 # -------------------- create problem -------------------- #
 N = 100
@@ -86,8 +86,7 @@ for (i,alpha) in enumerate(alphas)
 end
 x_ref[1:6,end] = rvf[1:6]   # to avoid initial infeasibility
 x_ref[8,:] = LinRange(0.0, tf_guess, N)
-u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)];
-y_ref = nothing
+u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)]
 
 # plot initial guess
 fig = Figure(size=(1600,800))
@@ -103,8 +102,7 @@ prob = SCPLib.ContinuousProblem(
     objective,
     times,
     x_ref,
-    u_ref,
-    y_ref;
+    u_ref;
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -136,10 +134,10 @@ tf_span = [1.5π, 3π]
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, w_max=1e20)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 
 # propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 arc_colors = [
     solution.u[4,i] > 1e-6 ? :red : :black for i in 1:N-1
 ]

@@ -116,9 +116,8 @@ function test_convex_subproblem(;verbosity::Int = 0)
         x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
     end
     u_ref = zeros(nu, N-1)
-    y_ref = nothing
 
-    function objective(x, u, y)
+    function objective(x, u)
         return sum(u[4,:])
     end
 
@@ -130,8 +129,7 @@ function test_convex_subproblem(;verbosity::Int = 0)
         objective,
         times,
         x_ref,
-        u_ref,
-        y_ref;
+        u_ref;
         eom_aug! = eom_aug!,
     )
     if verbosity == 0
@@ -149,12 +147,12 @@ function test_convex_subproblem(;verbosity::Int = 0)
         prob.model[:u][4,k] <= umax)
 
     # propagate initial guess
-    sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
+    sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref)
 
     # -------------------- instantiate algorithm -------------------- #
     algo = SCPLib.SCvxStar(nx, N;)
 
-    SCPLib.set_linearized_constraints!(prob, x_ref, u_ref, y_ref)
+    SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
     SCPLib.set_trust_region_constraints!(algo, prob, x_ref, u_ref)
 
     # try solving subproblem

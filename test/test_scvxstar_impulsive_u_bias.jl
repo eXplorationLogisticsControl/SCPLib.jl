@@ -96,7 +96,7 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
     )
 
     # -------------------- define objective -------------------- #
-    function objective(x, u, y)
+    function objective(x, u)
         return sum(u[4,:])
     end
 
@@ -135,8 +135,7 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
             objective,
             times,
             x_ref,
-            u_ref,
-            y_ref;
+            u_ref;
             eom_aug! = eom_aug!,
             ode_method = Vern7(),
             u_bias = u_bias,
@@ -161,11 +160,11 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
         # solve problem
         tol_opt = 1e-4
         tol_feas = 1e-6
-        solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref;
+        solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
             verbosity = verbosity, maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
 
         # propagate solution
-        sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+        sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
         @test maximum(abs.(g_dynamics_opt)) <= tol_feas
         @test solution.status == :Optimal
 

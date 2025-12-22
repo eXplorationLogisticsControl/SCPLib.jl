@@ -24,6 +24,8 @@ include("algorithms/scvxstar.jl")
 include("algorithms/fixedtrw.jl")
 include("algorithms/proxlinear.jl")
 
+include("problems/quadcopter.jl")
+
 export get_continuous_augmented_eom
 export get_impulsive_augmented_eom
 

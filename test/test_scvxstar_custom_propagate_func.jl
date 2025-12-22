@@ -169,7 +169,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
     # end
 
     # define custom propagation functions
-    custom_get_trajectory = function (prob::SCPLib.ImpulsiveProblem, x_ref, u_ref, y_ref)
+    custom_get_trajectory = function (prob::SCPLib.ImpulsiveProblem, x_ref, u_ref)
         sols = []
         g_dynamics = zeros(prob.nx, prob.N-1)
         for k in 1:size(x_ref,2)-1
@@ -189,10 +189,9 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         prob::SCPLib.ImpulsiveProblem,
         x_ref::Union{Matrix,Adjoint},
         u_ref::Union{Matrix,Adjoint},
-        y_ref::Union{Matrix,Nothing},
     )
         # solve ensemble problem for each spacecraft & for each time-step
-        sols, g_dynamics_ref = custom_get_trajectory(prob, x_ref, u_ref, y_ref)
+        sols, g_dynamics_ref = custom_get_trajectory(prob, x_ref, u_ref)
         nx, N = size(x_ref)
         for (k,sol) in enumerate(sols)
             xf_aug = sol.u[end]
@@ -228,10 +227,9 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         x_ref[7:12,i] = x_ref[1:6,i]
     end
     u_ref = zeros(nu, N)
-    y_ref = nothing
 
     # objective function
-    function objective(x, u, y)
+    function objective(x, u)
         return sum(u[7,:]) + sum(u[8,:])
     end
 
@@ -243,8 +241,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         objective,
         times,
         x_ref,
-        u_ref,
-        y_ref;
+        u_ref;
         dfdu = dfdu,
         eom_aug! = multi_spacecraft_eom_aug!,
         ode_ensemble_method = EnsembleSerial(),
@@ -278,11 +275,11 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
     # solve problem
     tol_opt = 1e-6
     tol_feas = 1e-8
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; 
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref; 
         verbosity = verbosity, maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
 
     # propagate solution
-    sols_opt, g_dynamics_opt = custom_get_trajectory(prob, solution.x, solution.u, solution.y)
+    sols_opt, g_dynamics_opt = custom_get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
 

@@ -21,7 +21,7 @@ m = 0.3;                        # kg, mass of quadrotor
 T_min = 1.0;                    # N, minimum thrust
 T_max = 4.0;                    # N, maximum thrust
 theta_max = pi/4;               # rad, maximum tilt angle
-N = 30;                         # number of nodes
+N = 50;                         # number of nodes
 
 # initial and final states
 x_initial = [0, 0, 0, 0, 0.5, 0];
@@ -73,12 +73,12 @@ function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
 end
 
 # -------------------- define objective & non-convex constraints -------------------- #
-function objective(x, u, y)
+function objective(x, u)
     return sum(u[4,:])
 end
 
 nh = 2 * N    # two obstacles, enforced at each node
-function h_noncvx(x,u,y)
+function h_noncvx(x,u)
     h = vcat(
         [R_obstacle_1 - norm(x[1:3,k] - p_obstacle_1) for k in 1:N],
         [R_obstacle_2 - norm(x[1:3,k] - p_obstacle_2) for k in 1:N]
@@ -93,7 +93,6 @@ x_ref = hcat([[el for el in LinRange(x_initial[i], x_final[i], N)] for i in 1:6]
 u_ref = zeros(nu, N-1)
 u_ref[1:3,:] = repeat(-m*g, outer=[1,N-1])
 u_ref[4,:] = norm.(eachcol(u_ref[1:3,:]))
-y_ref = nothing
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
@@ -103,11 +102,10 @@ prob = SCPLib.ContinuousProblem(
     objective,
     times,
     x_ref,
-    u_ref,
-    y_ref;
+    u_ref;
     nh = nh,
     h_noncvx = h_noncvx,
-    #eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
+    eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
     ode_method = Tsit5(),
 )
 set_silent(prob.model)
@@ -136,12 +134,14 @@ w_prox = 1e0
 algo = SCPLib.ProxLinear(w_ep, w_prox)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; tol_opt = 1e-6, tol_feas = 1e-6)
+tol_feas = 1e-8
+tol_opt = 1e-6
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt = tol_opt, tol_feas = tol_feas)
 
 
 # -------------------- analysis of solution -------------------- #
 # propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 
 # get obstacles x[2] & x[3] values for plotting
 coord_obstacle_1 = R_obstacle_1 * [cos.(LinRange(0, 2*pi, 100)) sin.(LinRange(0, 2*pi, 100))]' .+ p_obstacle_1[2:3]
