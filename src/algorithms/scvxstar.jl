@@ -277,7 +277,8 @@ function solve!(
         @printf("   Feasibility tolerance tol_feas : % 1.2e\n", tol_feas)
         @printf("   Optimality tolerance tol_opt   : % 1.2e\n", tol_opt)
         @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
-        @printf("   Use L1 penalty                 : %s\n", algo.l1_penalty ? "Yes" : "No")
+        @printf("   Initial penalty weight w       : % 1.2e\n", algo.w)
+        @printf("   Use L1 penalty                 :  %s\n", algo.l1_penalty ? "Yes" : "No")
         println(header)
     end
     cpu_times = Dict(
