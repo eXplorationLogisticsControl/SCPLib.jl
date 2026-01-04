@@ -270,7 +270,7 @@ function solve!(
     solution = SCvxStarSolution(prob, size(u_ref,2))
 
     # print initial information
-    header = "\nIter |     J0     |    ΔJ_i   |    ΔL_i    |     χ_i    |   ρ_i    |   r_i    |    w     |  acpt. |"
+    header = "\nIter |     J0     |    ΔJ_i    |    ΔL_i    |     χ_i    |    ρ_i    |    r_i    |     w     |  acpt. |"
     if verbosity > 0
         println()
         @printf(" Solving OCP with SCvx* Algorithm (`・ω・´)\n\n")
@@ -359,7 +359,7 @@ function solve!(
             if mod(it, 20) == 0
                 println(header)
             end
-            @printf(" %3.0f | % 1.3e |% 1.3e | % 1.3e | % 1.3e |% 1.2e |% 1.2e |% 1.2e |  %s   |\n",
+            @printf(" %3.0f | % 1.3e | % 1.3e | % 1.3e | % 1.3e | % 1.2e | % 1.2e | % 1.2e |  %s   |\n",
                     it, J0, ΔJ, ΔL, χ, rho_i, algo.tr.Δ[1,1], algo.w,
                     message_accept_step(rho_i >= algo.rhos[1]))
         end
