@@ -30,3 +30,6 @@ JuliaLocalPreferences.toml
 # Mac tmp file
 .DS_Store
 *.so
+
+# animation temp images
+examples_astrodynamics/img_*
