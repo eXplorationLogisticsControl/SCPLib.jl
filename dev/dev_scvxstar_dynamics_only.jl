@@ -101,7 +101,7 @@ sol_lpof = solve(
 )
 
 # -------------------- define objective -------------------- #
-function objective(x, u, y)
+function objective(x, u)
     return sum(u[4,:])
 end
 
@@ -163,10 +163,10 @@ set_silent(prob.model)
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref, y_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 
 # propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u, solution.y)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 arc_colors = [
     solution.u[4,i] > 1e-6 ? :red : :black for i in 1:N-1
 ]

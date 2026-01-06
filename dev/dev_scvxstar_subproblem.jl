@@ -134,7 +134,7 @@ lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
 # scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
 
-function objective(x, u, y)
+function objective(x, u)
     return sum(u[4,:])
 end
 
