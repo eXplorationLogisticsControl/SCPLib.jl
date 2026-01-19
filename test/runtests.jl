@@ -11,6 +11,7 @@ get_plot = false
 @testset "SCvxStar" begin
     include("test_scvxstar_subproblem.jl")
     include("test_scvxstar_dynamics_userdefined.jl")
+    include("test_scvxstar_dynamics_userdefined_oop.jl")
     include("test_scvxstar_dynamics_ad.jl")
     include("test_scvxstar_h_noncvx.jl")
 

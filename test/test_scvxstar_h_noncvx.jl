@@ -137,7 +137,7 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
 
 
     # -------------------- instantiate algorithm -------------------- #
-    algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0)   # don't forget to pass `nh` to the algorithm as well!
+    algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0, l1_penalty = true)   # don't forget to pass `nh` to the algorithm as well!
 
     # solve problem
     solution = SCPLib.solve!(algo, prob, x_ref, u_ref;

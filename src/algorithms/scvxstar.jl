@@ -85,7 +85,7 @@ end
 
 
 """
-Augmented Lagrangian penalty function
+Augmented Lagrangian penalty function for numerical evaluation
 """
 function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Float64}, ξ, ζ)
     P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
@@ -109,7 +109,10 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Flo
 end
 
 
-function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1)
+"""
+Augmented Lagrangian penalty function for JuMP model
+"""
+function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1::Union{Nothing,Dict})
     P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
     if prob.ng > 0
         P += dot(algo.λ, ξ) + algo.w/2 * dot(ξ,ξ)                   # append equality constraints terms
@@ -132,30 +135,6 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Var
         end
     end
     return P
-end
-
-
-"""Update trust-region size"""
-function update_trust_region!(algo::SCvxStar, rho_i::Float64)
-    flag_trust_region = false
-    if rho_i < algo.rhos[2]
-        algo.tr.Δ = max.(algo.tr.Δ / algo.alphas[1], algo.Δ_bounds[1])
-        flag_trust_region = true
-    elseif rho_i >= algo.rhos[3]
-        algo.tr.Δ = min.(algo.tr.Δ * algo.alphas[2], algo.Δ_bounds[2])
-        flag_trust_region = true
-    end
-    return flag_trust_region
-end
-
-
-function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
-    # define trust-region constraints
-    @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
-        -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
-    @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
-          prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
-    return
 end
 
 
