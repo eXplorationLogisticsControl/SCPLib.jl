@@ -90,7 +90,7 @@ prob = SCPLib.ContinuousProblem(
 )
 
 # 2. append convex constraints to `prob.model` if any
-@constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)     # final boundary conditions
+@constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)     # initial boundary conditions
 @constraint(prob.model, constraint_final_rv,   prob.model[:x][:,end] == rvf)   # final boundary conditions
 
 set_silent(prob.model)
