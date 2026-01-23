@@ -222,7 +222,6 @@ function Base.show(io::IO, solution::SCvxStarSolution)
 end
 
 
-
 function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref, J_expected::Real = 1.0, K_w::Real = 10.0)
     # evaluate nonlinear constraints
     if isnothing(prob.fun_get_trajectory)
@@ -279,7 +278,8 @@ function solve!(
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
-    
+    tcpu_start = time()
+
     # re-tune initial penalty weight if not provided
     if isnothing(algo.w)
         tune_initial_penalty_weight!(algo, prob, x_ref, u_ref, J_expected, K_w)
@@ -290,7 +290,6 @@ function solve!(
     flag_reference    = true    # at initial iteraiton, we need to update reference
     flag_trust_region = true    # (redundant since `flag_reference = true`)
     δ_i = 1e16
-    tcpu_start = time()
 
     # initialize storage
     _x = similar(x_ref)
