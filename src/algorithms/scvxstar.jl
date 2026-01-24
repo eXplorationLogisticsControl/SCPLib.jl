@@ -44,7 +44,7 @@ mutable struct SCvxStar <: SCPAlgorithm
         w0::Union{Nothing,Float64} = nothing,
         rhos::Tuple{Real,Real,Real} = (0.0, 0.25, 0.7),
         alphas::Tuple{Real,Real} = (2.0, 3.0),
-        Δ_bounds::Tuple{Float64,Float64} = (1e-6, 1e2),
+        Δ_bounds::Tuple{Float64,Float64} = (1e-6, 1e4),
         gamma::Float64 = 0.9,
         beta::Float64 = 2.0,
         w_max::Float64 = 1e16,

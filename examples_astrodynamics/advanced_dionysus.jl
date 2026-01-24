@@ -140,14 +140,16 @@ set_silent(prob.model)
 sols_ig, _ = SCPLib.get_trajectory(prob, x_ref, u_ref)
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
+algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, Δ0=0.1, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
 
 # w_ep = 1e2
 # w_prox = 1e1
 # algo = SCPLib.ProxLinear(w_ep, w_prox)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 500)
+tol_feas = 1e-8
+tol_opt = 1e-6
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_feas = tol_feas, tol_opt = tol_opt, maxiter = 500)
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 @show -solution.info[:J0][end] * MASS
 
@@ -219,4 +221,4 @@ for (isol,sol) in enumerate(sols_opt)
 end
 
 save(joinpath(@__DIR__, "plots/advanced_dionysus_trajectory.png"), fig_traj; px_per_unit=5)
-display(fig_traj)
+display(fig)
