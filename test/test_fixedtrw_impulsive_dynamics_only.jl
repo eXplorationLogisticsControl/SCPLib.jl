@@ -147,8 +147,8 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
         prob.model[:u][4,k] <= umax)
 
     # -------------------- instantiate algorithm -------------------- #
-    # algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
-    algo = SCPLib.FixedTRWSCP(nx, N, 0.05, 1e10)
+    w0 = nothing
+    algo = SCPLib.FixedTRWSCP(nx, N, 0.05, w0)
 
     # solve problem
     tol_opt = 1e-6
@@ -157,8 +157,8 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
-    # @test maximum(abs.(g_dynamics_opt)) <= tol_feas
-    # @test solution.status == :Optimal
+    @test maximum(abs.(g_dynamics_opt)) <= tol_feas
+    @test solution.status == :Optimal
 
     # -------------------- plot -------------------- #
     if get_plot

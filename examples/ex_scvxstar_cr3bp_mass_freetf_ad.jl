@@ -106,7 +106,7 @@ x_ref[8,:] = LinRange(0.0, tf_guess, N)
 u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)]
 
 # plot initial guess
-fig = Figure(size=(1600,800))
+fig = Figure(size=(1400,600))
 ax3d = Axis3(fig[1,1]; aspect=:data)
 lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
@@ -162,42 +162,44 @@ for (i, _sol) in enumerate(sols_opt)
     lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=arc_colors[i], linewidth=1.5)
 end
 
-# # plot controls
-# ax_u = Axis(fig[2,1]; xlabel="Time", ylabel="Control")
-# times_u = []
-# umags = []
-# udirs = []
-# for (i, _sol) in enumerate(sols_opt)
-#     u_zoh = solution.u[4,i] * ones(length(_sol.t))
-#     append!(times_u, Array(_sol)[8,:])
-#     append!(umags, u_zoh)
-#     push!(udirs, [solution.u[1,i] * ones(1,length(_sol.t)); solution.u[2,i] * ones(1,length(_sol.t)); solution.u[3,i] * ones(1,length(_sol.t))])
-# end
-# udirs = hcat(udirs...)
-# for i in 1:3
-#     stairs!(ax_u, times_u, udirs[i,:], label="u[$i]", step=:pre, linewidth=1.0)
-# end
-# stairs!(ax_u, times_u, umags, label="||u||", step=:pre, linewidth=0.5, color=:black)
-# axislegend(ax_u, position=:cc)
+# plot controls
+ax_u = Axis(fig[2,1]; xlabel="Time", ylabel="Control")
+times_u = []
+umags = []
+udirs = []
+for (i, _sol) in enumerate(sols_opt)
+    u_zoh = solution.u[4,i] * ones(length(_sol.t))
+    append!(times_u, Array(_sol)[8,:])
+    append!(umags, u_zoh)
+    push!(udirs, [solution.u[1,i] * ones(1,length(_sol.t)); solution.u[2,i] * ones(1,length(_sol.t)); solution.u[3,i] * ones(1,length(_sol.t))])
+end
+udirs = hcat(udirs...)
+times_u = [el for el in times_u]
+umags = [el for el in umags]
+for i in 1:3
+    stairs!(ax_u, times_u, udirs[i,:], label="u[$i]", step=:pre, linewidth=1.0)
+end
+stairs!(ax_u, times_u, umags, label="||u||", step=:pre, linewidth=0.5, color=:black)
+axislegend(ax_u, position=:cc)
 
-# # plot iterate information
-# colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
-# ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
-# scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+# plot iterate information
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
+ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
+scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
 
-# ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-# scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
+scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
 
-# ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
-# scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
+ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
+scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
 
-# ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
-# scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
+ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
-# ax_m = Axis(fig[1,4]; xlabel="Time", ylabel="mass")
-# for (i, _sol) in enumerate(sols_opt)
-#     lines!(ax_m, Array(_sol)[8,:], Array(_sol)[7,:], color=arc_colors[i])
-# end
+ax_m = Axis(fig[1,4]; xlabel="Time", ylabel="mass")
+for (i, _sol) in enumerate(sols_opt)
+    lines!(ax_m, Array(_sol)[8,:], Array(_sol)[7,:], color=arc_colors[i])
+end
 
 display(fig)
 println("Done!")

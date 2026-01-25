@@ -106,7 +106,7 @@ x_ref[8,:] = LinRange(0.0, tf_guess, N)
 u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)]
 
 # plot initial guess
-fig = Figure(size=(1600,800))
+fig = Figure(size=(1400,600))
 ax3d = Axis3(fig[1,1]; aspect=:data)
 lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
@@ -176,6 +176,8 @@ for (i, _sol) in enumerate(sols_opt)
     push!(udirs, [solution.u[1,i] * ones(1,length(_sol.t)); solution.u[2,i] * ones(1,length(_sol.t)); solution.u[3,i] * ones(1,length(_sol.t))])
 end
 udirs = hcat(udirs...)
+times_u = [el for el in times_u]
+umags = [el for el in umags]
 for i in 1:3
     stairs!(ax_u, times_u, udirs[i,:], label="u[$i]", step=:pre, linewidth=1.0)
 end

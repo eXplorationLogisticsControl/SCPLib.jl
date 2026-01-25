@@ -59,18 +59,26 @@ function solve_convex_subproblem!(
     ϵ_proximal = @variable(prob.model)
     @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
 
-    # L1 penalty on non-convex equality constraints
-    ϵ_noncvx_g = @variable(prob.model)              # slack for L1 norm of non-convex equality constraints violation
-    _g_noncvx = vec(prob.model[:ξ_dyn])             # stacked non-convex equality constraints violations
-    if prob.ng > 0
-        append!(_g_noncvx, vec(prob.model[:ξ]))
-    end
-    @constraint(prob.model, ϵ_noncvx_g >= 0)
-    @constraint(prob.model,
-        [ϵ_noncvx_g; _g_noncvx]
-        in MOI.NormOneCone(1 + prod(size(prob.model[:ξ_dyn])) + prob.ng)
+    # L1 penalty on dynamics constraints
+    ϵ_noncvx_dyn = @variable(prob.model, [1:prob.N-1])
+    @constraint(prob.model, [k in 1:prob.N-1],
+        [ϵ_noncvx_dyn[k]; prob.model[:ξ_dyn][:,k]]
+        in MOI.NormOneCone(1 + prob.nx)
     )
 
+    # L1 penalty on non-convex equality constraints
+    if prob.ng > 0
+        ϵ_noncvx_g = @variable(prob.model)          # slack for L1 norm of non-convex equality constraints violation
+        _g_noncvx = vec(prob.model[:ξ])             # stacked non-convex equality constraints violations
+        @constraint(prob.model, ϵ_noncvx_g >= 0)
+        @constraint(prob.model,
+            [ϵ_noncvx_g; _g_noncvx]
+            in MOI.NormOneCone(1 + prob.ng)
+        )
+    else
+        ϵ_noncvx_g = 0.0
+    end
+    
     # max(0, h(x,u)) penalty on non-convex inequality constraints
     if prob.nh > 0
         slack_h_eval = @variable(prob.model, [1:prob.nh])           # slack equated to each max(0, h(x,u))
@@ -82,14 +90,14 @@ function solve_convex_subproblem!(
 
     # combine into objective function
     J = prob.objective(prob.model[:x], prob.model[:u])    # original objective function
-    @objective(prob.model, Min, J + algo.w_ep*(ϵ_noncvx_g + sum(slack_h_eval)) + algo.w_prox/2*ϵ_proximal^2)
+    @objective(prob.model, Min, J + algo.w_ep*(sum(ϵ_noncvx_dyn) + ϵ_noncvx_g + sum(slack_h_eval)) + algo.w_prox/2*ϵ_proximal^2)
 
     # solve convex subproblem
     optimize!(prob.model)
     if prob.nh > 0
-        return value(ϵ_noncvx_g), sum(value.(slack_h_eval)), value(ϵ_proximal)
+        return sum(value.(ϵ_noncvx_dyn)) + value(ϵ_noncvx_g), sum(value.(slack_h_eval)), value(ϵ_proximal)
     else
-        return value(ϵ_noncvx_g),0.0, value(ϵ_proximal)
+        return sum(value.(ϵ_noncvx_dyn)) + value(ϵ_noncvx_g), 0.0, value(ϵ_proximal)
     end
 end
 
@@ -140,7 +148,8 @@ Solve non-convex OCP with prox-linear algorithm
 function solve!(
     algo::ProxLinear,
     prob::OptimalControlProblem,
-    x_ref, u_ref;
+    x_ref,
+    u_ref;
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-4,
