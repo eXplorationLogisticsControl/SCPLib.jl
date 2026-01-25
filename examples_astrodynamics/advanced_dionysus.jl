@@ -118,6 +118,7 @@ prob = SCPLib.ContinuousProblem(
     u_ref;
     ng = ng,
     g_noncvx = g_noncvx,
+    ode_ensemble_method = EnsembleThreads(),
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -140,14 +141,18 @@ set_silent(prob.model)
 sols_ig, _ = SCPLib.get_trajectory(prob, x_ref, u_ref)
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
+algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, Δ0=0.1, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
 
+# algo = SCPLib.FixedTRWSCP(nx, N, 0.05)
 # w_ep = 1e2
 # w_prox = 1e1
 # algo = SCPLib.ProxLinear(w_ep, w_prox)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 500)
+maxiter = 1000
+tol_feas = 1e-6
+tol_opt = 1e-6
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_feas = tol_feas, tol_opt = tol_opt, maxiter = maxiter)
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 @show -solution.info[:J0][end] * MASS
 
@@ -196,4 +201,27 @@ stairs!(axu, times*TU/86400, [solution.u[3,:]; 0.0]; step=:post, color = :limegr
 stairs!(axu, times*TU/86400, [solution.u[4,:]; 0.0]; step=:post, color = :black, linewidth=0.8, linestyle=:dash)
 
 save(joinpath(@__DIR__, "plots/advanced_dionysus.png"), fig; px_per_unit=3)
+display(fig)
+
+# --------------------------- figure of trajectory only --------------------------- #
+fontsize = 20 
+fig_traj = Figure(size=(700,400))
+ax3d = Axis3(fig_traj[1,1]; aspect=:data, xlabel="x, AU", ylabel="y, AU", zlabel="z, AU", 
+    xlabelsize=fontsize, ylabelsize=fontsize, zlabelsize=fontsize,
+    xticklabelsize=fontsize, yticklabelsize=fontsize, zticklabelsize=fontsize,
+    protrusions = (60, 0, 0, 0))
+
+scatter!(ax3d, RV0[1], RV0[2], RV0[3], color=:limegreen, markersize=10)
+scatter!(ax3d, RVf[1], RVf[2], RVf[3], color=:blue, markersize=10)
+lines!(ax3d, initial_orbit_rvs[1,:], initial_orbit_rvs[2,:], initial_orbit_rvs[3,:], color=:limegreen, linewidth=1.2)
+lines!(ax3d, final_orbit_rvs[1,:], final_orbit_rvs[2,:], final_orbit_rvs[3,:], color=:blue, linewidth=1.2)
+
+# plot optimal solution
+ucolor_tol = 1e-2
+for (isol,sol) in enumerate(sols_opt)
+    rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
+    lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.5)
+end
+
+save(joinpath(@__DIR__, "plots/advanced_dionysus_trajectory.png"), fig_traj; px_per_unit=5)
 display(fig)

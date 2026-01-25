@@ -21,7 +21,7 @@ SCvx* algorithm
 mutable struct SCvxStar <: SCPAlgorithm
     # storage
     tr::TrustRegions
-    w::Float64
+    w::Union{Nothing,Float64}
     λ_dyn::Matrix
     λ::Vector
     μ::Vector
@@ -41,10 +41,10 @@ mutable struct SCvxStar <: SCPAlgorithm
         ng::Int = 0,
         nh::Int = 0,
         Δ0::Union{Float64,Vector{Float64},Matrix{Float64}} = 0.05,
-        w0::Float64 = 1e2,
+        w0::Union{Nothing,Float64} = nothing,
         rhos::Tuple{Real,Real,Real} = (0.0, 0.25, 0.7),
         alphas::Tuple{Real,Real} = (2.0, 3.0),
-        Δ_bounds::Tuple{Float64,Float64} = (1e-6, 1e2),
+        Δ_bounds::Tuple{Float64,Float64} = (1e-6, 1e4),
         gamma::Float64 = 0.9,
         beta::Float64 = 2.0,
         w_max::Float64 = 1e16,
@@ -222,6 +222,30 @@ function Base.show(io::IO, solution::SCvxStarSolution)
 end
 
 
+function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref, J_expected::Real = 1.0, K_w::Real = 10.0)
+    # evaluate nonlinear constraints
+    if isnothing(prob.fun_get_trajectory)
+        _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+    else
+        _, g_dynamics = prob.fun_get_trajectory(prob, x_ref, u_ref)
+    end
+    g_noncvx = prob.ng > 0 ? prob.g_noncvx(x_ref, u_ref) : nothing
+    h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(x_ref, u_ref), 0) : nothing
+    χ = norm(g_dynamics,Inf)
+    if prob.ng > 0
+        χ = max(χ, norm(g_noncvx,Inf))
+    end
+    if prob.nh > 0
+        χ = max(χ, norm(h_noncvx,Inf))
+    end
+
+    # return initial penalty weight
+    eps = 1e-8
+    algo.w = K_w * (eps + J_expected) / (eps + χ)
+    return
+end
+
+
 """
 Solve non-convex OCP with SCvx* algorithm
 
@@ -240,24 +264,32 @@ Solve non-convex OCP with SCvx* algorithm
 function solve!(
     algo::SCvxStar,
     prob::OptimalControlProblem,
-    x_ref, u_ref;
+    x_ref,
+    u_ref;
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-4,
     tol_J0::Real = -1e16,
+    J_expected::Real = 1.0,
+    K_w::Real = 10.0,
     verbosity::Int = 1,
     store_iterates::Bool = true,
     callback::Union{Nothing,Function} = nothing,
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
-    
+    tcpu_start = time()
+
+    # re-tune initial penalty weight if not provided
+    if isnothing(algo.w)
+        tune_initial_penalty_weight!(algo, prob, x_ref, u_ref, J_expected, K_w)
+    end
+
     # initialize algorithm hyperparameters
     rho_i = (algo.rhos[2] + algo.rhos[3]) / 2
     flag_reference    = true    # at initial iteraiton, we need to update reference
     flag_trust_region = true    # (redundant since `flag_reference = true`)
     δ_i = 1e16
-    tcpu_start = time()
 
     # initialize storage
     _x = similar(x_ref)

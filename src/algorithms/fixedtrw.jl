@@ -4,9 +4,9 @@
 mutable struct FixedTRWSCP <: SCPAlgorithm
     # algorithm hyperparameters
     tr::TrustRegions
-    w::Float64
+    w::Union{Nothing,Float64}
 
-    function FixedTRWSCP(nx::Int, N::Int, Δ::Union{Float64,Vector{Float64},Matrix{Float64}}, w::Float64)
+    function FixedTRWSCP(nx::Int, N::Int, Δ::Union{Float64,Vector{Float64},Matrix{Float64}}, w::Union{Nothing,Float64}=nothing)
         tr = TrustRegions(nx, N, Δ)
         new(tr, w)
     end
@@ -116,17 +116,24 @@ penalized quadratically with a fixed weight.
 function solve!(
     algo::FixedTRWSCP,
     prob::OptimalControlProblem,
-    x_ref, u_ref;
+    x_ref,
+    u_ref;
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-4,
     tol_J0::Real = -1e16,
+    J_expected::Real = 1.0,
     verbosity::Int = 1,
     store_iterates::Bool = true,
 )
-    @assert tol_feas <= algo.w "tol_feas must be less than or equal to penalty weight w, currently set at $(algo.w)"
     tcpu_start = time()
 
+    # re-tune initial penalty weight if not provided
+    if isnothing(algo.w)
+        algo.w = 1/tol_feas * 10
+    end
+    @assert tol_feas <= algo.w "tol_feas must be less than or equal to penalty weight w, currently set at $(algo.w)"
+    
     # print initial information
     if verbosity > 0
         println()
