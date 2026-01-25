@@ -150,7 +150,7 @@ function test_convex_subproblem(;verbosity::Int = 0)
     sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref)
 
     # -------------------- instantiate algorithm -------------------- #
-    algo = SCPLib.SCvxStar(nx, N;)
+    algo = SCPLib.SCvxStar(nx, N; w0 = 1e2)
 
     SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
     SCPLib.set_trust_region_constraints!(algo, prob, x_ref, u_ref)
