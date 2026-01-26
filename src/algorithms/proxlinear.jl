@@ -60,30 +60,25 @@ function solve_convex_subproblem!(
     @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
 
     # L1 penalty on dynamics constraints
-    ϵ_noncvx_dyn = @variable(prob.model, [1:prob.N-1])
-    @constraint(prob.model, [k in 1:prob.N-1],
-        [ϵ_noncvx_dyn[k]; prob.model[:ξ_dyn][:,k]]
-        in MOI.NormOneCone(1 + prob.nx)
-    )
+    ϵ_noncvx_dyn = @variable(prob.model, [1:prob.nx,1:prob.N-1])
+    @constraint(prob.model, ϵ_noncvx_dyn .>= 0.0)
+    @constraint(prob.model, [k in 1:prob.N-1], prob.model[:ξ_dyn][:,k] .<=  ϵ_noncvx_dyn[:,k])
+    @constraint(prob.model, [k in 1:prob.N-1], prob.model[:ξ_dyn][:,k] .>= -ϵ_noncvx_dyn[:,k])
 
     # L1 penalty on non-convex equality constraints
     if prob.ng > 0
-        ϵ_noncvx_g = @variable(prob.model)          # slack for L1 norm of non-convex equality constraints violation
-        _g_noncvx = vec(prob.model[:ξ])             # stacked non-convex equality constraints violations
-        @constraint(prob.model, ϵ_noncvx_g >= 0)
-        @constraint(prob.model,
-            [ϵ_noncvx_g; _g_noncvx]
-            in MOI.NormOneCone(1 + prob.ng)
-        )
+        # slack for L1 norm of non-convex equality constraints violation
+        ϵ_noncvx_g = @variable(prob.model, [1:prob.ng])
+        @constraint(prob.model, ϵ_noncvx_g .>= 0.0)
+        @constraint(prob.model, prob.model[:ξ] .<=  ϵ_noncvx_g)
+        @constraint(prob.model, prob.model[:ξ] .>= -ϵ_noncvx_g)
     else
         ϵ_noncvx_g = 0.0
     end
-    
+
     # max(0, h(x,u)) penalty on non-convex inequality constraints
     if prob.nh > 0
-        slack_h_eval = @variable(prob.model, [1:prob.nh])           # slack equated to each max(0, h(x,u))
-        @constraint(prob.model, slack_h_eval .>= 0.0)               # make sure slack is non-negative
-        @constraint(prob.model, slack_h_eval .>= prob.model[:ζ])    # make sure slack is greater than ζ if there is violation
+        slack_h_eval = prob.model[:ζ]
     else
         slack_h_eval = [0.0]
     end
