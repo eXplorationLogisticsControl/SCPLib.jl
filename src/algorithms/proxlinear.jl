@@ -82,17 +82,17 @@ function solve_convex_subproblem!(
     else
         slack_h_eval = [0.0]
     end
-
+    
     # combine into objective function
     J = prob.objective(prob.model[:x], prob.model[:u])    # original objective function
-    @objective(prob.model, Min, J + algo.w_ep*(sum(ϵ_noncvx_dyn) + ϵ_noncvx_g + sum(slack_h_eval)) + algo.w_prox/2*ϵ_proximal^2)
+    @objective(prob.model, Min, J + algo.w_ep*(sum(ϵ_noncvx_dyn) + sum(ϵ_noncvx_g) + sum(slack_h_eval)) + algo.w_prox/2*ϵ_proximal^2)
 
     # solve convex subproblem
     optimize!(prob.model)
     if prob.nh > 0
-        return sum(value.(ϵ_noncvx_dyn)) + value(ϵ_noncvx_g), sum(value.(slack_h_eval)), value(ϵ_proximal)
+        return sum(value.(ϵ_noncvx_dyn)) + sum(value.(ϵ_noncvx_g)), sum(value.(slack_h_eval)), value(ϵ_proximal)
     else
-        return sum(value.(ϵ_noncvx_dyn)) + value(ϵ_noncvx_g), 0.0, value(ϵ_proximal)
+        return sum(value.(ϵ_noncvx_dyn)) + sum(value.(ϵ_noncvx_g)), 0.0, value(ϵ_proximal)
     end
 end
 
