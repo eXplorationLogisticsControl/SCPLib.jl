@@ -82,7 +82,7 @@ function solve_convex_subproblem!(
     else
         slack_h_eval = [0.0]
     end
-    
+
     # combine into objective function
     J = prob.objective(prob.model[:x], prob.model[:u])    # original objective function
     @objective(prob.model, Min, J + algo.w_ep*(sum(ϵ_noncvx_dyn) + sum(ϵ_noncvx_g) + sum(slack_h_eval)) + algo.w_prox/2*ϵ_proximal^2)
@@ -119,9 +119,23 @@ mutable struct ProxLinearSolution <: SCPSolution
             :w => Float64[],
             :Δ => Matrix{Float64}[],
             :accept => Bool[],
+            :cpu_times => Dict(
+                :time_subproblem => Float64[],
+                :time_update_reference => Float64[],
+                :time_iter_total => Float64[],
+                :time_total => 0.0,
+            )
         )
         new(status, x, u, 0, info)
     end
+end
+
+
+function Base.show(io::IO, solution::ProxLinearSolution)
+    println(io, "Prox-linear solution")
+    @printf("   Status                   : %s\n", solution.status)
+    @printf("   Iterations               : %d\n", solution.n_iter)
+    @printf("   Objective                : %1.4e\n", solution.info[:J0][end])
 end
 
 
@@ -178,11 +192,6 @@ function solve!(
         @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
         println(header)
     end
-    cpu_times = Dict(
-        :time_subproblem => 0.0,
-        :time_update_reference => 0.0,
-        :time_total => 0.0,
-    )
 
     # remove constraint_trust_region_x_lb and constraint_trust_region_x_ub
     filter!(e->e≠:constraint_trust_region_x_lb, prob.model_nl_references)
@@ -197,12 +206,12 @@ function solve!(
             end
             g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
         end
-        cpu_times[:time_update_reference] = time() - tcpu_start_iter
+        push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
 
         # solve convex subproblem
         tstart_cp = time()
         _ϵ_noncvx_g, _ϵ_noncvx_h, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref)
-        cpu_times[:time_subproblem] = time() - tstart_cp
+        push!(solution.info[:cpu_times][:time_subproblem], time() - tstart_cp)
 
         # check termination status
         if termination_status(prob.model) == SLOW_PROGRESS
@@ -261,7 +270,6 @@ function solve!(
             push!(solution.info[:χ], χ)
             solution.n_iter += 1
         end
-
         if !isnothing(callback)
             callback(solution)
         end
@@ -279,8 +287,10 @@ function solve!(
                 solution.status = :MaxIterReached
             end
         end
+        push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
     end
     tcpu_end = time()
+    solution.info[:cpu_times][:time_total] = tcpu_end - tcpu_start
 
     # print exit results
     if verbosity > 0

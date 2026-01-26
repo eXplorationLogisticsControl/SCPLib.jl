@@ -12,12 +12,12 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
-mutable struct ControlParams
+mutable struct ControlParams_mass_freetf
     μ::Float64
     c1::Float64
     c2::Float64
     u::Vector
-    function ControlParams(μ::Float64, c1::Float64, c2::Float64)
+    function ControlParams_mass_freetf(μ::Float64, c1::Float64, c2::Float64)
         new(μ, c1, c2, zeros(5))
     end
 end
@@ -29,7 +29,7 @@ DU = 389703     # km
 TU = 382981     # sec
 MU = 500.0      # kg
 VU = DU/TU      # km/s
-params = ControlParams(μ, c1, c2)
+params = ControlParams_mass_freetf(μ, c1, c2)
 
 function eom!(drvm, rvm, p, t)
     x, y, z = rvm[1:3]

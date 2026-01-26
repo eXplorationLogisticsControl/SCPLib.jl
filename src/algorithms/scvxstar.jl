@@ -208,6 +208,12 @@ mutable struct SCvxStarSolution <: SCPSolution
             :w => Float64[],
             :Δ => Matrix{Float64}[],
             :accept => Bool[],
+            :cpu_times => Dict(
+                :time_subproblem => Float64[],
+                :time_update_reference => Float64[],
+                :time_iter_total => Float64[],
+                :time_total => 0.0,
+            )
         )
         new(status, x, u, 0, info)
     end
@@ -313,11 +319,11 @@ function solve!(
         @printf("   Use L1 penalty                 :  %s\n", algo.l1_penalty ? "Yes" : "No")
         println(header)
     end
-    cpu_times = Dict(
-        :time_subproblem => 0.0,
-        :time_update_reference => 0.0,
-        :time_total => 0.0,
-    )
+    # cpu_times = Dict(
+    #     :time_subproblem => 0.0,
+    #     :time_update_reference => 0.0,
+    #     :time_total => 0.0,
+    # )
 
     for it in 1:maxiter
         tcpu_start_iter = time()
@@ -336,12 +342,12 @@ function solve!(
             end
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is not updated but trsut region size changed
         end
-        cpu_times[:time_update_reference] = time() - tcpu_start_iter
+        push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
 
         # solve convex subproblem
         tstart_cp = time()
         solve_convex_subproblem!(algo, prob)
-        cpu_times[:time_subproblem] = time() - tstart_cp
+        push!(solution.info[:cpu_times][:time_subproblem], time() - tstart_cp)
 
         # check termination status
         if termination_status(prob.model) == SLOW_PROGRESS
@@ -447,7 +453,6 @@ function solve!(
 
         # update trust-region 
         flag_trust_region = update_trust_region!(algo, rho_i)
-        cpu_times[:time_total] = time() - tcpu_start_iter
 
         if verbosity >= 2
             # extra information when verbosity >= 2
@@ -465,8 +470,10 @@ function solve!(
                 solution.status = :MaxIterReached
             end
         end
+        push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
     end
     tcpu_end = time()
+    solution.info[:cpu_times][:time_total] = tcpu_end - tcpu_start
 
     # print exit results
     if verbosity > 0
