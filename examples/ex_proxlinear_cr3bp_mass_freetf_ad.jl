@@ -1,6 +1,7 @@
 """Example with CR3BP + mass dynamics with free final time"""
 
 using Clarabel
+using Gurobi
 using ForwardDiff
 using GLMakie
 using JuMP
@@ -12,12 +13,12 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
-mutable struct ControlParams
+mutable struct ControlParams_CR3BP_mass_freetf
     μ::Float64
     c1::Float64
     c2::Float64
     u::Vector
-    function ControlParams(μ::Float64, c1::Float64, c2::Float64)
+    function ControlParams_CR3BP_mass_freetf(μ::Float64, c1::Float64, c2::Float64)
         new(μ, c1, c2, zeros(5))
     end
 end
@@ -29,7 +30,7 @@ DU = 389703     # km
 TU = 382981     # sec
 MU = 500.0      # kg
 VU = DU/TU      # km/s
-params = ControlParams(μ, c1, c2)
+params = ControlParams_CR3BP_mass_freetf(μ, c1, c2)
 
 function eom!(drvm, rvm, p, t)
     x, y, z = rvm[1:3]
@@ -113,7 +114,8 @@ lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
-    Clarabel.Optimizer,
+    # Clarabel.Optimizer,
+    Gurobi.Optimizer,
     eom!,
     params,
     objective,
@@ -153,7 +155,7 @@ w_prox = 1e0
 algo = SCPLib.ProxLinear(w_ep, w_prox)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100, warmstart_primal=true, warmstart_dual=false)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
@@ -194,10 +196,19 @@ scatterlines!(ax_w, 1:length(solution.info[:χ]), abs.(solution.info[:J0]), colo
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
 scatterlines!(ax_J, 1:length(solution.info[:χ]), abs.(solution.info[:ΔJ]), color=:black, marker=:circle, markersize=7)
 
-ax_m = Axis(fig[1,4]; xlabel="Time", ylabel="mass")
+ax_m = Axis(fig[2,3]; xlabel="Time", ylabel="mass")
 for (i, _sol) in enumerate(sols_opt)
     lines!(ax_m, Array(_sol)[8,:], Array(_sol)[7,:], color=arc_colors[i])
 end
+
+# make plot of times spent
+ax_cpsolve = Axis(fig[1,4]; xlabel="Iteration", ylabel="CPU time in CP solve, s")
+iters = collect(1:length(solution.info[:cpu_times][:time_subproblem]))
+scatterlines!(ax_cpsolve, iters, solution.info[:cpu_times][:time_subproblem], color=:black, marker=:utriangle, markersize=7, label="CP solve")
+
+ax_nlcon = Axis(fig[2,4]; xlabel="Iteration", ylabel="CPU time in reference update, s", yscale=log10)
+iters = collect(1:length(solution.info[:cpu_times][:time_update_reference]))
+scatterlines!(ax_nlcon, iters, solution.info[:cpu_times][:time_update_reference], color=:black, marker=:utriangle, markersize=7, label="Update reference")
 
 display(fig)
 println("Done!")
