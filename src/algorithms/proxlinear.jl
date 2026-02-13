@@ -221,6 +221,7 @@ function solve!(
                 @warn("Exiting as CP termination status: $(termination_status(prob.model))")
             end
             solution.status = :CPFailed
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
 
@@ -261,6 +262,7 @@ function solve!(
         # check for convergence
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
 
