@@ -365,7 +365,7 @@ function solve!(
         # check termination status
         if termination_status(prob.model) == SLOW_PROGRESS
             @warn("CP termination status: $(termination_status(prob.model))")
-        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL]
+        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL, LOCALLY_SOLVED]
             if verbosity > 0
                 @warn("Exiting as CP termination status: $(termination_status(prob.model))")
             end
