@@ -264,8 +264,13 @@ Solve non-convex OCP with SCvx* algorithm
 - `tol_feas::Float64`: feasibility tolerance
 - `tol_opt::Float64`: optimality tolerance
 - `tol_J0::Real`: objective tolerance
+- `J_expected::Real`: expected objective value
+- `K_w::Real`: initial penalty weight scaling factor
 - `verbosity::Int`: verbosity level
 - `store_iterates::Bool`: whether to store iterates
+- `callback::Union{Nothing,Function}`: callback function
+- `warmstart_primal::Bool`: whether to warmstart primal variables
+- `warmstart_dual::Bool`: whether to warmstart dual variables
 """
 function solve!(
     algo::SCvxStar,
@@ -323,13 +328,8 @@ function solve!(
         @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
         println(header)
     end
-    # cpu_times = Dict(
-    #     :time_subproblem => 0.0,
-    #     :time_update_reference => 0.0,
-    #     :time_total => 0.0,
-    # )
 
-    # initialize
+    # initialize warmstart dictionaries
     variable_primal = Dict()
     constraint_solution = Dict()
 
@@ -353,8 +353,8 @@ function solve!(
         push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
 
         # warmstart
-        if it > 1 && warmstart_primal
-            set_optimal_start_values(prob.model, variable_primal, constraint_solution)
+        if it > 1 && (warmstart_primal || warmstart_dual)
+            set_optimal_start_values(variable_primal, constraint_solution)
         end
 
         # solve convex subproblem
@@ -370,7 +370,6 @@ function solve!(
                 @warn("Exiting as CP termination status: $(termination_status(prob.model))")
             end
             solution.status = :CPFailed
-            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
 
