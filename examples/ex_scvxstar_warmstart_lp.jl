@@ -125,7 +125,7 @@ prob = SCPLib.ContinuousProblem(
     u_ref;
     ode_method = Vern7(),
 )
-# set_silent(prob.model)
+set_silent(prob.model)
 
 # append boundary conditions
 @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)
@@ -145,7 +145,7 @@ prob = SCPLib.ContinuousProblem(
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 2, warmstart_primal=true, warmstart_dual=false)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100, warmstart_primal=true, warmstart_dual=true)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
