@@ -433,14 +433,12 @@ function solve!(
             callback(solution)
         end
 
-        if rho_i >= algo.rhos[1]
-            if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
-                solution.status = :Optimal
-                push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
-                break
-            end
+        if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
+            solution.status = :Optimal
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
+            break
         end
-        
+               
         # check step acceptance
         if rho_i >= algo.rhos[1]
             flag_reference = true
@@ -485,7 +483,7 @@ function solve!(
             println()
         end
 
-        if it == maxiter
+        if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible
             else
