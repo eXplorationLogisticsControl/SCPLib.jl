@@ -306,7 +306,7 @@ function solve!(
             constraint_solution = get_constraint_solutions(prob.model)
         end
         
-        if it == maxiter
+        if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible
             else
