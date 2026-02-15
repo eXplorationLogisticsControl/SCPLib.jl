@@ -18,7 +18,7 @@ SCvx* algorithm
 - `beta::Float64`: penalty weight update factor
 - `w_max::Float64`: maximum penalty weight
 """
-mutable struct SCvxStar <: SCPAlgorithm
+mutable struct SCvxStar <: TrustRegionAlgorithm
     # storage
     tr::TrustRegions
     w::Union{Nothing,Float64}
@@ -26,7 +26,7 @@ mutable struct SCvxStar <: SCPAlgorithm
     λ::Vector
     μ::Vector
 
-    # algorithm hyperparameters
+    # algorithm parameters
     rhos::Tuple{Real,Real,Real}
     alphas::Tuple{Real,Real}
     Δ_bounds::Tuple{Float64,Float64}
@@ -135,30 +135,32 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Var
 end
 
 
-"""Update trust-region size"""
-function update_trust_region!(algo::SCvxStar, rho_i::Float64)
-    flag_trust_region = false
-    if rho_i < algo.rhos[2]
-        algo.tr.Δ = max.(algo.tr.Δ / algo.alphas[1], algo.Δ_bounds[1])
-        flag_trust_region = true
-    elseif rho_i >= algo.rhos[3]
-        algo.tr.Δ = min.(algo.tr.Δ * algo.alphas[2], algo.Δ_bounds[2])
-        flag_trust_region = true
-    end
-    return flag_trust_region
-end
+# """Update trust-region size"""
+# function update_trust_region!(algo::SCvxStar, rho_i::Float64)
+#     flag_trust_region = false
+#     if rho_i < algo.rhos[2]
+#         algo.tr.Δ = max.(algo.tr.Δ / algo.alphas[1], algo.Δ_bounds[1])
+#         flag_trust_region = true
+#     elseif rho_i >= algo.rhos[3]
+#         algo.tr.Δ = min.(algo.tr.Δ * algo.alphas[2], algo.Δ_bounds[2])
+#         flag_trust_region = true
+#     end
+#     return flag_trust_region
+# end
 
 
-function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
-    # define trust-region constraints
-    @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
-        -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
-    @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
-          prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
-    return
-end
+# """Set trust-region constraints"""
+# function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
+#     # define trust-region constraints
+#     @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
+#         -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
+#     @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
+#           prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
+#     return
+# end
 
 
+"""Solve convex subproblem for SCvx* algorithm"""
 function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
     # set objective with penalty
     _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
@@ -186,9 +188,7 @@ function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
 end
 
 
-"""
-Solution struct for SCvx* algorithm
-"""
+"""Solution struct for SCvx* algorithm"""
 mutable struct SCvxStarSolution <: SCPSolution
     status::Symbol
     x::Matrix
@@ -484,7 +484,8 @@ function solve!(
             @printf("       CPU time on update reference : %1.2f sec\n", solution.info[:cpu_times][:time_update_reference][end])
             println()
         end
-
+        
+        # handle termination status when maximum number of iterations is reached
         if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible

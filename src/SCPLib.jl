@@ -11,6 +11,8 @@ abstract type OptimalControlProblem end
 abstract type SCPAlgorithm end
 abstract type SCPSolution end
 
+abstract type TrustRegionAlgorithm <: SCPAlgorithm end
+
 include("utils.jl")
 include("dynamics.jl")
 
