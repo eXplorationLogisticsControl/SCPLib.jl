@@ -1,12 +1,21 @@
-# Core routines
+# API: Problems & Dynamics
 
-## Continuous and Impulsive Problems
+## Continuous problems
 
 ```@autodocs
 Modules = [SCPLib]
 Order   = [:function, :type, :struct]
 Pages   = [
   "continuous_problem.jl",
+]
+```
+
+## Impulsive problems
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
   "impulsive_problem.jl",
 ]
 ```
@@ -20,16 +29,3 @@ Pages   = [
   "dynamics.jl",
 ]
 ```
-
-## Algorithms
-
-```@autodocs
-Modules = [SCPLib]
-Order   = [:function, :type, :struct]
-Pages   = [
-  "algorithms/fixedtrw.jl",
-  "algorithms/proxlinear.jl",
-  "algorithms/scvxstar.jl",
-]
-```
-

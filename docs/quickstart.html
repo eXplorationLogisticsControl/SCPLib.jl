@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Quick Start · SCPLib.jl</title><meta name="title" content="Quick Start · SCPLib.jl"/><meta property="og:title" content="Quick Start · SCPLib.jl"/><meta property="twitter:title" content="Quick Start · SCPLib.jl"/><meta name="description" content="Documentation for SCPLib.jl."/><meta property="og:description" content="Documentation for SCPLib.jl."/><meta property="twitter:description" content="Documentation for SCPLib.jl."/><script data-outdated-warner src="assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="search_index.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="index.html"><img src="assets/logo.png" alt="SCPLib.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="index.html">SCPLib.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="index.html">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li class="is-active"><a class="tocitem" href="quickstart.html">Quick Start</a><ul class="internal"><li><a class="tocitem" href="#Import-modules"><span>Import modules</span></a></li><li><a class="tocitem" href="#Define-dynamics"><span>Define dynamics</span></a></li><li><a class="tocitem" href="#Instantiate-algorithm-and-solve-problem"><span>Instantiate algorithm &amp; solve problem</span></a></li><li><a class="tocitem" href="#Analyze-solution"><span>Analyze solution</span></a></li></ul></li></ul></li><li><a class="tocitem" href="api.html">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Tutorials</a></li><li class="is-active"><a href="quickstart.html">Quick Start</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="quickstart.html">Quick Start</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/Yuricst/SCPLib.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/Yuricst/SCPLib.jl/blob/master/docs/src/quickstart.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Quickstart"><a class="docs-heading-anchor" href="#Quickstart">Quickstart</a><a id="Quickstart-1"></a><a class="docs-heading-anchor-permalink" href="#Quickstart" title="Permalink"></a></h1><h2 id="Import-modules"><a class="docs-heading-anchor" href="#Import-modules">Import modules</a><a id="Import-modules-1"></a><a class="docs-heading-anchor-permalink" href="#Import-modules" title="Permalink"></a></h2><p>We will start with a simple, fixed-time optimal control problem.</p><pre><code class="language-julia hljs">using Clarabel
+using GLMakie
+using JuMP
+using LinearAlgebra
+using OrdinaryDiffEq
+
+using SCPLib</code></pre><h2 id="Define-dynamics"><a class="docs-heading-anchor" href="#Define-dynamics">Define dynamics</a><a id="Define-dynamics-1"></a><a class="docs-heading-anchor-permalink" href="#Define-dynamics" title="Permalink"></a></h2><p>We will first define and instantiate a struct that will hold the control, along with any parameters we may want to pass to the equations of motion:</p><pre><code class="language-julia hljs"># create parameters with `u` entry
+mutable struct ControlParams
+    μ::Float64
+    u::Vector
+    function ControlParams(μ::Float64)
+        new(μ, zeros(4))
+    end
+end
+
+μ = 1.215058560962404e-02
+DU = 389703     # km
+TU = 382981     # sec
+MU = 500.0      # kg
+VU = DU/TU      # km/s
+params = ControlParams(μ)</code></pre><p>We will now define an equations of motion</p><pre><code class="language-julia hljs">function eom!(drv, rv, p, t)
+    x, y, z = rv[1:3]
+    vx, vy, vz = rv[4:6]
+    r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
+    r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+    drv[1:3] = rv[4:6]
+    # derivatives of velocities
+    drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
+    drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
+    drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+    # append controls
+    drv[4:6] += p.u[1:3]
+    return
+end</code></pre><h3 id="Define-problem"><a class="docs-heading-anchor" href="#Define-problem">Define problem</a><a id="Define-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Define-problem" title="Permalink"></a></h3><p>We will now define boundary conditions</p><pre><code class="language-julia hljs">rv0 = [1.0809931218390707E+00,
+    0.0000000000000000E+00,
+    -2.0235953267405354E-01,
+    1.0157158264396639E-14,
+    -1.9895001215078018E-01,
+    7.2218178975912707E-15]
+period_0 = 2.3538670417546639E+00
+
+rvf = [1.1648780946517576,
+    0.0,
+    -1.1145303634437023E-1,
+    0.0,
+    -2.0191923237095796E-1,
+    0.0]
+period_f = 3.3031221822879884</code></pre><p>We can now define the objective function</p><pre><code class="language-julia hljs">function objective(x, u)
+    return sum(u[4,:])
+end</code></pre><p>We will now define the problem parameters</p><pre><code class="language-julia hljs">N = 100
+nx = 6
+nu = 4                              # [ux,uy,uz,Γ]
+tf = 2.6 
+times = LinRange(0.0, tf, N)
+
+thrust = 0.35    # N
+umax = thrust/MU/1e3 / (VU/TU)</code></pre><p>We will now define an initial guess by propagating the initial and final boundary conditions</p><pre><code class="language-julia hljs"># initial &amp; final LPO
+sol_lpo0 = solve(
+    ODEProblem(eom!, rv0, [0.0, period_0], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
+sol_lpof = solve(
+    ODEProblem(eom!, rvf, [0.0, period_f], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
+
+# create reference solution
+x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
+x_along_lpof = sol_lpof(LinRange(0.0, period_f, N))
+x_ref = zeros(nx,N)
+alphas = LinRange(0,1,N)
+for (i,alpha) in enumerate(alphas)
+    x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
+end
+u_ref = zeros(nu, N-1)</code></pre><p>then, we instantiate the problem struct</p><pre><code class="language-julia hljs">prob = SCPLib.ContinuousProblem(
+    Clarabel.Optimizer,
+    eom!,
+    params,
+    objective,
+    times,
+    x_ref,
+    u_ref;
+    eom_aug! = eom_aug!,
+    ode_method = Vern7(),
+)
+set_silent(prob.model)              # we will silence the convex program
+
+# append boundary conditions
+@constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)
+@constraint(prob.model, constraint_final_rv,   prob.model[:x][:,end] == rvf)
+
+# append constraints on control magnitude
+@constraint(prob.model, constraint_associate_control[k in 1:N-1],
+    [prob.model[:u][4,k], prob.model[:u][1:3,k]...] in SecondOrderCone())
+@constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
+    prob.model[:u][4,k] &lt;= umax)</code></pre><h2 id="Instantiate-algorithm-and-solve-problem"><a class="docs-heading-anchor" href="#Instantiate-algorithm-and-solve-problem">Instantiate algorithm &amp; solve problem</a><a id="Instantiate-algorithm-and-solve-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Instantiate-algorithm-and-solve-problem" title="Permalink"></a></h2><pre><code class="language-julia hljs">algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)</code></pre><h2 id="Analyze-solution"><a class="docs-heading-anchor" href="#Analyze-solution">Analyze solution</a><a id="Analyze-solution-1"></a><a class="docs-heading-anchor-permalink" href="#Analyze-solution" title="Permalink"></a></h2><pre><code class="language-julia hljs"># propagate controlled trajectory solution
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+arc_colors = [
+    solution.u[4,i] &gt; 1e-6 ? :red : :black for i in 1:N-1
+]
+for (i, _sol) in enumerate(sols_opt)
+    lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=arc_colors[i])
+end
+
+# plot controls
+ax_u = Axis(fig[2,1]; xlabel=&quot;Time&quot;, ylabel=&quot;Control&quot;)
+for i in 1:3
+    stairs!(ax_u, prob.times[1:end-1], solution.u[i,:], label=&quot;u[$i]&quot;, step=:pre, linewidth=1.0)
+end
+stairs!(ax_u, prob.times[1:end-1], solution.u[4,:], label=&quot;||u||&quot;, step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
+axislegend(ax_u, position=:cc)
+
+# plot iterate information
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
+ax_χ = Axis(fig[1,2]; xlabel=&quot;Iteration&quot;, ylabel=&quot;χ&quot;, yscale=log10)
+scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+
+ax_w = Axis(fig[2,2]; xlabel=&quot;Iteration&quot;, ylabel=&quot;w&quot;, yscale=log10)
+scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+
+ax_J = Axis(fig[1,3]; xlabel=&quot;Iteration&quot;, ylabel=&quot;ΔJ&quot;, yscale=log10)
+scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
+
+ax_Δ = Axis(fig[2,3]; xlabel=&quot;Iteration&quot;, ylabel=&quot;trust region radius&quot;, yscale=log10)
+scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
+
+display(fig)</code></pre><p><img src="assets/cr3bp_traj_scvxstar.png" alt="SCvxStar CR3BP Trajectory Solution"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="index.html">« Home</a><a class="docs-footer-nextpage" href="api.html">API »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.16.1 on <span class="colophon-date" title="Saturday 14 February 2026 21:56">Saturday 14 February 2026</span>. Using Julia version 1.10.0.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

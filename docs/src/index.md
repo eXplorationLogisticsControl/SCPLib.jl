@@ -22,7 +22,7 @@ Note:
 For now, `git clone` the repo & add via `pkg> dev ./path/to/SCPLib.jl`.
 
 
-## Quick start
+## Illustrative example
 
 We first need to define a few things:
 
