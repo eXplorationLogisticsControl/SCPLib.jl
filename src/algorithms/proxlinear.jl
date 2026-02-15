@@ -135,7 +135,9 @@ function Base.show(io::IO, solution::ProxLinearSolution)
     println(io, "Prox-linear solution")
     @printf("   Status                   : %s\n", solution.status)
     @printf("   Iterations               : %d\n", solution.n_iter)
-    @printf("   Objective                : %1.4e\n", solution.info[:J0][end])
+    if length(solution.info[:J0]) > 0
+        @printf("   Objective                : %1.4e\n", solution.info[:J0][end])
+    end
 end
 
 
