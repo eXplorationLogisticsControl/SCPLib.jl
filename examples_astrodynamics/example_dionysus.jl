@@ -1,5 +1,6 @@
 """Sample SCP problem with MEE"""
 
+using Base.Threads
 using Clarabel
 using GLMakie
 using JuMP
@@ -7,6 +8,8 @@ using LinearAlgebra
 using OrdinaryDiffEq
 
 using AstrodynamicsCore
+
+@show nthreads()
 
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
