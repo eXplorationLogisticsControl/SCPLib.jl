@@ -261,7 +261,8 @@ function solve!(
             println()
         end
 
-        if it == maxiter
+        # handle termination status when maximum number of iterations is reached
+        if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible
             else
