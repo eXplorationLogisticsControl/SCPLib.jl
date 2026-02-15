@@ -78,16 +78,6 @@ rvf = [1.1648780946517576,
     0.0]
 period_f = 3.3031221822879884
 
-# initial & final LPO
-sol_lpo0 = solve(
-    ODEProblem(eom!, rv0, [0.0, period_0], params),
-    Tsit5(); reltol = 1e-12, abstol = 1e-12
-)
-sol_lpof = solve(
-    ODEProblem(eom!, rvf, [0.0, period_f], params),
-    Tsit5(); reltol = 1e-12, abstol = 1e-12
-)
-
 # -------------------- define objective -------------------- #
 function objective(x, u)
     return sum(u[4,:])
@@ -103,6 +93,16 @@ times = LinRange(0.0, tf, N)
 
 thrust = 0.35    # N
 umax = thrust/MU/1e3 / (VU/TU)
+
+# initial & final LPO
+sol_lpo0 = solve(
+    ODEProblem(eom!, rv0, [0.0, period_0], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
+sol_lpof = solve(
+    ODEProblem(eom!, rvf, [0.0, period_f], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
 
 # create reference solution
 x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
@@ -130,7 +130,7 @@ prob = SCPLib.ContinuousProblem(
     times,
     x_ref,
     u_ref;
-    eom_aug! = eom_aug!,
+    # eom_aug! = eom_aug!,
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -182,5 +182,6 @@ scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]),
 ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
 scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
+save(joinpath(@__DIR__, "plots/cr3bp_traj_scvxstar.png"), fig; px_per_unit=3)
 display(fig)
 println("Done!")
