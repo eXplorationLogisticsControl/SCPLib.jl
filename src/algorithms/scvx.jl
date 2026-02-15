@@ -20,7 +20,7 @@ mutable struct SCvx <: TrustRegionAlgorithm
         nx::Int,
         N::Int;
         Δ0::Union{Float64,Vector{Float64},Matrix{Float64}} = 0.05,
-        w::Float64 = 1e4,
+        w::Float64 = 1e3,
         rhos::Tuple{Real,Real,Real} = (0.0, 0.25, 0.7),
         alphas::Tuple{Real,Real} = (2.0, 3.0),
         Δ_bounds::Tuple{Float64,Float64} = (1e-6, 1e4),
@@ -44,27 +44,27 @@ end
 SCvx exact penalty function (l1-penalty)
 """
 function penalty(algo::SCvx, prob::OptimalControlProblem, ξ_dyn, ξ, ζ)
-    P = sqrt(algo.w) * norm(ξ_dyn,1)
+    P = algo.w * norm(ξ_dyn,1)
     if prob.ng > 0
-        P += sqrt(algo.w) * norm(ξ,1)
+        P += algo.w * norm(ξ,1)
     end
     if prob.nh > 0
-        P += sqrt(algo.w) * norm(ζ,1)
+        P += algo.w * norm(ζ,1)
     end
     return P
 end
 
 
 function penalty(algo::SCvx, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1)
-    P = sqrt(algo.w) * sum(slacks_L1[:slack_gdyn])
+    P = algo.w * sum(slacks_L1[:slack_gdyn])
     @constraint(prob.model, [slacks_L1[:slack_gdyn]; vec(ξ_dyn)] in MOI.NormOneCone(1 + prod(size(ξ_dyn))))
     if prob.ng > 0
-        P += sqrt(algo.w) * sum(slacks_L1[:slack_gnoncvx])
+        P += algo.w * sum(slacks_L1[:slack_gnoncvx])
         @constraint(prob.model, [slacks_L1[:slack_gnoncvx]; ξ] in MOI.NormOneCone(1 + length(ξ)))
     end
     if prob.nh > 0
         # this penalization works because ζ is defined to be non-negative
-        P += sqrt(algo.w) * sum(slacks_L1[:slack_hnoncvx])
+        P += algo.w * sum(slacks_L1[:slack_hnoncvx])
         @constraint(prob.model, [slacks_L1[:slack_hnoncvx]; ζ] in MOI.NormOneCone(1 + length(ζ)))
     end
     return P
