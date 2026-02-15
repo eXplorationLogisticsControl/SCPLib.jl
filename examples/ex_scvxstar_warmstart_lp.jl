@@ -88,7 +88,7 @@ nu = 6                              # [ux,uy,uz,Γx,Γy,Γz]
 tf = 2.6 
 times = LinRange(0.0, tf, N)
 
-thrust = 0.35    # N
+thrust = 0.15    # N
 umax = thrust/MU/1e3 / (VU/TU)
 
 # create reference solution
@@ -145,7 +145,7 @@ set_silent(prob.model)
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100, warmstart_primal=true, warmstart_dual=true)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100, warmstart_primal=false, warmstart_dual=false)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
@@ -161,7 +161,6 @@ ax_u = Axis(fig[2,1]; xlabel="Time", ylabel="Control")
 for i in 1:3
     stairs!(ax_u, prob.times[1:end-1], solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
 end
-stairs!(ax_u, prob.times[1:end-1], solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
