@@ -76,6 +76,19 @@ function solve_convex_subproblem!(
         ϵ_noncvx_g = 0.0
     end
 
+    # L1 penalty on non-convex equality constraints
+    if prob.ng > 0
+        ϵ_noncvx_g = @variable(prob.model)          # slack for L1 norm of non-convex equality constraints violation
+        _g_noncvx = vec(prob.model[:ξ])             # stacked non-convex equality constraints violations
+        @constraint(prob.model, ϵ_noncvx_g >= 0)
+        @constraint(prob.model,
+            [ϵ_noncvx_g; _g_noncvx]
+            in MOI.NormOneCone(1 + prob.ng)
+        )
+    else
+        ϵ_noncvx_g = 0.0
+    end
+    
     # max(0, h(x,u)) penalty on non-convex inequality constraints
     if prob.nh > 0
         slack_h_eval = prob.model[:ζ]
