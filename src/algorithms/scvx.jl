@@ -13,21 +13,20 @@ mutable struct SCvx <: TrustRegionAlgorithm
     # algorithm parameters
     w::Float64
     rhos::Tuple{Real,Real,Real}
-    alpha::Float64
+    alphas::Tuple{Real,Real}
     Δ_bounds::Tuple{Float64,Float64}
-    beta::Float64
 
     function SCvx(
         nx::Int,
         N::Int;
-        w::Float64 = 1e0,
+        Δ0::Union{Float64,Vector{Float64},Matrix{Float64}} = 0.05,
+        w::Float64 = 1e4,
         rhos::Tuple{Real,Real,Real} = (0.0, 0.25, 0.7),
-        alpha::Float64 = 2.0,
+        alphas::Tuple{Real,Real} = (2.0, 3.0),
         Δ_bounds::Tuple{Float64,Float64} = (1e-6, 1e4),
-        beta::Float64 = 2.0,
     )
         tr = TrustRegions(nx, N, Δ0)
-        new(tr, w, rhos, alpha, Δ_bounds, beta)
+        new(tr, w, rhos, alphas, Δ_bounds)
     end
 end
 
@@ -145,14 +144,13 @@ function solve!(
     maxiter::Int = 100,
     tol_feas::Float64 = 1e-6,
     tol_opt::Float64 = 1e-6,
+    tol_J0::Real = -1e16,
     verbosity::Int = 1,
-    store_iterates::Bool = false,
+    store_iterates::Bool = true,
     callback::Union{Nothing,Function} = nothing,
     warmstart_primal::Bool = false,
     warmstart_dual::Bool = false,
 )
-    @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
-    @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
     tcpu_start = time()
 
     # initialize algorithm hyperparameters
@@ -179,7 +177,9 @@ function solve!(
         @printf("   Feasibility tolerance tol_feas : % 1.2e\n", tol_feas)
         @printf("   Optimality tolerance tol_opt   : % 1.2e\n", tol_opt)
         @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
-        @printf("   Initial penalty weight w       : % 1.2e\n", algo.w)
+        @printf("   Penalty weight w               : % 1.2e\n", algo.w)
+        @printf("   Warmstart primal               :  %s\n", warmstart_primal ? "Yes" : "No")
+        @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
         println(header)
     end
 
@@ -188,6 +188,109 @@ function solve!(
     constraint_solution = Dict()
 
     for it in 1:maxiter
+        tcpu_start_iter = time()
+        # re-set non-convex expression according to reference
+        if it > 1
+            delete_noncvx_referencs!(prob, prob.model_nl_references)
+        end
+        g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
+        set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
+        push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
+
+        # solve convex subproblem
+        tstart_cp = time()
+        solve_convex_subproblem!(algo, prob)
+        push!(solution.info[:cpu_times][:time_subproblem], time() - tstart_cp)
+
+        # check termination status
+        if termination_status(prob.model) == SLOW_PROGRESS
+            @warn("CP termination status: $(termination_status(prob.model))")
+        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL, LOCALLY_SOLVED]
+            if verbosity > 0
+                @warn("Exiting as CP termination status: $(termination_status(prob.model))")
+            end
+            solution.status = :CPFailed
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
+            break
+        end
+
+        _x = value.(prob.model[:x])
+        _u = value.(prob.model[:u])
+        _ξ_dyn = value.(prob.model[:ξ_dyn])
+        _ξ = prob.ng > 0 ? value.(prob.model[:ξ]) : nothing
+        _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
+
+        # evaluate nonlinear constraints
+        _, g_dynamics = get_trajectory(prob, _x, _u)
+        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u) : nothing
+        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u), 0) : nothing
+
+        # check improvement
+        J_ref = prob.objective(x_ref, u_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
+        J0 = prob.objective(_x, _u)
+        J = J0 + penalty(algo, prob, g_dynamics, g_noncvx, h_noncvx)
+        L = J0 + penalty(algo, prob, _ξ_dyn, _ξ, _ζ)
+        ΔJ = J_ref - J            # actual cost reduction, eqn (13a)
+        ΔL = J_ref - L            # predicted cost reduction, eqn (13b)
+        rho_i = abs(ΔL) > 1e-12 ? ΔJ / ΔL : 1.0
+
+        # check nonlinear convergence
+        χ = norm(g_dynamics,Inf)
+        if prob.ng > 0
+            χ = max(χ, norm(g_noncvx,Inf))
+        end
+        if prob.nh > 0
+            χ = max(χ, norm(h_noncvx,Inf))
+        end
+
+        if verbosity > 0
+            if mod(it, 20) == 0
+                println(header)
+            end
+            @printf(" %3.0f | % 1.3e | % 1.3e | % 1.3e | % 1.3e | % 1.2e | % 1.2e | % 1.2e |  %s   |\n",
+                    it, J0, ΔJ, ΔL, χ, rho_i, algo.tr.Δ[1,1], algo.w,
+                    message_accept_step(rho_i >= algo.rhos[1]))
+        end
+
+        # update current solution
+        solution.x[:,:] = _x
+        solution.u[:,:] = _u
+
+        if store_iterates
+            push!(solution.info[:J0], J0)
+            push!(solution.info[:ΔJ], ΔJ)
+            push!(solution.info[:χ], χ)
+            push!(solution.info[:Δ], algo.tr.Δ)
+            push!(solution.info[:accept], rho_i >= algo.rhos[1])
+            solution.n_iter += 1
+        end
+
+        if !isnothing(callback)
+            callback(solution)
+        end
+
+        if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
+            solution.status = :Optimal
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
+            break
+        end
+               
+        # check step acceptance - FIXME
+        if rho_i >= algo.rhos[1]
+            flag_reference = true
+            x_ref[:,:] = _x
+            u_ref[:,:] = _u
+
+            # update primal and dual solutions
+            if warmstart_primal
+                variable_primal = get_primal_variables(prob.model)
+            end
+            if warmstart_dual
+                constraint_solution = get_constraint_solutions(prob.model)
+            end
+        else
+            flag_reference = false
+        end
 
         # update trust-region 
         flag_trust_region = update_trust_region!(algo, rho_i)
