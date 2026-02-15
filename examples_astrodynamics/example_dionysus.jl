@@ -144,9 +144,9 @@ set_silent(prob.model)
 sols_ig, _ = SCPLib.get_trajectory(prob, x_ref, u_ref)
 
 # -------------------- instantiate algorithm -------------------- #
-# algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, Δ0=0.1, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
+algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, Δ0=0.1, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
 
-algo = SCPLib.FixedTRWSCP(nx, N, 0.05)
+# algo = SCPLib.FixedTRWSCP(nx, N, 0.05)
 # w_ep = 1e2
 # w_prox = 1e1
 # algo = SCPLib.ProxLinear(w_ep, w_prox)
