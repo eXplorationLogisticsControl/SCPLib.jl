@@ -168,6 +168,9 @@ Solve non-convex OCP with prox-linear algorithm
 - `tol_J0::Real`: objective tolerance
 - `verbosity::Int`: verbosity level
 - `store_iterates::Bool`: whether to store iterates
+- `callback::Union{Nothing,Function}`: callback function
+- `warmstart_primal::Bool`: whether to warmstart primal variables
+- `warmstart_dual::Bool`: whether to warmstart dual variables
 """
 function solve!(
     algo::ProxLinear,
@@ -181,6 +184,8 @@ function solve!(
     verbosity::Int = 1,
     store_iterates::Bool = true,
     callback::Union{Nothing,Function} = nothing,
+    warmstart_primal::Bool = false,
+    warmstart_dual::Bool = false,
 )
     # initialize algorithm hyperparameters
     flag_reference    = true    # at initial iteraiton, we need to update reference
@@ -205,8 +210,14 @@ function solve!(
         @printf("   Feasibility tolerance tol_feas : % 1.2e\n", tol_feas)
         @printf("   Optimality tolerance tol_opt   : % 1.2e\n", tol_opt)
         @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
+        @printf("   Warmstart primal               :  %s\n", warmstart_primal ? "Yes" : "No")
+        @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
         println(header)
     end
+
+    # initialize warmstart dictionaries
+    variable_primal = Dict()
+    constraint_solution = Dict()
 
     # remove constraint_trust_region_x_lb and constraint_trust_region_x_ub
     filter!(e->e≠:constraint_trust_region_x_lb, prob.model_nl_references)
@@ -223,6 +234,11 @@ function solve!(
         end
         push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
 
+        # warmstart
+        if it > 1 && (warmstart_primal || warmstart_dual)
+            set_optimal_start_values(variable_primal, constraint_solution)
+        end
+
         # solve convex subproblem
         tstart_cp = time()
         _ϵ_noncvx_g, _ϵ_noncvx_h, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref)
@@ -231,11 +247,12 @@ function solve!(
         # check termination status
         if termination_status(prob.model) == SLOW_PROGRESS
             @warn("CP termination status: $(termination_status(prob.model))")
-        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL]
+        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL, LOCALLY_SOLVED]
             if verbosity > 0
                 @warn("Exiting as CP termination status: $(termination_status(prob.model))")
             end
             solution.status = :CPFailed
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
 
@@ -276,6 +293,7 @@ function solve!(
         # check for convergence
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
 
@@ -294,8 +312,16 @@ function solve!(
         x_ref[:,:] = _x
         u_ref[:,:] = _u
         J0_ref = J0
+
+        # update primal and dual solutions
+        if warmstart_primal
+            variable_primal = get_primal_variables(prob.model)
+        end
+        if warmstart_dual
+            constraint_solution = get_constraint_solutions(prob.model)
+        end
         
-        if it == maxiter
+        if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible
             else

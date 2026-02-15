@@ -47,12 +47,14 @@ function set_impulsive_dynamics_cache!(lincache::LinearizedCache, x_ref, u_ref, 
 end
 
 
+"""Set cache for non-convex equality constraints"""
 function set_g_noncvx_cache!(lincache::LinearizedCache, ∇g_noncvx::Function, x_ref, u_ref)
     lincache.∇g[:,:] = ∇g_noncvx(x_ref, u_ref)
     return
 end
 
 
+"""Set cache for non-convex inequality constraints"""
 function set_h_noncvx_cache!(lincache::LinearizedCache, ∇h_noncvx::Function, x_ref, u_ref)
     lincache.∇h[:,:] = ∇h_noncvx(x_ref, u_ref)
     return

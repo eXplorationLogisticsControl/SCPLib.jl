@@ -266,8 +266,13 @@ Solve non-convex OCP with SCvx* algorithm
 - `tol_feas::Float64`: feasibility tolerance
 - `tol_opt::Float64`: optimality tolerance
 - `tol_J0::Real`: objective tolerance
+- `J_expected::Real`: expected objective value
+- `K_w::Real`: initial penalty weight scaling factor
 - `verbosity::Int`: verbosity level
 - `store_iterates::Bool`: whether to store iterates
+- `callback::Union{Nothing,Function}`: callback function
+- `warmstart_primal::Bool`: whether to warmstart primal variables
+- `warmstart_dual::Bool`: whether to warmstart dual variables
 """
 function solve!(
     algo::SCvxStar,
@@ -283,6 +288,8 @@ function solve!(
     verbosity::Int = 1,
     store_iterates::Bool = true,
     callback::Union{Nothing,Function} = nothing,
+    warmstart_primal::Bool = false,
+    warmstart_dual::Bool = false,
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
@@ -319,13 +326,14 @@ function solve!(
         @printf("   Objective tolerance tol_J0     : % 1.2e\n", tol_J0)
         @printf("   Initial penalty weight w       : % 1.2e\n", algo.w)
         @printf("   Use L1 penalty                 :  %s\n", algo.l1_penalty ? "Yes" : "No")
+        @printf("   Warmstart primal               :  %s\n", warmstart_primal ? "Yes" : "No")
+        @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
         println(header)
     end
-    # cpu_times = Dict(
-    #     :time_subproblem => 0.0,
-    #     :time_update_reference => 0.0,
-    #     :time_total => 0.0,
-    # )
+
+    # initialize warmstart dictionaries
+    variable_primal = Dict()
+    constraint_solution = Dict()
 
     for it in 1:maxiter
         tcpu_start_iter = time()
@@ -346,6 +354,11 @@ function solve!(
         end
         push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
 
+        # warmstart
+        if it > 1 && (warmstart_primal || warmstart_dual)
+            set_optimal_start_values(variable_primal, constraint_solution)
+        end
+
         # solve convex subproblem
         tstart_cp = time()
         solve_convex_subproblem!(algo, prob)
@@ -354,7 +367,7 @@ function solve!(
         # check termination status
         if termination_status(prob.model) == SLOW_PROGRESS
             @warn("CP termination status: $(termination_status(prob.model))")
-        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL]
+        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL, LOCALLY_SOLVED]
             if verbosity > 0
                 @warn("Exiting as CP termination status: $(termination_status(prob.model))")
             end
@@ -422,18 +435,25 @@ function solve!(
             callback(solution)
         end
 
-        if rho_i >= algo.rhos[1]
-            if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
-                solution.status = :Optimal
-                break
-            end
+        if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
+            solution.status = :Optimal
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
+            break
         end
-        
+               
         # check step acceptance
         if rho_i >= algo.rhos[1]
             flag_reference = true
             x_ref[:,:] = _x
             u_ref[:,:] = _u
+
+            # update primal and dual solutions
+            if warmstart_primal
+                variable_primal = get_primal_variables(prob.model)
+            end
+            if warmstart_dual
+                constraint_solution = get_constraint_solutions(prob.model)
+            end
 
             # stationarity check
             if abs(ΔJ) < δ_i
@@ -459,13 +479,13 @@ function solve!(
         if verbosity >= 2
             # extra information when verbosity >= 2
             println()
-            @printf("       CPU time on iteration        : %1.2f sec\n", cpu_times[:time_total])
-            @printf("       CPU time on subproblem       : %1.2f sec\n", cpu_times[:time_subproblem])
-            @printf("       CPU time on update reference : %1.2f sec\n", cpu_times[:time_update_reference])
+            @printf("       CPU time on iteration        : %1.2f sec\n", solution.info[:cpu_times][:time_iter_total][end])
+            @printf("       CPU time on subproblem       : %1.2f sec\n", solution.info[:cpu_times][:time_subproblem][end])
+            @printf("       CPU time on update reference : %1.2f sec\n", solution.info[:cpu_times][:time_update_reference][end])
             println()
         end
 
-        if it == maxiter
+        if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible
             else

@@ -45,9 +45,7 @@ function get_continuous_augmented_eom(eom!::Function, params, nx::Int)
 end
 
 
-"""
-Get augmented in-place dynamics function with signature `eom_aug!(dx_aug, x_aug, p, t)`
-"""
+"""Get augmented in-place dynamics function with signature `eom_aug!(dx_aug, x_aug, p, t)`"""
 function get_impulsive_augmented_eom(eom!::Function, f_dfdx::Function, nx::Int)
     eom_aug! = function (dx_aug, x_aug, p, t)
         eom!(dx_aug, x_aug, p, t)
