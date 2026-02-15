@@ -190,12 +190,26 @@ function solve!(
     for it in 1:maxiter
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference
-        if it > 1
-            delete_noncvx_referencs!(prob, prob.model_nl_references)
+        if flag_reference
+            if it > 1
+                delete_noncvx_referencs!(prob, prob.model_nl_references)
+            end
+            g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
+            set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
+        
+        # only update trust-region constraints
+        elseif flag_trust_region
+            if it > 1
+                delete_noncvx_referencs!(prob, [:constraint_trust_region_x_lb, :constraint_trust_region_x_ub])
+            end
+            set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is not updated but trsut region size changed
         end
-        g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
-        set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
         push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
+
+        # warmstart
+        if it > 1 && (warmstart_primal || warmstart_dual)
+            set_optimal_start_values(variable_primal, constraint_solution)
+        end
 
         # solve convex subproblem
         tstart_cp = time()
@@ -275,7 +289,7 @@ function solve!(
             break
         end
                
-        # check step acceptance - FIXME
+        # check step acceptance
         if rho_i >= algo.rhos[1]
             flag_reference = true
             x_ref[:,:] = _x
