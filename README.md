@@ -6,6 +6,10 @@
   <img src="https://github.com/Yuricst/SCPLib.jl/actions/workflows/test.yml/badge.svg" alt="test workflow"/>
 </p>
 
+<p align="center">
+  <a href="https://explorationlogisticscontrol.github.io/SCPLib.jl/">📚Read the docs📚</a>
+</p>
+
 # `SCPLib.jl`: Sequential Convex Programming library
 
 We are interested in solving the discretized non-convex optimal control problem (OCP)
