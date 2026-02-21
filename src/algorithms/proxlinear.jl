@@ -18,7 +18,7 @@ where `L(Z)` is the original objective function, `G(Z)` are the non-convex const
 - `proximal_u::Bool`: whether to enforce proximal constraint on u
 """
 mutable struct ProxLinear <: SCPAlgorithm
-    # hyperparameters
+    # algorithm parameters
     w_ep::Float64           # exact penalty term weight
     w_prox::Float64         # proximal term weight
     proximal_u::Bool
@@ -321,6 +321,7 @@ function solve!(
             constraint_solution = get_constraint_solutions(prob.model)
         end
         
+        # handle termination status when maximum number of iterations is reached
         if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible
