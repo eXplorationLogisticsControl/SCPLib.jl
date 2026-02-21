@@ -55,6 +55,16 @@ function update_trust_region!(algo::SCPAlgorithm, rho_i::Float64)
         algo.tr.Δ = min.(algo.tr.Δ * algo.alphas[2], algo.Δ_bounds[2])
         flag_trust_region = true
     end
+
+    if algo.use_trustregion_control
+        if rho_i < algo.rhos[2]
+            algo.tr_u.Δ = max.(algo.tr_u.Δ / algo.alphas[1], algo.Δ_bounds[1])
+            flag_trust_region = true
+        elseif rho_i >= algo.rhos[3]
+            algo.tr_u.Δ = min.(algo.tr_u.Δ * algo.alphas[2], algo.Δ_bounds[2])
+            flag_trust_region = true
+        end
+    end
     return flag_trust_region
 end
 
@@ -80,5 +90,12 @@ function set_trust_region_constraints!(
         -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
     @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
           prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
+
+    if algo.use_trustregion_control
+        @constraint(prob.model, constraint_trust_region_u_lb[k in 1:size(u_ref,2)],
+            -(prob.model[:u][:,k] - u_ref[:,k]) <= algo.tr_u.Δ[:,k])
+        @constraint(prob.model, constraint_trust_region_u_ub[k in 1:prob.N],
+            prob.model[:u][:,k] - u_ref[:,k]  <= algo.tr_u.Δ[:,k])
+    end
     return
 end
