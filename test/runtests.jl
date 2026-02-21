@@ -26,3 +26,7 @@ end
 @testset "ProxLinear" begin
     include("test_proxlinear_dynamics_only.jl")
 end
+
+@testset "SCvx" begin
+    include("test_scvx_dynamics_ad.jl")
+end

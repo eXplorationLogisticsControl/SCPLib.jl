@@ -127,10 +127,10 @@ set_silent(prob.model)
 # -------------------- instantiate algorithm -------------------- #
 tol_opt = 1e-6
 tol_feas = 1e-6
-algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
+algo = SCPLib.SCvx(nx, N; w = 1/tol_feas)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; 
     tol_opt=tol_opt, tol_feas=tol_feas, maxiter = 100)
 
 # propagate solution
@@ -154,9 +154,6 @@ axislegend(ax_u, position=:cc)
 colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
 ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
 scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
-
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
 
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
 scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
