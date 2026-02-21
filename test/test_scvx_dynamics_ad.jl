@@ -121,7 +121,7 @@ function test_scvx_dynamics_ad(;verbosity::Int = 0)
     # -------------------- instantiate algorithm -------------------- #
     tol_feas = 1e-6
     tol_opt = 1e-6
-    algo = SCPLib.SCvx(nx, N; w = 1/tol_feas)
+    algo = SCPLib.SCvx(nx, N; w = 1e3)
 
     # solve problem
     solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
