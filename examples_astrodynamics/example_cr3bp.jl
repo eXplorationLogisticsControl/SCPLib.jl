@@ -90,15 +90,16 @@ nu = 4                              # [ux,uy,uz,Γ]
 # umax = thrust/MU/1e3 / (VU/TU)
 umax = 0.273 * 1e-6 / (DU/TU^2)
 
-if !@isdefined(x_ref)
+if !@isdefined(x_ref__)
     N = 100
     Nseg = N - 1
     times = [el for el in LinRange(0.0, tf, Nseg+1)]
     
     params_ode = [μ,]
+    #nodes = ShootingStar.initialguess_linear(rv0, rvf, times)
     nodes = ShootingStar.initialguess_gradual_transit(rv0, rvf, times, 
         ShootingStar.rhs_cr3bp_sv!, params_ode)
-    
+
     # create problem
     prob = ShootingStar.TwoStageShootingProblem(
         rv0,
@@ -110,7 +111,7 @@ if !@isdefined(x_ref)
     )
 
     # solve outerloop
-    maxiter = 10
+    maxiter = 100
     status, sols, residuals = ShootingStar.solve_outerloop!(
         prob,
         maxiter,
@@ -135,8 +136,8 @@ if !@isdefined(x_ref)
 end
 
 # plot initial guess
-fig = Figure(size=(1200,800))
-ax3d = Axis3(fig[1,1]; aspect=:data)
+fig = Figure(size=(1600,800))
+ax3d = Axis3(fig[1,1:2]; aspect=:data)
 lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
 
@@ -171,10 +172,11 @@ for _sol in sol_ig
 end
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; w0 = 1e0)
+algo = SCPLib.SCvxStar(nx, N; w0 = 0.1)
 
 # solve problem
 solution = SCPLib.solve!(algo, prob, _x_ref, _u_ref; maxiter = 500)
+total_dv = sum(solution.u[4,:] .* diff(prob.times) * (DU/TU)) * 1e3   # in m/s
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
@@ -187,26 +189,30 @@ end
 
 # plot controls
 ax_u = Axis(fig[2,1]; xlabel="Time, day", ylabel="Control, mm/s^2")
+colors_u = [:blue, :red, :limegreen]
 for i in 1:3
-    stairs!(ax_u, prob.times[1:end-1]*TU/86400, solution.u[i,:] * (DU/TU^2)/1e-6, label="u[$i]", step=:pre, linewidth=1.0)
+    stairs!(ax_u, prob.times[1:end-1]*TU/86400, solution.u[i,:] * (DU/TU^2)/1e-6, label="u[$i]", step=:pre, linewidth=1.0, color=colors_u[i])
 end
 stairs!(ax_u, prob.times[1:end-1]*TU/86400, solution.u[4,:] * (DU/TU^2)/1e-6, label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
 hlines!(ax_u, [ umax * (DU/TU^2)/1e-6], color=:grey, linestyle=:dot)
 hlines!(ax_u, [-umax * (DU/TU^2)/1e-6], color=:grey, linestyle=:dot)
-axislegend(ax_u, position=:cc)
+#axislegend(ax_u, position=:cc)
 
 # plot iterate information
 colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
-ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
+ax_J0 = Axis(fig[2,2]; xlabel="Iteration", ylabel="J0")
+scatterlines!(ax_J0, 1:length(solution.info[:accept]), solution.info[:J0], color=colors_accept, marker=:circle, markersize=7)
+
+ax_χ = Axis(fig[1,3]; xlabel="Iteration", ylabel="χ", yscale=log10)
 scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
 
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
+ax_w = Axis(fig[2,3]; xlabel="Iteration", ylabel="w", yscale=log10)
 scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
 
-ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
+ax_J = Axis(fig[1,4]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
 scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
 
-ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+ax_Δ = Axis(fig[2,4]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
 scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
 display(fig)
