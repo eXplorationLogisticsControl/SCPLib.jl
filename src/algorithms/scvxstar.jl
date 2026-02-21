@@ -93,7 +93,7 @@ function Base.show(io::IO, algo::SCvxStar)
     @printf("   Maximum penalty weight w_max                       : %1.2e\n", algo.w_max)
     @printf("   Trust-region acceptance thresholds (ρ_1, ρ_2, ρ_3) : %1.2e, %1.2e, %1.2e\n", algo.rhos[1], algo.rhos[2], algo.rhos[3])
     @printf("   Trust-region size update factors (α_1, α_2)        : %1.2e, %1.2e\n", algo.alphas[1], algo.alphas[2])
-    @printf("   Use trust-region control for control variables      : %s\n", algo.use_trustregion_control ? "Yes" : "No")
+    @printf("   Use trust-region control for control variables     : %s\n", algo.use_trustregion_control ? "Yes" : "No")
 end
 
 
@@ -334,7 +334,7 @@ function solve!(
     if algo.use_trustregion_control
         append!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
     end
-
+    
     for it in 1:maxiter
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference

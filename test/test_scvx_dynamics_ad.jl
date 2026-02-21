@@ -124,7 +124,8 @@ function test_scvx_dynamics_ad(;verbosity::Int = 0)
     algo = SCPLib.SCvx(nx, N; w = 1/tol_feas)
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt=tol_opt, tol_feas=tol_feas, verbosity = verbosity, maxiter = 100)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+        tol_opt=tol_opt, tol_feas=tol_feas, verbosity = verbosity, maxiter = 100)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
