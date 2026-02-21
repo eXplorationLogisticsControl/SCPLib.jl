@@ -119,7 +119,6 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
         x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
     end
     u_ref = zeros(nu, N)
-    y_ref = nothing
 
     # instantiate problem object    
     prob = SCPLib.ImpulsiveProblem(
