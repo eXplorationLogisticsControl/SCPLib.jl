@@ -12,10 +12,10 @@ end
 
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
-mutable struct ControlParams_dynamics_ad
+mutable struct ControlParams_scvx_dynamics_ad
     μ::Float64
     u::Vector
-    function ControlParams_dynamics_ad(μ::Float64)
+    function ControlParams_scvx_dynamics_ad(μ::Float64)
         new(μ, zeros(4))
     end
 end
@@ -26,7 +26,7 @@ function test_scvx_dynamics_ad(;verbosity::Int = 0)
     TU = 382981     # sec
     MU = 500.0      # kg
     VU = DU/TU      # km/s
-    params = ControlParams_dynamics_ad(μ)
+    params = ControlParams_scvx_dynamics_ad(μ)
 
     function eom!(drv, rv, p, t)
         x, y, z = rv[1:3]
@@ -121,10 +121,11 @@ function test_scvx_dynamics_ad(;verbosity::Int = 0)
     # -------------------- instantiate algorithm -------------------- #
     tol_feas = 1e-6
     tol_opt = 1e-6
-    algo = SCPLib.SCvx(nx, N; w = 1/tol_feas)
+    algo = SCPLib.SCvx(nx, N; w = 1e3)
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt=tol_opt, tol_feas=tol_feas, verbosity = verbosity, maxiter = 100)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+        tol_opt=tol_opt, tol_feas=tol_feas, verbosity = verbosity, maxiter = 100)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)

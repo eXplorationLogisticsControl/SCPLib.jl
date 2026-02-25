@@ -29,8 +29,8 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 
     ode_ensemble_method
     ode_method
-    ode_reltol
-    ode_abstol
+    ode_reltol::Float64
+    ode_abstol::Float64
 
     fun_get_trajectory::Union{Function,Nothing}
     set_dynamics_cache!::Union{Function,Nothing}
@@ -149,8 +149,8 @@ function ContinuousProblem(
     ∇h_noncvx::Union{Function,Nothing} = nothing,
     ode_ensemble_method = EnsembleSerial(),
     ode_method = Tsit5(),
-    ode_reltol = 1e-12,
-    ode_abstol = 1e-12,
+    ode_reltol::Float64 = 1e-12,
+    ode_abstol::Float64 = 1e-12,
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
     u_bias::Union{Matrix,Nothing} = nothing,

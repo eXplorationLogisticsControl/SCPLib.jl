@@ -21,6 +21,7 @@ SCvx* algorithm
 mutable struct SCvxStar <: TrustRegionAlgorithm
     # storage
     tr::TrustRegions
+    tr_u::Union{Nothing,TrustRegions}
     w::Union{Nothing,Float64}
     λ_dyn::Matrix
     λ::Vector
@@ -34,6 +35,7 @@ mutable struct SCvxStar <: TrustRegionAlgorithm
     beta::Float64
     w_max::Float64
     l1_penalty::Bool
+    use_trustregion_control::Bool
 
     function SCvxStar(
         nx::Int,
@@ -49,13 +51,22 @@ mutable struct SCvxStar <: TrustRegionAlgorithm
         beta::Float64 = 2.0,
         w_max::Float64 = 1e16,
         l1_penalty::Bool = false,
+        nu::Union{Nothing,Int} = nothing,
+        Δ0_u::Union{Float64,Vector{Float64},Matrix{Float64}} = 0.1,
+        use_trustregion_control::Bool = false,
     )
         λ_dyn = zeros(nx, N-1)
         λ = zeros(ng)
         μ = zeros(nh)
         tr = TrustRegions(nx, N, Δ0)
+
+        if use_trustregion_control && isnothing(nu)
+            @error "Number of control variables `nu` is not provided to SCvxStar"
+        end
+        tr_u = use_trustregion_control && !isnothing(nu) ? TrustRegions(nu, N, Δ0_u) : nothing
         new(
             tr,
+            tr_u,
             w0,
             λ_dyn,
             λ,
@@ -67,6 +78,7 @@ mutable struct SCvxStar <: TrustRegionAlgorithm
             beta,
             w_max,
             l1_penalty,
+            use_trustregion_control,
         )
     end
 end
@@ -81,11 +93,12 @@ function Base.show(io::IO, algo::SCvxStar)
     @printf("   Maximum penalty weight w_max                       : %1.2e\n", algo.w_max)
     @printf("   Trust-region acceptance thresholds (ρ_1, ρ_2, ρ_3) : %1.2e, %1.2e, %1.2e\n", algo.rhos[1], algo.rhos[2], algo.rhos[3])
     @printf("   Trust-region size update factors (α_1, α_2)        : %1.2e, %1.2e\n", algo.alphas[1], algo.alphas[2])
+    @printf("   Use trust-region control for control variables     : %s\n", algo.use_trustregion_control ? "Yes" : "No")
 end
 
 
 """
-Augmented Lagrangian penalty function
+Augmented Lagrangian penalty function for numerical evaluation
 """
 function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Float64}, ξ, ζ)
     P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
@@ -109,7 +122,10 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Flo
 end
 
 
-function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1)
+"""
+Augmented Lagrangian penalty function for JuMP model
+"""
+function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1::Union{Nothing,Dict})
     P = dot(algo.λ_dyn, ξ_dyn) + algo.w/2 * dot(ξ_dyn,ξ_dyn)        # dynamics violation penalty
     if prob.ng > 0
         P += dot(algo.λ, ξ) + algo.w/2 * dot(ξ,ξ)                   # append equality constraints terms
@@ -133,31 +149,6 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Var
     end
     return P
 end
-
-
-# """Update trust-region size"""
-# function update_trust_region!(algo::SCvxStar, rho_i::Float64)
-#     flag_trust_region = false
-#     if rho_i < algo.rhos[2]
-#         algo.tr.Δ = max.(algo.tr.Δ / algo.alphas[1], algo.Δ_bounds[1])
-#         flag_trust_region = true
-#     elseif rho_i >= algo.rhos[3]
-#         algo.tr.Δ = min.(algo.tr.Δ * algo.alphas[2], algo.Δ_bounds[2])
-#         flag_trust_region = true
-#     end
-#     return flag_trust_region
-# end
-
-
-# """Set trust-region constraints"""
-# function set_trust_region_constraints!(algo::SCvxStar, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
-#     # define trust-region constraints
-#     @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
-#         -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
-#     @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
-#           prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
-#     return
-# end
 
 
 """Solve convex subproblem for SCvx* algorithm"""
@@ -293,6 +284,9 @@ function solve!(
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
+    if algo.use_trustregion_control
+        @assert prob.nu == size(algo.tr_u.Δ,1) "Number of control variables mismatch between problem and algorithm"
+    end
     tcpu_start = time()
 
     # re-tune initial penalty weight if not provided
@@ -328,6 +322,7 @@ function solve!(
         @printf("   Use L1 penalty                 :  %s\n", algo.l1_penalty ? "Yes" : "No")
         @printf("   Warmstart primal               :  %s\n", warmstart_primal ? "Yes" : "No")
         @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
+        @printf("   Use trust-region on u          : %s\n", algo.use_trustregion_control ? "Yes" : "No")
         println(header)
     end
 
@@ -335,6 +330,11 @@ function solve!(
     variable_primal = Dict()
     constraint_solution = Dict()
 
+    # append trust-region constraints references for nonlinear program
+    if algo.use_trustregion_control
+        append!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
+    end
+    
     for it in 1:maxiter
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference
@@ -349,6 +349,9 @@ function solve!(
         elseif flag_trust_region
             if it > 1
                 delete_noncvx_referencs!(prob, [:constraint_trust_region_x_lb, :constraint_trust_region_x_ub])
+                if algo.use_trustregion_control
+                    delete_noncvx_referencs!(prob, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
+                end
             end
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is not updated but trsut region size changed
         end

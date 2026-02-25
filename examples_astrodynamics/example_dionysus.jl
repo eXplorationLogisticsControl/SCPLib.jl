@@ -163,26 +163,26 @@ sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
 @show -solution.info[:J0][end] * MASS
 
 # -------------------- make plot -------------------- #
-fig = Figure(size=(1200,800); title="SCP problem with MEE")
+fig = Figure(size=(1600,800); title="SCP problem with MEE")
 ax3d = Axis3(fig[1,1:2]; aspect=:data, xlabel="x", ylabel="y", zlabel="z")
-ax2d = Axis(fig[1,3]; aspect=DataAspect(), xlabel="x", ylabel="y")
+#ax2d = Axis(fig[1,3]; aspect=DataAspect(), xlabel="x", ylabel="y")
 
 scatter!(ax3d, RV0[1], RV0[2], RV0[3], color=:limegreen, markersize=10)
 scatter!(ax3d, RVf[1], RVf[2], RVf[3], color=:blue, markersize=10)
 lines!(ax3d, initial_orbit_rvs[1,:], initial_orbit_rvs[2,:], initial_orbit_rvs[3,:], color=:limegreen, linewidth=0.8)
 lines!(ax3d, final_orbit_rvs[1,:], final_orbit_rvs[2,:], final_orbit_rvs[3,:], color=:blue, linewidth=0.8)
 
-scatter!(ax2d, RV0[1], RV0[2], color=:limegreen, markersize=10)
-scatter!(ax2d, RVf[1], RVf[2], color=:blue, markersize=10)
-lines!(ax2d, initial_orbit_rvs[1,:], initial_orbit_rvs[2,:], color=:limegreen, linewidth=0.8)
-lines!(ax2d, final_orbit_rvs[1,:], final_orbit_rvs[2,:], color=:blue, linewidth=0.8)
+# scatter!(ax2d, RV0[1], RV0[2], color=:limegreen, markersize=10)
+# scatter!(ax2d, RVf[1], RVf[2], color=:blue, markersize=10)
+# lines!(ax2d, initial_orbit_rvs[1,:], initial_orbit_rvs[2,:], color=:limegreen, linewidth=0.8)
+# lines!(ax2d, final_orbit_rvs[1,:], final_orbit_rvs[2,:], color=:blue, linewidth=0.8)
 
 # plot initial guess
 ucolor_tol = 1e-2
 for (isol,sol) in enumerate(sols_ig)
     rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
     lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=:grey, linewidth=1.0)
-    lines!(ax2d, rvs[1,:], rvs[2,:], color=:grey, linewidth=1.0)
+    #lines!(ax2d, rvs[1,:], rvs[2,:], color=:grey, linewidth=1.0)
 end
 
 # plot optimal solution
@@ -205,6 +205,21 @@ stairs!(axu, times*TU/86400, [solution.u[1,:]; 0.0]; step=:post, color = :blue, 
 stairs!(axu, times*TU/86400, [solution.u[2,:]; 0.0]; step=:post, color = :red, linewidth=0.8)
 stairs!(axu, times*TU/86400, [solution.u[3,:]; 0.0]; step=:post, color = :limegreen, linewidth=0.8)
 stairs!(axu, times*TU/86400, [solution.u[4,:]; 0.0]; step=:post, color = :black, linewidth=0.8, linestyle=:dash)
+
+# plot iterate information
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
+ax_χ = Axis(fig[1,3]; xlabel="Iteration", ylabel="χ", yscale=log10)
+scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+
+ax_w = Axis(fig[2,3]; xlabel="Iteration", ylabel="w", yscale=log10)
+scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+
+ax_J = Axis(fig[1,4]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
+scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
+
+ax_Δ = Axis(fig[2,4]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
+
 
 save(joinpath(@__DIR__, "plots/advanced_dionysus.png"), fig; px_per_unit=3)
 display(fig)

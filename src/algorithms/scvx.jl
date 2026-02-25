@@ -9,12 +9,14 @@ SCvx algorithm
 mutable struct SCvx <: TrustRegionAlgorithm
     # storage
     tr::TrustRegions
+    tr_u::Union{Nothing,TrustRegions}
 
     # algorithm parameters
     w::Float64
     rhos::Tuple{Real,Real,Real}
     alphas::Tuple{Real,Real}
     Δ_bounds::Tuple{Float64,Float64}
+    use_trustregion_control::Bool
 
     function SCvx(
         nx::Int,
@@ -24,9 +26,17 @@ mutable struct SCvx <: TrustRegionAlgorithm
         rhos::Tuple{Real,Real,Real} = (0.0, 0.25, 0.7),
         alphas::Tuple{Real,Real} = (2.0, 3.0),
         Δ_bounds::Tuple{Float64,Float64} = (1e-6, 1e4),
+        nu::Union{Nothing,Int} = nothing,
+        Δ0_u::Union{Float64,Vector{Float64},Matrix{Float64}} = 0.1,
+        use_trustregion_control::Bool = false,
     )
         tr = TrustRegions(nx, N, Δ0)
-        new(tr, w, rhos, alphas, Δ_bounds)
+        if use_trustregion_control && isnothing(nu)
+            @error "Number of control variables `nu` is not provided to SCvxStar"
+        end
+        tr_u = use_trustregion_control && !isnothing(nu) ? TrustRegions(nu, N, Δ0_u) : nothing
+        
+        new(tr, tr_u, w, rhos, alphas, Δ_bounds, use_trustregion_control)
     end
 end
 
@@ -35,8 +45,8 @@ function Base.show(io::IO, algo::SCvx)
     println(io, "SCvx algorithm")
     @printf("   Trust-region size Δ                                : %1.2e\n", algo.tr.Δ[1,1])
     @printf("   Penalty weight w                                   : %1.2e\n", algo.w)
-    @printf("   Penalty weight update factor β                     : %1.2e\n", algo.beta)
     @printf("   Trust-region size bounds (Δ_min, Δ_max)            : %1.2e, %1.2e\n", algo.Δ_bounds[1], algo.Δ_bounds[2])
+    @printf("   Use trust-region control for control variables     : %s\n", algo.use_trustregion_control ? "Yes" : "No")
 end
 
 
@@ -151,6 +161,10 @@ function solve!(
     warmstart_primal::Bool = false,
     warmstart_dual::Bool = false,
 )
+    @show algo.use_trustregion_control
+    if algo.use_trustregion_control
+        @assert prob.nu == size(algo.tr_u.Δ,1) "Number of control variables mismatch between problem and algorithm"
+    end
     tcpu_start = time()
 
     # initialize algorithm hyperparameters
@@ -180,12 +194,19 @@ function solve!(
         @printf("   Penalty weight w               : % 1.2e\n", algo.w)
         @printf("   Warmstart primal               :  %s\n", warmstart_primal ? "Yes" : "No")
         @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
+        @printf("   Use trust-region on u          : %s\n", algo.use_trustregion_control ? "Yes" : "No")
         println(header)
     end
 
     # initialize warmstart dictionaries
     variable_primal = Dict()
     constraint_solution = Dict()
+
+    # append trust-region constraints references for nonlinear program
+    if algo.use_trustregion_control
+        append!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
+    end
+
 
     for it in 1:maxiter
         tcpu_start_iter = time()
@@ -201,6 +222,9 @@ function solve!(
         elseif flag_trust_region
             if it > 1
                 delete_noncvx_referencs!(prob, [:constraint_trust_region_x_lb, :constraint_trust_region_x_ub])
+                if algo.use_trustregion_control
+                    delete_noncvx_referencs!(prob, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
+                end
             end
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is not updated but trsut region size changed
         end

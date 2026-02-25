@@ -19,7 +19,7 @@ include("dynamics.jl")
 include("linearization.jl")
 include("continuous_problem.jl")
 include("impulsive_problem.jl")
-include("constraints.jl")
+include("nlconstraints.jl")
 include("trust_region.jl")
 
 include("algorithms/scvx.jl")
