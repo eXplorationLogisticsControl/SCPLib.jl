@@ -194,7 +194,7 @@ function solve!(
         @printf("   Penalty weight w               : % 1.2e\n", algo.w)
         @printf("   Warmstart primal               :  %s\n", warmstart_primal ? "Yes" : "No")
         @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
-        @printf("   Use trust-region on u          : %s\n", algo.use_trustregion_control ? "Yes" : "No")
+        @printf("   Use trust-region on u          :  %s\n", algo.use_trustregion_control ? "Yes" : "No")
         println(header)
     end
 
