@@ -322,7 +322,7 @@ function solve!(
         @printf("   Use L1 penalty                 :  %s\n", algo.l1_penalty ? "Yes" : "No")
         @printf("   Warmstart primal               :  %s\n", warmstart_primal ? "Yes" : "No")
         @printf("   Warmstart dual                 :  %s\n", warmstart_dual ? "Yes" : "No")
-        @printf("   Use trust-region on u          : %s\n", algo.use_trustregion_control ? "Yes" : "No")
+        @printf("   Use trust-region on u          :  %s\n", algo.use_trustregion_control ? "Yes" : "No")
         println(header)
     end
 
