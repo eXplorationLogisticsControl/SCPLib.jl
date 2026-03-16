@@ -174,6 +174,10 @@ function ImpulsiveProblem(
     nx, _ = size(x_ref)
     nu, _ = size(u_ref)
 
+    # check on size of dfdu function
+    _dfdu_test = dfdu(x_ref[:,1], u_ref[:,1], times[1])
+    @assert size(_dfdu_test) == (nx, nu) "Size of output from dfdu is not (nx,nu)"
+
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
         eom_aug! = get_impulsive_augmented_eom(eom!, params, nx)

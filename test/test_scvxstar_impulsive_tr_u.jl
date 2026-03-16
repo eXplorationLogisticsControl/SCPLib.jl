@@ -129,6 +129,7 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
         times,
         x_ref,
         u_ref;
+        dfdu = (x,u,t) -> [zeros(3,4); I(3) zeros(3,1)],
         eom_aug! = eom_aug!,
         ode_method = Vern7(),
     )
