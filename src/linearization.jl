@@ -2,7 +2,7 @@
 
 
 """Cache for linearized Jacobians"""
-mutable struct LinearizedCache <: AbstractLinearizationCache
+mutable struct MultipleShootingCache <: AbstractLinearizationCache
     Φ_A::Array{Float64, 3}
     Φ_B::Array{Float64, 3}
     Φ_c::Array{Float64, 2}
@@ -10,7 +10,7 @@ mutable struct LinearizedCache <: AbstractLinearizationCache
     ∇g::Array{Float64, 2}
     ∇h::Array{Float64, 2}
 
-    function LinearizedCache(nx::Int, nu::Int, N::Int, Nu::Int, ng::Int, nh::Int)
+    function MultipleShootingCache(nx::Int, nu::Int, N::Int, Nu::Int, ng::Int, nh::Int)
         return new(
             zeros(nx, nx, N-1),
             zeros(nx, nu, N-1),
@@ -23,7 +23,7 @@ end
 
 
 """Set cache for continuous dynamics"""
-function set_continuous_dynamics_cache!(lincache::LinearizedCache, x_ref, u_ref, sols::Union{Vector{ODESolution},EnsembleSolution})
+function set_continuous_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, sols::Union{Vector{ODESolution},EnsembleSolution})
     nx, N = size(x_ref)
     nu, _ = size(u_ref)
     for (k,sol) in enumerate(sols)
@@ -36,7 +36,7 @@ end
 
 
 """Set cache for impulsive dynamics"""
-function set_impulsive_dynamics_cache!(lincache::LinearizedCache, x_ref, u_ref, sols::Union{Vector{ODESolution},EnsembleSolution}, dfdu::Function)
+function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, sols::Union{Vector{ODESolution},EnsembleSolution}, dfdu::Function)
     nx, N = size(x_ref)
     for (k,sol) in enumerate(sols)
         xf_aug = sol.u[end]
@@ -48,14 +48,14 @@ end
 
 
 """Set cache for non-convex equality constraints"""
-function set_g_noncvx_cache!(lincache::LinearizedCache, ∇g_noncvx::Function, x_ref, u_ref)
+function set_g_noncvx_cache!(lincache::MultipleShootingCache, ∇g_noncvx::Function, x_ref, u_ref)
     lincache.∇g[:,:] = ∇g_noncvx(x_ref, u_ref)
     return
 end
 
 
 """Set cache for non-convex inequality constraints"""
-function set_h_noncvx_cache!(lincache::LinearizedCache, ∇h_noncvx::Function, x_ref, u_ref)
+function set_h_noncvx_cache!(lincache::MultipleShootingCache, ∇h_noncvx::Function, x_ref, u_ref)
     lincache.∇h[:,:] = ∇h_noncvx(x_ref, u_ref)
     return
 end

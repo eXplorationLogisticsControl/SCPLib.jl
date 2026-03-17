@@ -254,7 +254,7 @@ function ContinuousProblem(
 
     # initialize linearization cache
     if shooting_method == :multiple
-        lincache = LinearizedCache(nx, nu, N, N-1, ng, nh)
+        lincache = MultipleShootingCache(nx, nu, N, N-1, ng, nh)
     elseif shooting_method == :forwardbackward
         lincache = ForwardBackwardCache(nx, nu, N, N-1, ng, nh)
     else

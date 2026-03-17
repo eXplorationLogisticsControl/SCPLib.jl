@@ -187,7 +187,7 @@ function ImpulsiveProblem(
     end
 
     # initialize linearization cache
-    lincache = LinearizedCache(nx, nu, N, Nu, ng, nh)
+    lincache = MultipleShootingCache(nx, nu, N, Nu, ng, nh)
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
