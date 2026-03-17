@@ -149,7 +149,6 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
     tol_feas = 1e-6
     tol_opt = 1e-6
     algo = SCPLib.SCvx(nx, N; w = 1e3, use_trustregion_control=true, nu=nu)
-    @show algo
 
     # solve problem
     solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
