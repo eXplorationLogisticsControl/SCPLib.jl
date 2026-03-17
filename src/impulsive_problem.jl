@@ -26,7 +26,7 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
     model::Model
     model_nl_references::Vector{Symbol}
 
-    lincache::LinearizedCache
+    lincache::AbstractLinearizationCache
 
     ode_ensemble_method
     ode_method
@@ -37,20 +37,22 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
     set_dynamics_cache!::Union{Function,Nothing}
 
     u_bias::Matrix
+    shooting_method::Symbol
 end
 
 
 function Base.show(io::IO, prob::ImpulsiveProblem)
     @printf("Impulsive optimal control problem\n")
-    @printf("  nx             : %d\n", prob.nx)
-    @printf("  nu             : %d\n", prob.nu)
-    @printf("  N              : %d\n", prob.N)
-    @printf("  ng             : %d\n", prob.ng)
-    @printf("  nh             : %d\n", prob.nh)
-    @printf("  ODE ensemble   : %s\n", prob.ode_ensemble_method)
-    @printf("  ODE method     : %s\n", prob.ode_method)
-    @printf("  ODE reltol     : %1.4e\n", prob.ode_reltol)
-    @printf("  ODE abstol     : %1.4e\n", prob.ode_abstol)
+    @printf("  Shooting method : %s\n", prob.shooting_method)
+    @printf("  nx              : %d\n", prob.nx)
+    @printf("  nu              : %d\n", prob.nu)
+    @printf("  N               : %d\n", prob.N)
+    @printf("  ng              : %d\n", prob.ng)
+    @printf("  nh              : %d\n", prob.nh)
+    @printf("  ODE ensemble    : %s\n", prob.ode_ensemble_method)
+    @printf("  ODE method      : %s\n", prob.ode_method)
+    @printf("  ODE reltol      : %1.4e\n", prob.ode_reltol)
+    @printf("  ODE abstol      : %1.4e\n", prob.ode_abstol)
 end
 
 
@@ -166,6 +168,7 @@ function ImpulsiveProblem(
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
     u_bias::Union{Matrix,Nothing} = nothing,
+    shooting_method::Symbol = :multiple,
 )
     # get problem size from initial guess
     N = length(times)
@@ -241,6 +244,7 @@ function ImpulsiveProblem(
         fun_get_trajectory,
         set_dynamics_cache!,
         u_bias,
+        shooting_method,
     )
 
     # poopulate JuMP with variables
