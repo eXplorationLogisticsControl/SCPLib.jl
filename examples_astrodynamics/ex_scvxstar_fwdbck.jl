@@ -87,38 +87,49 @@ xf_ref = [meef; 0.4]
 initial_orbit_rvs = hcat([AstrodynamicsCore.eph(orbit_init, t) for t in LinRange(0.0, orbit_init.period, 100)]...)
 final_orbit_rvs = hcat([AstrodynamicsCore.eph(orbit_final, t) for t in LinRange(0.0, orbit_final.period, 100)]...)
 
-
 # -------------------- create problem -------------------- #
-N = 20
+ng = 0 #6
+# function g_noncvx(x, u)
+#     g = AstrodynamicsCore.mee2rv(x[1:6,end], params.μ) - RVf
+#     return g
+# end
+
+N = 100
 nx = 7
 nu = 4                              # [ux,uy,uz,Γ]
 times = LinRange(0.0, tof, N)
 
 # create reference solution
-x_ref = [[mee0; x0_ref[7]]; [meef; xf_ref[7]]]
+x_ref = [[mee0; x0_ref[7]] [meef; xf_ref[7]]]
 u_ref = zeros(nu, N-1)
+
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
     Clarabel.Optimizer,
-    eom!,
+    eom_mee!,
     params,
     (x,u) -> -x[7,end],
     times,
     x_ref,
     u_ref;
+    ng = ng,
+    # g_noncvx = g_noncvx,
     shooting_method = :forwardbackward,
     ode_method = Vern7(),
 )
 set_silent(prob.model)
 
+# evaluate initial guess
+sols_ig, g_dynamics_ig = SCPLib.get_trajectory_forwardbackward(prob, x_ref, u_ref)
+
 # append boundary conditions
 @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == x0_ref)
 @constraint(prob.model, constraint_final_rv,   prob.model[:x][1:6,end] == meef)  # enforced in g_noncvx
 
-# minimum on mass for numerical stability
-@constraint(prob.model, constraint_mass_lb[k in 1:N], prob.model[:x][7,k] >= 0.1)
-@constraint(prob.model, constraint_p_lb[k in 1:N], prob.model[:x][1,k] >= 0.8)
+# # minimum on mass for numerical stability
+@constraint(prob.model, constraint_mass_lb[k in 1:2], prob.model[:x][7,k] >= 0.1)
+# @constraint(prob.model, constraint_p_lb[k in 1:2], prob.model[:x][1,k] >= 0.8)
 
 # append constraints on control magnitude
 @constraint(prob.model, constraint_associate_control[k in 1:N-1],
@@ -129,12 +140,12 @@ set_silent(prob.model)
 # solve
 tol_opt = 1e-6
 tol_feas = 1e-6
-algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, shooting_method = :forwardbackward)
+algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, shooting_method = :forwardbackward)
 
 # solve problem
 u_ref = zeros(nu, N-1)
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt=tol_opt, tol_feas=tol_feas, maxiter = 100)
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory_forwardbackward(prob, solution.x, solution.u)
 @show -solution.info[:J0][end] * MASS
 
 # -------------------- make plot -------------------- #
@@ -157,7 +168,6 @@ ucolor_tol = 1e-2
 for (isol,sol) in enumerate(sols_ig)
     rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
     lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=:grey, linewidth=1.0)
-    #lines!(ax2d, rvs[1,:], rvs[2,:], color=:grey, linewidth=1.0)
 end
 
 # plot optimal solution
@@ -165,7 +175,6 @@ ucolor_tol = 1e-2
 for (isol,sol) in enumerate(sols_opt)
     rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
     lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.0)
-    lines!(ax2d, rvs[1,:], rvs[2,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.0)
 end
 
 axm = Axis(fig[2,1]; xlabel="Time, day", ylabel="Mass", xticks=0:500:3500)
