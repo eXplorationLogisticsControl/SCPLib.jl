@@ -77,7 +77,7 @@ function eom_aug!(dx_aug, x_aug, p, t)
     Phi_B = reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))'  # note: julia is column-major
 
     # derivatives of Phi_A, Phi_B
-    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
+    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
     dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * Phi_B + B)', nx*nu)
 end
 

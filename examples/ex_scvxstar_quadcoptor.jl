@@ -68,8 +68,8 @@ function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
     # derivatives of Phi_A, Phi_B
     A = quadrotor_dfdx(x_aug[1:6], p.u, p, t)
     B = quadrotor_dfdu(x_aug[1:6], p.u, p, t)
-    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
+    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
+    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
 end
 
 # -------------------- define objective & non-convex constraints -------------------- #

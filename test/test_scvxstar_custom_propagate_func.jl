@@ -63,7 +63,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
             G1 + G2 + diagm([1,1,0])    Omega]
 
         # derivatives of Phi_A, Phi_B
-        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
+        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
         return
     end
 

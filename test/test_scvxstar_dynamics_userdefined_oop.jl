@@ -23,7 +23,7 @@ mutable struct ControlParams_dynamics_userdefined_oop
     end
 end
 
-function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
+function test_scvxstar_dynamics_userdefined_oop(;verbosity::Int = 0)
     μ = 1.215058560962404e-02
     DU = 389703     # km
     TU = 382981     # sec
@@ -69,8 +69,8 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
         B = [zeros(3,4); I(3) zeros(3,1)]
     
         # derivatives of Phi_A, Phi_B
-        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
+        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
+        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
         return dx_aug
     end
 
@@ -169,4 +169,4 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
 end
 
 
-test_scvxstar_dynamics_userdefined(;verbosity = verbosity)
+test_scvxstar_dynamics_userdefined_oop(;verbosity = verbosity)

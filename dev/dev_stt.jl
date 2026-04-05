@@ -76,14 +76,14 @@ sol_lpo0 = solve(
 eom_stm! = function (dx_aug, x_aug, p, t)
     eom!(view(dx_aug,1:6), x_aug[1:6], p, t)
     A = ForwardDiff.jacobian((y,x) -> eom!(y,x,p,t), zeros(nx), x_aug[1:nx])
-    dx_aug[nx+1:nx*(nx+1)] = reshape((A * reshape(x_aug[nx+1:nx*(nx+1)],nx,nx)')', nx*nx)
+    dx_aug[nx+1:nx*(nx+1)] = reshape((A * reshape(x_aug[nx+1:nx*(nx+1)],nx,nx)), nx*nx)
     return
 end
 
 eom_stm_stt! = function (dx_aug, x_aug, p, t)
     eom!(view(dx_aug,1:6), x_aug[1:6], p, t)
     A = ForwardDiff.jacobian((y,x) -> eom!(y,x,p,t), zeros(nx), x_aug[1:nx])
-    dx_aug[nx+1:nx*(nx+1)] = reshape((A * reshape(x_aug[nx+1:nx*(nx+1)],nx,nx)')', nx*nx)
+    dx_aug[nx+1:nx*(nx+1)] = reshape((A * reshape(x_aug[nx+1:nx*(nx+1)],nx,nx)), nx*nx)
     return
 end
 

@@ -161,7 +161,6 @@ function solve!(
     warmstart_primal::Bool = false,
     warmstart_dual::Bool = false,
 )
-    @show algo.use_trustregion_control
     if algo.use_trustregion_control
         @assert prob.nu == size(algo.tr_u.Δ,1) "Number of control variables mismatch between problem and algorithm"
     end

@@ -28,8 +28,8 @@ function set_continuous_dynamics_cache!(lincache::LinearizedCache, x_ref, u_ref,
     nu, _ = size(u_ref)
     for (k,sol) in enumerate(sols)
         xf_aug = sol.u[end]
-        lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))'
-        lincache.Φ_B[:,:,k] = reshape(xf_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))'
+        lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))
+        lincache.Φ_B[:,:,k] = reshape(xf_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu))
         lincache.Φ_c[:,k]   = xf_aug[1:nx] - lincache.Φ_A[:,:,k] * x_ref[:,k] - lincache.Φ_B[:,:,k] * u_ref[:,k]
     end
 end
@@ -40,7 +40,7 @@ function set_impulsive_dynamics_cache!(lincache::LinearizedCache, x_ref, u_ref, 
     nx, N = size(x_ref)
     for (k,sol) in enumerate(sols)
         xf_aug = sol.u[end]
-        lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))'
+        lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))
         lincache.Φ_B[:,:,k] = lincache.Φ_A[:,:,k] * dfdu(x_ref[:,k], u_ref[:,k], sol.t[1])
         lincache.Φ_c[:,k]   = xf_aug[1:nx] - lincache.Φ_A[:,:,k] * x_ref[:,k] - lincache.Φ_B[:,:,k] * u_ref[:,k]
     end

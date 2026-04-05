@@ -59,8 +59,8 @@ function get_quadcopter_problem(optimizer, N::Int=50)
         # derivatives of Phi_A, Phi_B
         A = quadcopter_dfdx(x_aug[1:6], p.u, p, t)
         B = quadcopter_dfdu(x_aug[1:6], p.u, p, t)
-        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
+        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
+        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
     end
     
     # -------------------- define objective & non-convex constraints -------------------- #
