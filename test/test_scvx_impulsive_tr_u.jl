@@ -65,7 +65,7 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
             G1 + G2 + diagm([1,1,0])    Omega]
 
         # derivatives of Phi_A, Phi_B
-        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
+        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
     end
 
 
