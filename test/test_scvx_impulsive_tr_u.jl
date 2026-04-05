@@ -5,17 +5,17 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-if !@isdefined SCPLib__
+if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 end
 
 
 # -------------------- setup parameters -------------------- #
 # create parameters with `u` entry
-mutable struct ControlParams_impulsive_dynamics_only
+mutable struct ControlParams_impulsive_tr_u
     μ::Float64
     u::Vector
-    function ControlParams_impulsive_dynamics_only(μ::Float64)
+    function ControlParams_impulsive_tr_u(μ::Float64)
         new(μ, zeros(4))
     end
 end
@@ -26,7 +26,7 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
     TU = 382981     # sec
     MU = 500.0      # kg
     VU = DU/TU      # km/s
-    params = ControlParams_impulsive_dynamics_only(μ)
+    params = ControlParams_impulsive_tr_u(μ)
 
     function eom!(drv, rv, p, t)
         x, y, z = rv[1:3]
@@ -149,7 +149,6 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
     tol_feas = 1e-6
     tol_opt = 1e-6
     algo = SCPLib.SCvx(nx, N; w = 1e3, use_trustregion_control=true, nu=nu)
-    @show algo
 
     # solve problem
     solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
