@@ -69,7 +69,7 @@ function get_quadcopter_problem(optimizer, N::Int=50)
     end
     
     nh = 2 * N    # two obstacles, enforced at each node
-    function h_noncvx(x,u)
+    function h_noncvx(cache,x,u)
         h = vcat(
             [R_obstacle_1 - norm(x[1:3,k] - p_obstacle_1) for k in 1:N],
             [R_obstacle_2 - norm(x[1:3,k] - p_obstacle_2) for k in 1:N]

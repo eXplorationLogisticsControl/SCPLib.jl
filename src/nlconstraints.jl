@@ -55,7 +55,7 @@ function set_linearized_constraints!(
     # set nonconvex equality constraints
     if prob.ng > 0
         set_g_noncvx_cache!(prob.lincache, prob.∇g_noncvx, x_ref, u_ref)
-        g_ref = prob.g_noncvx(x_ref, u_ref)
+        g_ref = prob.g_noncvx(prob.lincache, x_ref, u_ref)
         @constraint(prob.model, constraint_g_noncvx[i in 1:prob.ng],
             g_ref[i] + prob.lincache.∇g[i,:]' * Δz == prob.model[:ξ][i]
         )
@@ -66,7 +66,7 @@ function set_linearized_constraints!(
     # set nonconvex inequality constraints
     if prob.nh > 0
         set_h_noncvx_cache!(prob.lincache, prob.∇h_noncvx, x_ref, u_ref)
-        h_ref = max.(prob.h_noncvx(x_ref, u_ref), 0)
+        h_ref = max.(prob.h_noncvx(prob.lincache, x_ref, u_ref), 0)
         @constraint(prob.model, constraint_h_noncvx[i in 1:prob.nh],
             h_ref[i] + prob.lincache.∇h[i,:]' * Δz <= prob.model[:ζ][i]
         )

@@ -133,15 +133,36 @@ end
 Construct an impulsive optimal control problem
 
 If `set_dynamics_cache!` is provided, it will be used to set STM's to `prob.lincache`.
-
 The signature of `set_dynamics_cache!` should be:
-
-```
+```julia
 set_dynamics_cache!(prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
 ```
-
 and the function should return the dynamics residuals. 
 See `set_dynamics_cache!` for more details.
+
+# Arguments:
+- `optimizer`: optimizer for the JuMP model
+- `eom!::Function`: impulsive dynamics function
+- `params`: parameters for the problem
+- `objective::Function`: objective function
+- `times`: time points
+- `x_ref`: reference state
+- `u_ref`: reference control
+- `eom_aug!::Function`: augmented dynamics function
+- `dfdu::Function`: derivative of the impulsive dynamics function with respect to the control
+- `ng::Int`: number of non-convex equality constraints
+- `g_noncvx::Union{Function,Nothing}`: non-convex equality constraints with signature `(lincache, x, u) -> g`
+- `∇g_noncvx::Union{Function,Nothing}`: gradient of non-convex equality constraints with signature `(lincache, x, u) -> ∇g`
+- `nh::Int`: number of non-convex inequality constraints
+- `h_noncvx::Union{Function,Nothing}`: non-convex inequality constraints with signature `(lincache, x, u) -> h`
+- `∇h_noncvx::Union{Function,Nothing}`: gradient of non-convex inequality constraints with signature `(lincache, x, u) -> ∇h`
+- `ode_ensemble_method`: ensemble method for the ODE solver
+- `ode_method`: method for the ODE solver
+- `ode_reltol`: relative tolerance for the ODE solver
+- `ode_abstol`: absolute tolerance for the ODE solver
+- `fun_get_trajectory::Union{Function,Nothing}`: user-defined function to get the trajectory
+- `set_dynamics_cache!::Union{Function,Nothing}`: user-defined function to set the dynamics cache
+- `u_bias::Union{Matrix,Nothing}`: bias on the control
 """
 function ImpulsiveProblem(
     optimizer,
@@ -189,7 +210,7 @@ function ImpulsiveProblem(
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
         ∇g_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> g_noncvx(unpack_flattened_variables(prob, z)...),
+            return ForwardDiff.jacobian(z -> g_noncvx(lincache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end
@@ -197,7 +218,7 @@ function ImpulsiveProblem(
     # check if ∇h_noncvx is provided
     if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
         ∇h_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> h_noncvx(unpack_flattened_variables(prob, z)...),
+            return ForwardDiff.jacobian(z -> h_noncvx(lincache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end
