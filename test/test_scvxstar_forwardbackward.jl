@@ -2,14 +2,15 @@
 
 using Clarabel
 using ForwardDiff
-using GLMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 using Random
 using Test
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+if !@isdefined SCPLib
+    include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
 
 seed = 1234
 Random.seed!(seed)
