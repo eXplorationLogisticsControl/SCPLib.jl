@@ -82,8 +82,8 @@ function set_continuous_dynamics_cache!(lincache::ForwardBackwardCache, x_ref, u
     nu, Nu = size(u_ref)
     Nu_fwd = div(Nu+1, 2)
 
-    Φ_A_list = [reshape(sols[k].u[end][nx+1:nx*(nx+1)], (nx,nx))' for k in 1:Nu]
-    Φ_B_list = [reshape(sols[k].u[end][nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' for k in 1:Nu]
+    Φ_A_list = [reshape(sols[k].u[end][nx+1:nx*(nx+1)], (nx,nx)) for k in 1:Nu]
+    Φ_B_list = [reshape(sols[k].u[end][nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) for k in 1:Nu]
 
     lincache.∇g_dyn[1:nx,1:nx] = prod(reverse(Φ_A_list[1:Nu_fwd]))
     lincache.∇g_dyn[1:nx,nx+1:2nx] = prod(Φ_A_list[Nu_fwd+1:end])
