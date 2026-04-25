@@ -17,6 +17,8 @@ get_plot = false
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
     include("test_scvxstar_custom_propagate_func.jl")
+
+    include("test_scvxstar_forwardbackward.jl")
 end
 
 @testset "Biased control" begin

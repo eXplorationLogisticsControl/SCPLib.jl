@@ -86,15 +86,15 @@ function set_trust_region_constraints!(
     u_ref::Union{Matrix,Adjoint},
 )
     # define trust-region constraints
-    @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
+    @constraint(prob.model, constraint_trust_region_x_lb[k in 1:size(x_ref,2)],
         -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
-    @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
+    @constraint(prob.model, constraint_trust_region_x_ub[k in 1:size(x_ref,2)],
           prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
 
     if algo.use_trustregion_control
         @constraint(prob.model, constraint_trust_region_u_lb[k in 1:size(u_ref,2)],
             -(prob.model[:u][:,k] - u_ref[:,k]) <= algo.tr_u.Δ[:,k])
-        @constraint(prob.model, constraint_trust_region_u_ub[k in 1:prob.N],
+        @constraint(prob.model, constraint_trust_region_u_ub[k in 1:size(u_ref,2)],
             prob.model[:u][:,k] - u_ref[:,k]  <= algo.tr_u.Δ[:,k])
     end
     return
