@@ -9,7 +9,6 @@ if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 end
 
-
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
 mutable struct ControlParams_dynamics_ad

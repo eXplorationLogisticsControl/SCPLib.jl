@@ -1,13 +1,18 @@
-"""Dev for continuous problem"""
+"""Forward-backward shooting gradient"""
 
 using Clarabel
+using ForwardDiff
 using GLMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
+using Random
+using Test
 
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
+seed = 1234
+Random.seed!(seed)
 
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
@@ -41,7 +46,6 @@ function eom!(drv, rv, p, t)
     return
 end
 
-
 function eom_aug!(dx_aug, x_aug, p, t)
     # state derivatives
     eom!(view(dx_aug, 1:6), x_aug[1:6], p, t)
@@ -57,10 +61,9 @@ function eom_aug!(dx_aug, x_aug, p, t)
     B = [zeros(3,4); I(3) zeros(3,1)]
 
     # derivatives of Phi_A, Phi_B
-    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
-    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
+    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
+    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
 end
-
 
 rv0 = [1.0809931218390707E+00,
     0.0000000000000000E+00,
@@ -78,14 +81,8 @@ rvf = [1.1648780946517576,
     0.0]
 period_f = 3.3031221822879884
 
-# -------------------- define objective -------------------- #
-function objective(x, u)
-    return sum(u[4,:])
-end
-
-
 # -------------------- create problem -------------------- #
-N = 100
+N = 24
 nx = 6
 nu = 4                              # [ux,uy,uz,Γ]
 tf = 2.6 
@@ -107,34 +104,80 @@ sol_lpof = solve(
 # create reference solution
 x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
 x_along_lpof = sol_lpof(LinRange(0.0, period_f, N))
-x_ref = zeros(nx,N)
-alphas = LinRange(0,1,N)
-for (i,alpha) in enumerate(alphas)
-    x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
-end
-u_ref = zeros(nu, N-1)
+x_ref = [rv0 rvf]
 
-# plot initial guess
-fig = Figure(size=(1200,800))
-ax3d = Axis3(fig[1,1]; aspect=:data)
-lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
-lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
-# scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
+# control initial guess
+u_ref = zeros(nu, N-1)
+u_ref[1:3,:] = randn(3, N-1) * umax * 0.1
+u_ref[4,:] = norm.(eachcol(u_ref[1:3,:]))
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
     Clarabel.Optimizer,
     eom!,
     params,
-    objective,
+    (x,u) -> sum(u[4,:]),
     times,
     x_ref,
     u_ref;
-    # eom_aug! = eom_aug!,
+    shooting_method = :forwardbackward,
     ode_method = Vern7(),
 )
-set_silent(prob.model)
 
+# evaluate nonlinear constraints
+sols_ref, g_dynamics_ref = SCPLib.get_trajectory_augmented_forwardbackward(prob, x_ref, u_ref)
+
+# ------------------------------------------------------------------------------------------------------------------------ #
+# evaluate nonlinear constraints Jacobian analytically
+Φ_A_list, Φ_B_list = SCPLib.set_continuous_dynamics_cache!(prob.lincache, x_ref, u_ref, sols_ref)
+# @show prob.lincache.∇g_dyn
+
+# ------------------------------------------------------------------------------------------------------------------------ #
+# evaluate nonlinear constraints Jacobian via finite difference
+∇g_dyn_fd = zeros(nx, 2nx + nu*(N-1))
+for i in 1:6
+    x0_ptrb_pls = deepcopy(x_ref)
+    x0_ptrb_pls[i,1] += 1e-6
+
+    x0_ptrb_min = deepcopy(x_ref)
+    x0_ptrb_min[i,1] -= 1e-6
+    _, _g_pls = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_pls, u_ref)
+    _, _g_min = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_min, u_ref)
+
+    ∇g_dyn_fd[:,i] = -(_g_pls - _g_min) / (2e-6)    # forward segment has minus sign
+end
+
+for i in 1:6
+    x0_ptrb_pls = deepcopy(x_ref)
+    x0_ptrb_pls[i,2] += 1e-6
+
+    x0_ptrb_min = deepcopy(x_ref)
+    x0_ptrb_min[i,2] -= 1e-6
+    _, _g_pls = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_pls, u_ref)
+    _, _g_min = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_min, u_ref)
+
+    ∇g_dyn_fd[:,6+i] = (_g_pls - _g_min) / (2e-6)    # backward segment has plus sign
+end
+
+for i in 1:nu*(N-1)
+    u_ptrb_pls = deepcopy(u_ref)
+    u_ptrb_pls[i] += 1e-6
+
+    u_ptrb_min = deepcopy(u_ref)
+    u_ptrb_min[i] -= 1e-6
+    _, _g_pls = SCPLib.get_trajectory_augmented_forwardbackward(prob, x_ref, u_ptrb_pls)
+    _, _g_min = SCPLib.get_trajectory_augmented_forwardbackward(prob, x_ref, u_ptrb_min)
+
+    ∇g_dyn_fd[:,2nx+i] = (_g_pls - _g_min) / (2e-6)    # backward segment has plus sign
+end
+
+# error in gradients
+err = prob.lincache.∇g_dyn - ∇g_dyn_fd
+@test maximum(err) < 1e-6
+
+
+# ------------------------------------------------------------------------------------------------------------------------ #
+# append convex constraints to the model
 # append boundary conditions
 @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)
 @constraint(prob.model, constraint_final_rv,   prob.model[:x][:,end] == rvf)
@@ -145,14 +188,28 @@ set_silent(prob.model)
 @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
     prob.model[:u][4,k] <= umax)
 
-# -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
+set_silent(prob.model)
+
+# solve
+tol_opt = 1e-6
+tol_feas = 1e-6
+algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, shooting_method = :forwardbackward)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
+u_ref = zeros(nu, N-1)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt=tol_opt, tol_feas=tol_feas, maxiter = 100)
 
-# propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+# evaluate nonlinear constraints
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory_augmented_forwardbackward(prob, solution.x, solution.u)
+
+# ------------------------------------------------------------------------------------------------------------------------ #
+# plot
+# plot initial & final orbits
+fig = Figure(size=(1200,800))
+ax3d = Axis3(fig[1,1]; aspect=:data)
+lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
+lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
+
 arc_colors = [
     solution.u[4,i] > 1e-6 ? :red : :black for i in 1:N-1
 ]
@@ -173,15 +230,11 @@ colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(sol
 ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
 scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
 
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
-
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
 scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
 
 ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
 scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
-save(joinpath(@__DIR__, "plots/cr3bp_traj_scvxstar.png"), fig; px_per_unit=3)
 display(fig)
 println("Done!")

@@ -1,8 +1,6 @@
-"""Dev for continuous problem"""
+"""Test problem with non-convex dynamics only, using AD"""
 
 using Clarabel
-using ForwardDiff
-using GLMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
@@ -12,20 +10,21 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
-mutable struct ControlParams
+mutable struct ControlParams_dynamics_ad
     μ::Float64
     u::Vector
-    function ControlParams(μ::Float64)
+    function ControlParams_dynamics_ad(μ::Float64)
         new(μ, zeros(4))
     end
 end
+
 
 μ = 1.215058560962404e-02
 DU = 389703     # km
 TU = 382981     # sec
 MU = 500.0      # kg
 VU = DU/TU      # km/s
-params = ControlParams(μ)
+params = ControlParams_dynamics_ad(μ)
 
 function eom!(drv, rv, p, t)
     x, y, z = rv[1:3]
@@ -42,7 +41,7 @@ function eom!(drv, rv, p, t)
     return
 end
 
-# boundary conditions
+
 rv0 = [1.0809931218390707E+00,
     0.0000000000000000E+00,
     -2.0235953267405354E-01,
@@ -69,14 +68,8 @@ sol_lpof = solve(
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 
-# -------------------- define objective -------------------- #
-function objective(x, u)
-    return sum(u[4,:])
-end
-
-
 # -------------------- create problem -------------------- #
-N = 100
+N = 60
 nx = 6
 nu = 4                              # [ux,uy,uz,Γ]
 tf = 2.6 
@@ -94,12 +87,11 @@ for (i,alpha) in enumerate(alphas)
     x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
 end
 u_ref = zeros(nu, N-1)
+y_ref = nothing
 
-# plot initial guess
-fig = Figure(size=(1200,800))
-ax3d = Axis3(fig[1,1]; aspect=:data)
-lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
-lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
+function objective(x, u)
+    return sum(u[4,:])
+end
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
@@ -124,45 +116,21 @@ set_silent(prob.model)
 @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
     prob.model[:u][4,k] <= umax)
 
+# # propagate initial guess
+# sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
+# for _sol in sols_ig
+#     lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
+# end
+
 # -------------------- instantiate algorithm -------------------- #
-tol_opt = 1e-6
-tol_feas = 1e-6
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
-    tol_opt=tol_opt, tol_feas=tol_feas, maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_feas=1e-5, verbosity = verbosity, maxiter = 100)
 
-# propagate solution
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
-arc_colors = [
-    solution.u[4,i] > 1e-6 ? :red : :black for i in 1:N-1
-]
-for (i, _sol) in enumerate(sols_opt)
-    lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=arc_colors[i])
-end
+# # propagate solution
+# sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+# @test maximum(abs.(g_dynamics_opt)) <= 1e-5
+# @test solution.status == :Optimal
 
-# plot controls
-ax_u = Axis(fig[2,1]; xlabel="Time", ylabel="Control")
-for i in 1:3
-    stairs!(ax_u, prob.times[1:end-1], solution.u[i,:], label="u[$i]", step=:pre, linewidth=1.0)
-end
-stairs!(ax_u, prob.times[1:end-1], solution.u[4,:], label="||u||", step=:pre, linewidth=2.0, color=:black, linestyle=:dash)
-axislegend(ax_u, position=:cc)
-
-# plot iterate information
-colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
-ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
-scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
-
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
-
-ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
-scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
-
-ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
-scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
-
-display(fig)
 println("Done!")

@@ -1,19 +1,20 @@
-"""Sample SCP problem with MEE"""
+"""Forward-backward shooting gradient"""
 
-using Base.Threads
 using Clarabel
+using ForwardDiff
 using GLMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
+using Random
+using Test
 
 using AstrodynamicsCore
 
-@show nthreads()
-
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
-
+# -------------------- setup problem -------------------- #
+# create parameters with `u` entry
 mutable struct ControlParams
     μ::Float64
     c1::Float64
@@ -86,53 +87,49 @@ xf_ref = [meef; 0.4]
 initial_orbit_rvs = hcat([AstrodynamicsCore.eph(orbit_init, t) for t in LinRange(0.0, orbit_init.period, 100)]...)
 final_orbit_rvs = hcat([AstrodynamicsCore.eph(orbit_final, t) for t in LinRange(0.0, orbit_final.period, 100)]...)
 
-# -------------------- define objective -------------------- #
-function objective(x, u)
-    return -x[7,end]
-end
-
-ng = 6
-function g_noncvx(x, u)
-    g = AstrodynamicsCore.mee2rv(x[1:6,end], params.μ) - RVf
-    return g
-end
-
-
 # -------------------- create problem -------------------- #
-N = 500
-nx = 7                              # [p,f,g,h,k,L,mass]
+ng = 0 #6
+# function g_noncvx(x, u)
+#     g = AstrodynamicsCore.mee2rv(x[1:6,end], params.μ) - RVf
+#     return g
+# end
+
+N = 100
+nx = 7
 nu = 4                              # [ux,uy,uz,Γ]
 times = LinRange(0.0, tof, N)
 
 # create reference solution
-x_ref = zeros(nx, N)
-x_ref[1:6,:] = hcat(LinRange.(mee0, meef, N)...)'
-x_ref[7,:] = LinRange(x0_ref[7], xf_ref[7], N)
+x_ref = [[mee0; x0_ref[7]] [meef; xf_ref[7]]]
 u_ref = zeros(nu, N-1)
+
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
     Clarabel.Optimizer,
     eom_mee!,
     params,
-    objective,
+    (x,u) -> -x[7,end],
     times,
     x_ref,
     u_ref;
     ng = ng,
-    g_noncvx = g_noncvx,
-    ode_ensemble_method = EnsembleThreads(),
+    # g_noncvx = g_noncvx,
+    shooting_method = :forwardbackward,
     ode_method = Vern7(),
 )
 set_silent(prob.model)
 
+# evaluate initial guess
+sols_ig, g_dynamics_ig = SCPLib.get_trajectory_forwardbackward(prob, x_ref, u_ref)
+
 # append boundary conditions
 @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == x0_ref)
-# @constraint(prob.model, constraint_final_rv,   prob.model[:x][1:6,end] == meef)  # enforced in g_noncvx
+@constraint(prob.model, constraint_final_rv,   prob.model[:x][1:6,end] == meef)  # enforced in g_noncvx
 
-# minimum on mass for numerical stability
-@constraint(prob.model, constraint_mass_lb[k in 1:N], prob.model[:x][7,k] >= 0.1)
-@constraint(prob.model, constraint_p_lb[k in 1:N], prob.model[:x][1,k] >= 0.8)
+# # minimum on mass for numerical stability
+@constraint(prob.model, constraint_mass_lb[k in 1:2], prob.model[:x][7,k] >= 0.1)
+# @constraint(prob.model, constraint_p_lb[k in 1:2], prob.model[:x][1,k] >= 0.8)
 
 # append constraints on control magnitude
 @constraint(prob.model, constraint_associate_control[k in 1:N-1],
@@ -140,26 +137,15 @@ set_silent(prob.model)
 @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
     prob.model[:u][4,k] <= 1.0)
 
-
-sols_ig, _ = SCPLib.get_trajectory(prob, x_ref, u_ref)
-
-# -------------------- instantiate algorithm -------------------- #
-tol_feas = 1e-6
+# solve
 tol_opt = 1e-6
-
-# algo = SCPLib.SCvx(nx, N; w = 1/tol_feas)
-algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, Δ0=0.1, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
-
-# algo = SCPLib.FixedTRWSCP(nx, N, 0.05)
-
-# w_ep = 1e2
-# w_prox = 1e1
-# algo = SCPLib.ProxLinear(w_ep, w_prox)
+tol_feas = 1e-6
+algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, shooting_method = :forwardbackward)
 
 # solve problem
-maxiter = 1000
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_feas = tol_feas, tol_opt = tol_opt, maxiter = maxiter)
-sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+u_ref = zeros(nu, N-1)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; tol_opt=tol_opt, tol_feas=tol_feas, maxiter = 100)
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory_forwardbackward(prob, solution.x, solution.u)
 @show -solution.info[:J0][end] * MASS
 
 # -------------------- make plot -------------------- #
@@ -182,7 +168,6 @@ ucolor_tol = 1e-2
 for (isol,sol) in enumerate(sols_ig)
     rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
     lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=:grey, linewidth=1.0)
-    #lines!(ax2d, rvs[1,:], rvs[2,:], color=:grey, linewidth=1.0)
 end
 
 # plot optimal solution
@@ -190,7 +175,6 @@ ucolor_tol = 1e-2
 for (isol,sol) in enumerate(sols_opt)
     rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
     lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.0)
-    lines!(ax2d, rvs[1,:], rvs[2,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.0)
 end
 
 axm = Axis(fig[2,1]; xlabel="Time, day", ylabel="Mass", xticks=0:500:3500)
@@ -220,29 +204,4 @@ scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]),
 ax_Δ = Axis(fig[2,4]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
 scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
-
-save(joinpath(@__DIR__, "plots/advanced_dionysus.png"), fig; px_per_unit=3)
-display(fig)
-
-# --------------------------- figure of trajectory only --------------------------- #
-fontsize = 20 
-fig_traj = Figure(size=(700,400))
-ax3d = Axis3(fig_traj[1,1]; aspect=:data, xlabel="x, AU", ylabel="y, AU", zlabel="z, AU", 
-    xlabelsize=fontsize, ylabelsize=fontsize, zlabelsize=fontsize,
-    xticklabelsize=fontsize, yticklabelsize=fontsize, zticklabelsize=fontsize,
-    protrusions = (60, 0, 0, 0))
-
-scatter!(ax3d, RV0[1], RV0[2], RV0[3], color=:limegreen, markersize=10)
-scatter!(ax3d, RVf[1], RVf[2], RVf[3], color=:blue, markersize=10)
-lines!(ax3d, initial_orbit_rvs[1,:], initial_orbit_rvs[2,:], initial_orbit_rvs[3,:], color=:limegreen, linewidth=1.2)
-lines!(ax3d, final_orbit_rvs[1,:], final_orbit_rvs[2,:], final_orbit_rvs[3,:], color=:blue, linewidth=1.2)
-
-# plot optimal solution
-ucolor_tol = 1e-2
-for (isol,sol) in enumerate(sols_opt)
-    rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
-    lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.5)
-end
-
-save(joinpath(@__DIR__, "plots/advanced_dionysus_trajectory.png"), fig_traj; px_per_unit=5)
 display(fig)

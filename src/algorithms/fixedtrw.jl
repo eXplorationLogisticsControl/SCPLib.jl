@@ -79,6 +79,12 @@ mutable struct FixedTRWSCPSolution <: SCPSolution
             :w => Float64[],
             :Δ => Float64[],
             :accept => Bool[],
+            :cpu_times => Dict(
+                :time_subproblem => Float64[],
+                :time_update_reference => Float64[],
+                :time_iter_total => Float64[],
+                :time_total => 0.0,
+            )
         )
 
         new(status, x, u, 0, info)
@@ -160,11 +166,6 @@ function solve!(
     if verbosity > 0
         println(header)
     end
-    cpu_times = Dict(
-        :time_subproblem => 0.0,
-        :time_update_reference => 0.0,
-        :time_total => 0.0,
-    )
 
     for it in 1:maxiter
         tcpu_start_iter = time()
@@ -174,21 +175,22 @@ function solve!(
         end
         g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
         set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints
-        cpu_times[:time_update_reference] = time() - tcpu_start_iter
+        push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
 
         # solve convex subproblem
         tstart_cp = time()
         solve_convex_subproblem!(algo, prob)
-        cpu_times[:time_subproblem] = time() - tstart_cp
+        push!(solution.info[:cpu_times][:time_subproblem], time() - tstart_cp)
 
         # check termination status
         if termination_status(prob.model) == SLOW_PROGRESS
             @warn("CP termination status: $(termination_status(prob.model))")
-        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL]
+        elseif termination_status(prob.model) ∉ [OPTIMAL, ALMOST_OPTIMAL, LOCALLY_SOLVED]
             if verbosity > 0
                 @warn("Exiting as CP termination status: $(termination_status(prob.model))")
             end
             solution.status = :CPFailed
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
 
@@ -200,8 +202,8 @@ function solve!(
 
         # evaluate nonlinear constraints
         _, g_dynamics = get_trajectory(prob, _x, _u)
-        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u) : nothing
-        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u), 0) : nothing
+        g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
+        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 
         # check improvement
         J_ref = prob.objective(x_ref, u_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
@@ -245,20 +247,22 @@ function solve!(
         end
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
-        cpu_times[:time_total] = time() - tcpu_start_iter
+        push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
 
         if verbosity >= 2
             # extra information when verbosity >= 2
             println()
-            @printf("       CPU time on iteration        : %1.2f sec\n", cpu_times[:time_total])
-            @printf("       CPU time on subproblem       : %1.2f sec\n", cpu_times[:time_subproblem])
-            @printf("       CPU time on update reference : %1.2f sec\n", cpu_times[:time_update_reference])
+            @printf("       CPU time on iteration        : %1.2f sec\n", solution.info[:cpu_times][:time_iter_total][end])
+            @printf("       CPU time on subproblem       : %1.2f sec\n", solution.info[:cpu_times][:time_subproblem][end])
+            @printf("       CPU time on update reference : %1.2f sec\n", solution.info[:cpu_times][:time_update_reference][end])
             println()
         end
 
-        if it == maxiter
+        # handle termination status when maximum number of iterations is reached
+        if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
                 solution.status = :Feasible
             else

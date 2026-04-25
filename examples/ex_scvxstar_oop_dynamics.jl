@@ -1,4 +1,6 @@
-"""Dev for continuous problem"""
+"""SCvxStar with out-of-place dynamics functions
+(eom with signature `dx = f(x,p,t)` instead of `dx = f!(dx,x,p,t)`)
+"""
 
 using Clarabel
 using GLMakie
@@ -25,26 +27,33 @@ TU = 382981     # sec
 MU = 500.0      # kg
 VU = DU/TU      # km/s
 params = ControlParams(μ)
+nx = 6
+nu = 4                              # [ux,uy,uz,Γ]
 
-function eom!(drv, rv, p, t)
+function eom(rv, p, t)
+    drv = zeros(nx)
     x, y, z = rv[1:3]
     vx, vy, vz = rv[4:6]
     r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
     r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
-    drv[1:3] = rv[4:6]
-    # derivatives of velocities
-    drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-    drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-    drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+    drv = [
+        rv[4:6];
+         2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
+        -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
+        -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+
+    ]
     # append controls
     drv[4:6] += p.u[1:3]
-    return
+    return drv
 end
 
 
-function eom_aug!(dx_aug, x_aug, p, t)
+function eom_aug(x_aug, p, t)
+    dx_aug = zeros(nx*(nx+1)+nx*nu)
+
     # state derivatives
-    eom!(view(dx_aug, 1:6), x_aug[1:6], p, t)
+    dx_aug[1:6] = eom(view(x_aug, 1:6), p, t)
     
     # STM derivatives
     r1vec = [x_aug[1] + p.μ, x_aug[2], x_aug[3]]
@@ -59,6 +68,7 @@ function eom_aug!(dx_aug, x_aug, p, t)
     # derivatives of Phi_A, Phi_B
     dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
     dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
+    return dx_aug
 end
 
 
@@ -78,6 +88,16 @@ rvf = [1.1648780946517576,
     0.0]
 period_f = 3.3031221822879884
 
+# initial & final LPO
+sol_lpo0 = solve(
+    ODEProblem(eom, rv0, [0.0, period_0], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
+sol_lpof = solve(
+    ODEProblem(eom, rvf, [0.0, period_f], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
+
 # -------------------- define objective -------------------- #
 function objective(x, u)
     return sum(u[4,:])
@@ -86,23 +106,11 @@ end
 
 # -------------------- create problem -------------------- #
 N = 100
-nx = 6
-nu = 4                              # [ux,uy,uz,Γ]
 tf = 2.6 
 times = LinRange(0.0, tf, N)
 
 thrust = 0.35    # N
 umax = thrust/MU/1e3 / (VU/TU)
-
-# initial & final LPO
-sol_lpo0 = solve(
-    ODEProblem(eom!, rv0, [0.0, period_0], params),
-    Tsit5(); reltol = 1e-12, abstol = 1e-12
-)
-sol_lpof = solve(
-    ODEProblem(eom!, rvf, [0.0, period_f], params),
-    Tsit5(); reltol = 1e-12, abstol = 1e-12
-)
 
 # create reference solution
 x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
@@ -124,13 +132,13 @@ lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
     Clarabel.Optimizer,
-    eom!,
+    eom,
     params,
     objective,
     times,
     x_ref,
     u_ref;
-    # eom_aug! = eom_aug!,
+    eom_aug! = eom_aug,
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -182,6 +190,5 @@ scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]),
 ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
 scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
-save(joinpath(@__DIR__, "plots/cr3bp_traj_scvxstar.png"), fig; px_per_unit=3)
 display(fig)
 println("Done!")

@@ -1,6 +1,7 @@
 """Dev for continuous problem"""
 
 using Clarabel
+using ForwardDiff
 using GLMakie
 using JuMP
 using LinearAlgebra
@@ -41,27 +42,7 @@ function eom!(drv, rv, p, t)
     return
 end
 
-
-function eom_aug!(dx_aug, x_aug, p, t)
-    # state derivatives
-    eom!(view(dx_aug, 1:6), x_aug[1:6], p, t)
-    
-    # STM derivatives
-    r1vec = [x_aug[1] + p.μ, x_aug[2], x_aug[3]]
-    r2vec = [x_aug[1] - 1 + p.μ, x_aug[2], x_aug[3]]
-    G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-    G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
-    Omega = [0 2 0; -2 0 0; 0 0 0]
-    A = [zeros(3,3)                  I(3);
-         G1 + G2 + diagm([1,1,0])    Omega]
-    B = [zeros(3,4); I(3) zeros(3,1)]
-
-    # derivatives of Phi_A, Phi_B
-    dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
-    dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
-end
-
-
+# boundary conditions
 rv0 = [1.0809931218390707E+00,
     0.0000000000000000E+00,
     -2.0235953267405354E-01,
@@ -77,6 +58,16 @@ rvf = [1.1648780946517576,
     -2.0191923237095796E-1,
     0.0]
 period_f = 3.3031221822879884
+
+# initial & final LPO
+sol_lpo0 = solve(
+    ODEProblem(eom!, rv0, [0.0, period_0], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
+sol_lpof = solve(
+    ODEProblem(eom!, rvf, [0.0, period_f], params),
+    Tsit5(); reltol = 1e-12, abstol = 1e-12
+)
 
 # -------------------- define objective -------------------- #
 function objective(x, u)
@@ -94,16 +85,6 @@ times = LinRange(0.0, tf, N)
 thrust = 0.35    # N
 umax = thrust/MU/1e3 / (VU/TU)
 
-# initial & final LPO
-sol_lpo0 = solve(
-    ODEProblem(eom!, rv0, [0.0, period_0], params),
-    Tsit5(); reltol = 1e-12, abstol = 1e-12
-)
-sol_lpof = solve(
-    ODEProblem(eom!, rvf, [0.0, period_f], params),
-    Tsit5(); reltol = 1e-12, abstol = 1e-12
-)
-
 # create reference solution
 x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
 x_along_lpof = sol_lpof(LinRange(0.0, period_f, N))
@@ -119,7 +100,6 @@ fig = Figure(size=(1200,800))
 ax3d = Axis3(fig[1,1]; aspect=:data)
 lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
 lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
-# scatter!(x_ref[1,:], x_ref[2,:], x_ref[3,:], color=:black)
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
@@ -130,7 +110,6 @@ prob = SCPLib.ContinuousProblem(
     times,
     x_ref,
     u_ref;
-    # eom_aug! = eom_aug!,
     ode_method = Vern7(),
 )
 set_silent(prob.model)
@@ -146,10 +125,13 @@ set_silent(prob.model)
     prob.model[:u][4,k] <= umax)
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
+tol_opt = 1e-6
+tol_feas = 1e-6
+algo = SCPLib.SCvx(nx, N; w = 1/tol_feas)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; 
+    tol_opt=tol_opt, tol_feas=tol_feas, maxiter = 100)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
@@ -173,15 +155,11 @@ colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(sol
 ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
 scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
 
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
-
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
 scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
 
 ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
 scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
-save(joinpath(@__DIR__, "plots/cr3bp_traj_scvxstar.png"), fig; px_per_unit=3)
 display(fig)
 println("Done!")

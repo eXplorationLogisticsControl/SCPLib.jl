@@ -26,31 +26,33 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
     model::Model
     model_nl_references::Vector{Symbol}
 
-    lincache::LinearizedCache
+    lincache::AbstractLinearizationCache
 
     ode_ensemble_method
     ode_method
-    ode_reltol
-    ode_abstol
+    ode_reltol::Float64
+    ode_abstol::Float64
 
     fun_get_trajectory::Union{Function,Nothing}
     set_dynamics_cache!::Union{Function,Nothing}
 
     u_bias::Matrix
+    shooting_method::Symbol
 end
 
 
 function Base.show(io::IO, prob::ImpulsiveProblem)
     @printf("Impulsive optimal control problem\n")
-    @printf("  nx             : %d\n", prob.nx)
-    @printf("  nu             : %d\n", prob.nu)
-    @printf("  N              : %d\n", prob.N)
-    @printf("  ng             : %d\n", prob.ng)
-    @printf("  nh             : %d\n", prob.nh)
-    @printf("  ODE ensemble   : %s\n", prob.ode_ensemble_method)
-    @printf("  ODE method     : %s\n", prob.ode_method)
-    @printf("  ODE reltol     : %1.4e\n", prob.ode_reltol)
-    @printf("  ODE abstol     : %1.4e\n", prob.ode_abstol)
+    @printf("  Shooting method : %s\n", prob.shooting_method)
+    @printf("  nx              : %d\n", prob.nx)
+    @printf("  nu              : %d\n", prob.nu)
+    @printf("  N               : %d\n", prob.N)
+    @printf("  ng              : %d\n", prob.ng)
+    @printf("  nh              : %d\n", prob.nh)
+    @printf("  ODE ensemble    : %s\n", prob.ode_ensemble_method)
+    @printf("  ODE method      : %s\n", prob.ode_method)
+    @printf("  ODE reltol      : %1.4e\n", prob.ode_reltol)
+    @printf("  ODE abstol      : %1.4e\n", prob.ode_abstol)
 end
 
 
@@ -133,15 +135,36 @@ end
 Construct an impulsive optimal control problem
 
 If `set_dynamics_cache!` is provided, it will be used to set STM's to `prob.lincache`.
-
 The signature of `set_dynamics_cache!` should be:
-
-```
+```julia
 set_dynamics_cache!(prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint}, y_ref::Union{Matrix,Nothing})
 ```
-
 and the function should return the dynamics residuals. 
 See `set_dynamics_cache!` for more details.
+
+# Arguments:
+- `optimizer`: optimizer for the JuMP model
+- `eom!::Function`: impulsive dynamics function
+- `params`: parameters for the problem
+- `objective::Function`: objective function
+- `times`: time points
+- `x_ref`: reference state
+- `u_ref`: reference control
+- `eom_aug!::Function`: augmented dynamics function
+- `dfdu::Function`: derivative of the impulsive dynamics function with respect to the control
+- `ng::Int`: number of non-convex equality constraints
+- `g_noncvx::Union{Function,Nothing}`: non-convex equality constraints with signature `(lincache, x, u) -> g`
+- `∇g_noncvx::Union{Function,Nothing}`: gradient of non-convex equality constraints with signature `(lincache, x, u) -> ∇g`
+- `nh::Int`: number of non-convex inequality constraints
+- `h_noncvx::Union{Function,Nothing}`: non-convex inequality constraints with signature `(lincache, x, u) -> h`
+- `∇h_noncvx::Union{Function,Nothing}`: gradient of non-convex inequality constraints with signature `(lincache, x, u) -> ∇h`
+- `ode_ensemble_method`: ensemble method for the ODE solver
+- `ode_method`: method for the ODE solver
+- `ode_reltol`: relative tolerance for the ODE solver
+- `ode_abstol`: absolute tolerance for the ODE solver
+- `fun_get_trajectory::Union{Function,Nothing}`: user-defined function to get the trajectory
+- `set_dynamics_cache!::Union{Function,Nothing}`: user-defined function to set the dynamics cache
+- `u_bias::Union{Matrix,Nothing}`: bias on the control
 """
 function ImpulsiveProblem(
     optimizer,
@@ -161,11 +184,12 @@ function ImpulsiveProblem(
     ∇h_noncvx::Union{Function,Nothing} = nothing,
     ode_ensemble_method = EnsembleSerial(),
     ode_method = Tsit5(),
-    ode_reltol = 1e-12,
-    ode_abstol = 1e-12,
+    ode_reltol::Float64 = 1e-12,
+    ode_abstol::Float64 = 1e-12,
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
     u_bias::Union{Matrix,Nothing} = nothing,
+    shooting_method::Symbol = :multiple,
 )
     # get problem size from initial guess
     N = length(times)
@@ -174,18 +198,22 @@ function ImpulsiveProblem(
     nx, _ = size(x_ref)
     nu, _ = size(u_ref)
 
+    # check on size of dfdu function
+    _dfdu_test = dfdu(x_ref[:,1], u_ref[:,1], times[1])
+    @assert size(_dfdu_test) == (nx, nu) "Size of output from dfdu is not (nx,nu)"
+
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
         eom_aug! = get_impulsive_augmented_eom(eom!, params, nx)
     end
 
     # initialize linearization cache
-    lincache = LinearizedCache(nx, nu, N, Nu, ng, nh)
+    lincache = MultipleShootingCache(nx, nu, N, Nu, ng, nh)
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
         ∇g_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> g_noncvx(unpack_flattened_variables(prob, z)...),
+            return ForwardDiff.jacobian(z -> g_noncvx(lincache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end
@@ -193,7 +221,7 @@ function ImpulsiveProblem(
     # check if ∇h_noncvx is provided
     if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
         ∇h_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> h_noncvx(unpack_flattened_variables(prob, z)...),
+            return ForwardDiff.jacobian(z -> h_noncvx(lincache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end
@@ -237,6 +265,7 @@ function ImpulsiveProblem(
         fun_get_trajectory,
         set_dynamics_cache!,
         u_bias,
+        shooting_method,
     )
 
     # poopulate JuMP with variables

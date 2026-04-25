@@ -75,8 +75,8 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
         dx_aug[1:6] += B * p.u
 
         # derivatives of Phi_A, Phi_B
-        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)')', 36)
-        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))' + B)', nx*nu)
+        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
+        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
     end
 
     # -------------------- define objective & non-convex constraints -------------------- #
@@ -85,7 +85,7 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
     end
 
     nh = 2 * N    # two obstacles, enforced at each node
-    function h_noncvx(x,u)
+    function h_noncvx(cache,x,u)
         h = vcat(
             [R_obstacle_1 - norm(x[1:3,k] - p_obstacle_1) for k in 1:N],
             [R_obstacle_2 - norm(x[1:3,k] - p_obstacle_2) for k in 1:N]
@@ -137,7 +137,7 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
 
 
     # -------------------- instantiate algorithm -------------------- #
-    algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0)   # don't forget to pass `nh` to the algorithm as well!
+    algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0, l1_penalty = true)   # don't forget to pass `nh` to the algorithm as well!
 
     # solve problem
     solution = SCPLib.solve!(algo, prob, x_ref, u_ref;

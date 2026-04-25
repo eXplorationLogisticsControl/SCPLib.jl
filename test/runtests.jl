@@ -11,11 +11,14 @@ get_plot = false
 @testset "SCvxStar" begin
     include("test_scvxstar_subproblem.jl")
     include("test_scvxstar_dynamics_userdefined.jl")
+    include("test_scvxstar_dynamics_userdefined_oop.jl")
     include("test_scvxstar_dynamics_ad.jl")
     include("test_scvxstar_h_noncvx.jl")
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
     include("test_scvxstar_custom_propagate_func.jl")
+
+    include("test_scvxstar_forwardbackward.jl")
 end
 
 @testset "Biased control" begin
@@ -25,4 +28,9 @@ end
 
 @testset "ProxLinear" begin
     include("test_proxlinear_dynamics_only.jl")
+end
+
+@testset "SCvx" begin
+    include("test_scvx_dynamics_ad.jl")
+    include("test_scvx_impulsive_tr_u.jl")
 end

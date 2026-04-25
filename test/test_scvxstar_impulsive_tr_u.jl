@@ -1,4 +1,4 @@
-"""Dev for impulsive problem"""
+"""Dev for impulsive problem with trust-region control for control variables"""
 
 using Clarabel
 using JuMP
@@ -129,6 +129,7 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
         times,
         x_ref,
         u_ref;
+        dfdu = (x,u,t) -> [zeros(3,4); I(3) zeros(3,1)],
         eom_aug! = eom_aug!,
         ode_method = Vern7(),
     )
@@ -147,7 +148,10 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
 
     # -------------------- instantiate algorithm -------------------- #
     Δ0 = [0.05, 0.05, 0.05, 0.1, 0.1, 0.1]
-    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4, Δ0 = Δ0, l1_penalty = true)
+    algo = SCPLib.SCvxStar(
+        nx, N;
+        w0 = 1e4, Δ0 = Δ0, nu = nu, use_trustregion_control = true
+    )
 
     # solve problem
     tol_opt = 1e-6

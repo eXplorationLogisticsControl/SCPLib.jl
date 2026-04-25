@@ -1,4 +1,4 @@
-"""Dev for continuous problem with prox-linear method"""
+"""Test problem with non-convex dynamics only, using AD"""
 
 using Clarabel
 using JuMP
@@ -12,21 +12,21 @@ end
 
 # -------------------- setup problem -------------------- #
 # create parameters with `u` entry
-mutable struct ControlParams_proxlinear_dynamics_only
+mutable struct ControlParams_scvx_dynamics_ad
     μ::Float64
     u::Vector
-    function ControlParams_proxlinear_dynamics_only(μ::Float64)
+    function ControlParams_scvx_dynamics_ad(μ::Float64)
         new(μ, zeros(4))
     end
 end
 
-function test_proxlinear_dynamics_only(;verbosity::Int = 0)
+function test_scvx_dynamics_ad(;verbosity::Int = 0)
     μ = 1.215058560962404e-02
     DU = 389703     # km
     TU = 382981     # sec
     MU = 500.0      # kg
     VU = DU/TU      # km/s
-    params = ControlParams_proxlinear_dynamics_only(μ)
+    params = ControlParams_scvx_dynamics_ad(μ)
 
     function eom!(drv, rv, p, t)
         x, y, z = rv[1:3]
@@ -41,38 +41,6 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
         # append controls
         drv[4:6] += p.u[1:3]
         return
-    end
-
-
-    function eom_aug!(dx_aug, x_aug, p, t)
-        x, y, z = x_aug[1:3]
-        vx, vy, vz = x_aug[4:6]
-
-        r1vec = [x + p.μ, y, z]
-        r2vec = [x - 1 + p.μ, y, z]
-        r1 = norm(r1vec)
-        r2 = norm(r2vec)
-
-        dx_aug[1:3] = x_aug[4:6]
-        # derivatives of velocities
-        dx_aug[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        dx_aug[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        dx_aug[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
-
-        # append controls
-        dx_aug[4:6] += p.u[1:3]
-        
-        # Jacobian derivatives
-        G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-        G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
-        Omega = [0 2 0; -2 0 0; 0 0 0]
-        A = [zeros(3,3)                  I(3);
-            G1 + G2 + diagm([1,1,0])    Omega]
-        B = [zeros(3,4); I(3) zeros(3,1)]
-
-        # derivatives of Phi_A, Phi_B
-        dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
-        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
     end
 
 
@@ -102,12 +70,6 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
 
-    # -------------------- define objective -------------------- #
-    function objective(x, u)
-        return sum(u[4,:])
-    end
-
-
     # -------------------- create problem -------------------- #
     N = 60
     nx = 6
@@ -129,6 +91,10 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
     u_ref = zeros(nu, N-1)
     y_ref = nothing
 
+    function objective(x, u)
+        return sum(u[4,:])
+    end
+
     # instantiate problem object    
     prob = SCPLib.ContinuousProblem(
         Clarabel.Optimizer,
@@ -138,7 +104,6 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
         times,
         x_ref,
         u_ref;
-        eom_aug! = eom_aug!,
         ode_method = Vern7(),
     )
     set_silent(prob.model)
@@ -154,20 +119,19 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
         prob.model[:u][4,k] <= umax)
 
     # -------------------- instantiate algorithm -------------------- #
-    w_ep = 1e2
-    w_prox = 1e0
-    algo = SCPLib.ProxLinear(w_ep, w_prox)
+    tol_feas = 1e-6
+    tol_opt = 1e-6
+    algo = SCPLib.SCvx(nx, N; w = 1e3)
 
     # solve problem
-    tol_feas = 1e-6
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref; 
-        verbosity = verbosity, maxiter = 30, tol_feas = tol_feas)
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+        tol_opt=tol_opt, tol_feas=tol_feas, verbosity = verbosity, maxiter = 100)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
-    @test solution.status == :Optimal
 end
 
-test_proxlinear_dynamics_only(verbosity = verbosity)
+
+test_scvx_dynamics_ad(verbosity = verbosity)
