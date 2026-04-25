@@ -265,8 +265,8 @@ function solve!(
 
         # evaluate nonlinear constraints
         _, g_dynamics = get_trajectory(prob, _x, _u)
-        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u) : nothing
-        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u), 0) : nothing
+        g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
+        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 
         # check nonlinear convergence
         χ = norm(g_dynamics,Inf)

@@ -235,8 +235,8 @@ function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProble
     else
         _, g_dynamics = prob.fun_get_trajectory(prob, x_ref, u_ref)
     end
-    g_noncvx = prob.ng > 0 ? prob.g_noncvx(x_ref, u_ref) : nothing
-    h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(x_ref, u_ref), 0) : nothing
+    g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, x_ref, u_ref) : nothing
+    h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, x_ref, u_ref), 0) : nothing
     χ = norm(g_dynamics,Inf)
     if prob.ng > 0
         χ = max(χ, norm(g_noncvx,Inf))
@@ -406,8 +406,8 @@ function solve!(
         else
             _, g_dynamics = prob.fun_get_trajectory(prob, _x, _u)
         end
-        g_noncvx = prob.ng > 0 ? prob.g_noncvx(_x, _u) : nothing
-        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(_x, _u), 0) : nothing
+        g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
+        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 
         # check improvement
         J_ref = prob.objective(x_ref, u_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
