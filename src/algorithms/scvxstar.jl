@@ -54,8 +54,15 @@ mutable struct SCvxStar <: TrustRegionAlgorithm
         nu::Union{Nothing,Int} = nothing,
         Δ0_u::Union{Float64,Vector{Float64},Matrix{Float64}} = 0.1,
         use_trustregion_control::Bool = false,
+        shooting_method::Symbol = :multiple,
     )
-        λ_dyn = zeros(nx, N-1)
+        if shooting_method == :multiple
+            λ_dyn = zeros(nx, N-1)
+        elseif shooting_method == :forwardbackward
+            λ_dyn = zeros(nx, 1)
+        else
+            @error "Invalid shooting method: $shooting_method"
+        end
         λ = zeros(ng)
         μ = zeros(nh)
         tr = TrustRegions(nx, N, Δ0)
@@ -309,6 +316,9 @@ function solve!(
 
     # initialize solution object
     solution = SCvxStarSolution(prob, size(u_ref,2))
+    if prob.shooting_method == :forwardbackward
+        solution.x = zeros(prob.nx, 2)      # overwrite shape of solution
+    end
 
     # print initial information
     header = "\nIter |     J0     |    ΔJ_i    |    ΔL_i    |     χ_i    |    ρ_i    |    r_i    |     w     |  acpt. |"
@@ -386,7 +396,13 @@ function solve!(
 
         # evaluate nonlinear constraints
         if isnothing(prob.fun_get_trajectory)
-            _, g_dynamics = get_trajectory(prob, _x, _u)
+            if prob.shooting_method == :multiple
+                _, g_dynamics = get_trajectory(prob, _x, _u)
+            elseif prob.shooting_method == :forwardbackward
+                _, g_dynamics = get_trajectory_forwardbackward(prob, _x, _u)
+            else
+                @error "Invalid shooting method: $(prob.shooting_method)"
+            end
         else
             _, g_dynamics = prob.fun_get_trajectory(prob, _x, _u)
         end
