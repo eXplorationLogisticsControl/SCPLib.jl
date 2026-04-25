@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/Yuricst/SCPLib.jl/actions/workflows/test.yml/badge.svg" alt="test workflow"/>
+  <img src="https://github.com/exPLorationLogisticsControl/SCPLib.jl/actions/workflows/test.yml/badge.svg" alt="test workflow"/>
 </p>
 
 <p align="center">
