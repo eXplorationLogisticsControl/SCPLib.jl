@@ -17,11 +17,11 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
 
     times::Union{Vector,LinRange}
 
-    objective::Function                     # (x,u,y) -> J0
-    g_noncvx::Union{Function,Nothing}       # (x,u,y) -> g
-    ∇g_noncvx::Union{Function,Nothing}      # (x,u,y) -> ∇g
-    h_noncvx::Union{Function,Nothing}       # (x,u,y) -> h
-    ∇h_noncvx::Union{Function,Nothing}      # (x,u,y) -> ∇h
+    objective::Function                     # (x,u) -> J0
+    g_noncvx::Union{Function,Nothing}       # (cache,x,u) -> g
+    ∇g_noncvx::Union{Function,Nothing}      # (cache,x,u) -> ∇g
+    h_noncvx::Union{Function,Nothing}       # (cache,x,u) -> h
+    ∇h_noncvx::Union{Function,Nothing}      # (cache,x,u) -> ∇h
 
     model::Model
     model_nl_references::Vector{Symbol}
