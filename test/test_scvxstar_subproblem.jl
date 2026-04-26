@@ -156,7 +156,7 @@ function test_convex_subproblem(;verbosity::Int = 0)
     SCPLib.set_trust_region_constraints!(algo, prob, x_ref, u_ref)
 
     # try solving subproblem
-    SCPLib.solve_convex_subproblem!(algo, prob)
+    SCPLib.solve_convex_subproblem!(algo, prob, nothing)
     @test termination_status(prob.model) == OPTIMAL
 end
 
