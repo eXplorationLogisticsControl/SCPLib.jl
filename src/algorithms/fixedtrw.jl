@@ -35,6 +35,7 @@ function penalty(algo::FixedTRWSCP, prob::OptimalControlProblem, ξ_dyn, ξ, ζ)
 end
 
 
+"""Solve convex subproblem for Fixed trust-region & weight SCP algorithm"""
 function solve_convex_subproblem!(algo::FixedTRWSCP, prob::OptimalControlProblem)
     # set objective with penalty
     _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing

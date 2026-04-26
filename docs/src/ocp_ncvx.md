@@ -14,7 +14,7 @@ using OrdinaryDiffEq
 using SCPLib
 ```
 
-## Define dynamics
+## Define the dynamics
 
 We first initialize the dynamics parameters, a control parameter struct, and the equations of motion
 
@@ -86,7 +86,10 @@ function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
 end
 ```
 
-## Define problem
+Note that we could instead let `SCPLib.jl` define the augmented equations of motion internally with `ForwardDiff.jl`.
+
+
+## Define the problem
 
 We can define the objective function
 
@@ -96,11 +99,13 @@ function objective(x, u)
 end
 ```
 
-We will now define the non-convex path constraints
+We will now define the non-convex path constraints as additional functions, with signature `h_noncvx(lincache::SCPLib.AbstractLinearizationCache, x, u) -> h::Vector` for inequality constraints, and `g_noncvx(lincache::SCPLib.AbstractLinearizationCache, x, u) -> h::Vector` for equality constraints.
+
+As an example, we will implement non-convex inequality path constraints: 
 
 ```julia
 nh = 2 * N    # two obstacles, enforced at each node
-function h_noncvx(x,u)
+function h_noncvx(lincache,x,u)
     h = vcat(
         [R_obstacle_1 - norm(x[1:3,k] - p_obstacle_1) for k in 1:N],
         [R_obstacle_2 - norm(x[1:3,k] - p_obstacle_2) for k in 1:N]
@@ -131,7 +136,7 @@ prob = SCPLib.ContinuousProblem(
     u_ref;
     nh = nh,
     h_noncvx = h_noncvx,
-    eom_aug! = quadroptor_rhs_aug!,   # uncomment to use the user-defined eom_aug!
+    eom_aug! = quadroptor_rhs_aug!,
     ode_method = Tsit5(),
 )
 set_silent(prob.model)
@@ -158,7 +163,7 @@ and we will append convex constraints to `prob.model`
     prob.model[:u][4,k] <= T_max)
 ```
 
-## Instantiate algorithm & solve problem
+## Instantiate the algorithm & solve the problem
 
 We can now instantiate an algorithm and solve
 
@@ -197,7 +202,7 @@ Iter |     J0     |    ΔJ_i    |    ΔL_i    |     χ_i    |    ρ_i    |    r_
    Max constraint violation : 1.6306e-10 (tol: 1.0000e-08)
 ```
 
-## Analyze solution
+## Analyze the solution
 
 We can now visualize the solution
 

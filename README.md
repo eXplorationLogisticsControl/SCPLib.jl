@@ -24,10 +24,20 @@ We are interested in solving the discretized non-convex optimal control problem 
 \\&     x_1 \in \mathcal{X}(t_1) ,\,\, x_N \in \mathcal{X}(t_N)
 \\&     x_k \in \mathcal{X}(t_k),\,\, u_k \in \mathcal{U}(t_k) \quad \forall k=1,\ldots,N
 \end{aligned}
-``` 
+```
 
-Note:
-- A free-final time problem can be cast as the above OCP by including physical time as a state & adopting a time dilation.
+where $[t_0,t_f]$ are fixed, and the control is defined with zero-order hold (ZOH)
+
+```math
+\boldsymbol{u}(t) = \boldsymbol{u}_k \quad t\in[t_k,t_{k+1})
+```
+
+This problem structure is generic, and allows for:
+
+- problems with linear dynamics & non-convex path constraints
+- free initial/final time problem by including physical time as a state variable & the rate of time dilation as a control variable
+- problems with continuous-time path constraints by augmenting the state with an isoperimetric slack variable
+
 
 ## Installation
 

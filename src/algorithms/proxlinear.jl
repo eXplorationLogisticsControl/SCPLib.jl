@@ -44,6 +44,7 @@ function Base.show(io::IO, algo::ProxLinear)
 end
 
 
+"""Solve convex subproblem for Prox-linear algorithm"""
 function solve_convex_subproblem!(
     algo::ProxLinear, prob::OptimalControlProblem,
     x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint},

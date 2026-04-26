@@ -1,6 +1,30 @@
 # Basic Optimal Control Problem
 
-We will start with a simple, fixed-time optimal control problem.
+We will start with a simple, fixed-time optimal control problem, given by
+
+```math
+\begin{aligned}
+    \min_{\substack{\boldsymbol{x}_1,\ldots,\boldsymbol{x}_{N} \\ \boldsymbol{u}_1,\ldots,\boldsymbol{u}_{N-1} }} 
+    \quad& \sum_{k=1}^{N-1} \| \boldsymbol{u}_k \|_2
+    \\ \text{s.t.}\quad&
+    \boldsymbol{x}_{k+1} = \boldsymbol{x}_k + \int_{t_k}^{t_{k+1}} \boldsymbol{f}(\boldsymbol{x}, \boldsymbol{u}) \mathrm{d}t
+    \quad k=1,\ldots,N-1
+    \\& 
+    \boldsymbol{x}_1 = \text{fixed}
+    \\&
+    \boldsymbol{x}_{N} = \text{fixed}
+    \\& 
+    \| \boldsymbol{u}_k \|_2 \leq u_{\max} \quad k=1,\ldots,N-1
+\end{aligned}
+```
+
+where $[t_1,t_N]$ are fixed, and the control is defined with zero-order hold
+
+```math
+\boldsymbol{u}(t) = \boldsymbol{u}_k \quad t\in[t_k,t_{k+1})
+```
+
+We will start with imports
 
 ```julia
 using Clarabel
@@ -12,9 +36,14 @@ using OrdinaryDiffEq
 using SCPLib
 ```
 
-## Define dynamics
+## Define the dynamics
 
-We will first define and instantiate a struct that will hold the control, along with any parameters we may want to pass to the equations of motion:
+We will solve the optimal control problem for a fixed-time transfer in the circular-restricted three-body problem (CR3BP).
+We will first define and instantiate a struct that will hold the control, along with any parameters we may want to pass to the equations of motion.
+
+!!! info "Parameter struct for ODE"
+    The parameter struct `p` to be given into the equations of motion `eom!(dx, x, p, t)` needs to have a vector named `u`, which will contain the control values. The vector should be compatible with either a `Vector{Float64}` or a `Vector{ForwardDiff.Dual}`.
+
 
 ```julia
 # create parameters with `u` entry
@@ -34,7 +63,26 @@ VU = DU/TU      # km/s
 params = ControlParams(μ)
 ```
 
-We will now define an equations of motion
+We will now define the CR3BP equations of motion for the state vector $\boldsymbol{x} = [x,y,z,v_x,v_y,v_z]^T$ with acceleration control $\boldsymbol{y} = [u_x, u_y, u_z]^T$,
+
+```math
+\dot{\boldsymbol{x}} = 
+\begin{bmatrix}
+    \dot{x} \\ \dot{y} \\ \dot{z} \\ \dot{v}_x \\ \dot{v}_y \\ \dot{v}_z
+\end{bmatrix} 
+=
+\begin{bmatrix}
+    v_x \\ v_y \\ v_z \\[0.4em]
+    2 v_y + x - \dfrac{1-\mu}{r_1^3}(x+\mu) - \dfrac{\mu}{r_2^3}(x-1+\mu) + u_x \\[0.8em]
+    -2 v_x + y - \dfrac{1-\mu}{r_1^3}y - \dfrac{\mu}{r_2^3}y + u_y \\[0.8em]
+    -\dfrac{1-\mu}{r_1^3}z - \dfrac{\mu}{r_2^3}z + u_z
+\end{bmatrix}
+```
+where
+```math
+r_1 = \sqrt{(x + \mu)^2 + y^2 + z^2}, \quad r_2 = \sqrt{(x - 1 + \mu)^2 + y^2 + z^2}
+```
+and $\mu$ is the CR3BP mass parameter.
 
 ```julia
 function eom!(drv, rv, p, t)
@@ -53,7 +101,10 @@ function eom!(drv, rv, p, t)
 end
 ```
 
-## Define problem
+In this tutorial, we will let `SCPLib.jl` define augmented equations of motion for us internally using `ForwardDiff.jl`.
+
+
+## Define the problem
 
 We will now define boundary conditions
 
@@ -77,11 +128,28 @@ period_f = 3.3031221822879884
 
 We can now define the objective function
 
+```math
+\min \quad \sum_{k=1}^{N-1} \| \boldsymbol{u}_k \|_2
+```
+
+by introducing an auxiliary control variable $\Gamma_k$ for $k=1,\ldots,N-1$, and replacing the above with
+
+
+```math
+\begin{aligned}
+\min \quad& \sum_{k=1}^{N-1} \Gamma_k
+\\ \text{s.t.} \quad& \| \boldsymbol{u}_k \|_2 \leq \Gamma_k
+\end{aligned}
+```
+
+Here, we will implement the objective as follows:
 ```julia
 function objective(x, u)
     return sum(u[4,:])
 end
 ```
+
+where `u[4,k]` corresponds to $\Gamma_k$; we will add in the SOC constraints $\| \boldsymbol{u}_k \|_2 \leq \Gamma_k$ later as well.
 
 We will now define the problem parameters
 
@@ -136,7 +204,10 @@ prob = SCPLib.ContinuousProblem(
 set_silent(prob.model)              # we will silence the convex program
 ```
 
-and we will append convex constraints to `prob.model`
+and we will append convex constraints to `prob.model`. Namely, we need to append:
+- affine equality constraints for initial and final constraints, $\boldsymbol{x}_1 = \text{fixed}$ and $\boldsymbol{x}_N = \text{fixed}$
+- SOC to associate the control acceleration vector $\boldsymbol{u}_k$ with the slack for the control magnitude $\Gamma_k$, $\| \boldsymbol{u}_k \|_2 \leq \Gamma_k$
+- box upper bound on $\Gamma_k$, $\Gamma_k \leq u_{\max}$
 
 ```julia
 # append boundary conditions
@@ -150,7 +221,10 @@ and we will append convex constraints to `prob.model`
     prob.model[:u][4,k] <= umax)
 ```
 
-## Instantiate algorithm & solve problem
+We are now ready to solve this problem!
+
+
+## Instantiate the algorithm & solve the problem
 
 We can now instantiate an algorithm and solve
 
@@ -211,7 +285,7 @@ Iter |     J0     |    ΔJ_i    |    ΔL_i    |     χ_i    |    ρ_i    |    r_
    Max constraint violation : 6.3492e-08 (tol: 1.0000e-06)
 ```
 
-## Analyze solution
+## Analyze the solution
 
 We can now visualize the solution
 

@@ -10,6 +10,16 @@ Pages   = [
 ]
 ```
 
+## SCvx
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
+  "algorithms/scvx.jl",
+]
+```
+
 ## Prox-linear method
 
 ```@autodocs

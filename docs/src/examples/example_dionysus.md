@@ -94,7 +94,7 @@ function objective(x, u)
 end
 
 ng = 6
-function g_noncvx(x, u)
+function g_noncvx(lincache, x, u)
     g = AstrodynamicsCore.mee2rv(x[1:6,end], params.μ) - RVf
     return g
 end
