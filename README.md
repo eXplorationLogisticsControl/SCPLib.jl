@@ -35,8 +35,8 @@ where $[t_0,t_f]$ are fixed, and the control is defined with zero-order hold (ZO
 This problem structure is generic, and allows for:
 
 - problems with linear dynamics & non-convex path constraints
-- free initial/final time problem by including physical time as a state variable & the rate of time dilation as a control variable
-- problems with continuous-time path constraints by augmenting the state with an isoperimetric slack variable
+- problems with free initial/final $t_0$ and $t_f$ problem by including physical time as a state variable & the rate of time dilation as a control variable
+- problems with continuous-time path constraints $g(x(t),u(t))$ and/or $h(x(t),u(t))$ by augmenting the state with an isoperimetric slack variable
 
 
 ## Installation
