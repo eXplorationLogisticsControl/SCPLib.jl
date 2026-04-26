@@ -169,6 +169,7 @@ function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem, s
     _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
     _ζ = prob.nh > 0 ? prob.model[:ζ] : nothing
     J = prob.objective(prob.model[:x], prob.model[:u])
+
     P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ, slacks_L1)
     @objective(prob.model, Min, J + P)
 
@@ -295,7 +296,6 @@ function solve!(
             :slack_gnoncvx => prob.ng > 0 ? @variable(prob.model) : nothing,
             :slack_hnoncvx => prob.nh > 0 ? @variable(prob.model) : nothing,
         )
-        #@variable(prob.model, [1:1+prob.ng+prob.nh])  # anonymous construction of variable
     else
         slacks_L1 = nothing
     end
@@ -350,12 +350,12 @@ function solve!(
     end
 
     if algo.l1_penalty
-        append!(prob.model_nl_references, [:constraint_slack_gdyn])
+        l1_penalty_references = [:constraint_slack_gdyn]
         if prob.ng > 0
-            append!(prob.model_nl_references, [:constraint_slack_gncvx])
+            append!(l1_penalty_references, [:constraint_slack_gncvx])
         end
         if prob.nh > 0
-            append!(prob.model_nl_references, [:constraint_slack_hncvx])
+            append!(l1_penalty_references, [:constraint_slack_hncvx])
         end
     end
     
@@ -378,6 +378,11 @@ function solve!(
                 end
             end
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is not updated but trsut region size changed
+        end
+
+        # update references for l1 penalty
+        if algo.l1_penalty && it > 1
+            delete_noncvx_referencs!(prob, l1_penalty_references)
         end
         push!(solution.info[:cpu_times][:time_update_reference], time() - tcpu_start_iter)
 
