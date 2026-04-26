@@ -263,6 +263,7 @@ function ContinuousProblem(
     h_noncvx::Union{Function,Nothing} = nothing,
     ∇h_noncvx::Union{Function,Nothing} = nothing,
     g_cvx::Union{Function,Nothing} = nothing,
+    h_cvx::Union{Function,Nothing} = nothing,
     ode_ensemble_method = EnsembleSerial(),
     ode_method = Tsit5(),
     ode_reltol::Float64 = 1e-12,
