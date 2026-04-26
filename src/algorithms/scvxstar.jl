@@ -63,14 +63,19 @@ mutable struct SCvxStar <: TrustRegionAlgorithm
         else
             @error "Invalid shooting method: $shooting_method"
         end
+
+        # setup Lagrange multipliers
         λ = zeros(ng)
         μ = zeros(nh)
-        tr = TrustRegions(nx, N, Δ0)
 
+        # setup trust-regions
+        tr = TrustRegions(nx, N, Δ0)
         if use_trustregion_control && isnothing(nu)
             @error "Number of control variables `nu` is not provided to SCvxStar"
         end
         tr_u = use_trustregion_control && !isnothing(nu) ? TrustRegions(nu, N, Δ0_u) : nothing
+
+        # construct algorithm struct
         new(
             tr,
             tr_u,
@@ -143,15 +148,15 @@ function penalty(algo::SCvxStar, prob::OptimalControlProblem, ξ_dyn::Matrix{Var
 
     if algo.l1_penalty
         P += sqrt(algo.w) * sum(slacks_L1[:slack_gdyn])
-        @constraint(prob.model, [slacks_L1[:slack_gdyn]; vec(ξ_dyn)] in MOI.NormOneCone(1 + prod(size(ξ_dyn))))
+        @constraint(prob.model, constraint_slack_gdyn, [slacks_L1[:slack_gdyn]; vec(ξ_dyn)] in MOI.NormOneCone(1 + prod(size(ξ_dyn))))
         if prob.ng > 0
             P += sqrt(algo.w) * sum(slacks_L1[:slack_gnoncvx])
-            @constraint(prob.model, [slacks_L1[:slack_gnoncvx]; ξ] in MOI.NormOneCone(1 + length(ξ)))
+            @constraint(prob.model, constraint_slack_gncvx, [slacks_L1[:slack_gnoncvx]; ξ] in MOI.NormOneCone(1 + length(ξ)))
         end
         if prob.nh > 0
             # this penalization works because ζ is defined to be non-negative
             P += sqrt(algo.w) * sum(slacks_L1[:slack_hnoncvx])
-            @constraint(prob.model, [slacks_L1[:slack_hnoncvx]; ζ] in MOI.NormOneCone(1 + length(ζ)))
+            @constraint(prob.model, constraint_slack_hncvx, [slacks_L1[:slack_hnoncvx]; ζ] in MOI.NormOneCone(1 + length(ζ)))
         end
     end
     return P
@@ -159,23 +164,10 @@ end
 
 
 """Solve convex subproblem for SCvx* algorithm"""
-function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem)
+function solve_convex_subproblem!(algo::SCvxStar, prob::OptimalControlProblem, slacks_L1::Union{Nothing,Dict})
     # set objective with penalty
     _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
     _ζ = prob.nh > 0 ? prob.model[:ζ] : nothing
-
-    # append slack variable for l1 penalty term
-    if algo.l1_penalty
-        slacks_L1 = Dict(
-            :slack_gdyn => @variable(prob.model),
-            :slack_gnoncvx => prob.ng > 0 ? @variable(prob.model) : nothing,
-            :slack_hnoncvx => prob.nh > 0 ? @variable(prob.model) : nothing,
-        )
-        #@variable(prob.model, [1:1+prob.ng+prob.nh])  # anonymous construction of variable
-    else
-        slacks_L1 = nothing
-    end
-
     J = prob.objective(prob.model[:x], prob.model[:u])
     P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ, slacks_L1)
     @objective(prob.model, Min, J + P)
@@ -296,6 +288,18 @@ function solve!(
     end
     tcpu_start = time()
 
+    # append slack variable for l1 penalty term
+    if algo.l1_penalty
+        slacks_L1 = Dict(
+            :slack_gdyn => @variable(prob.model),
+            :slack_gnoncvx => prob.ng > 0 ? @variable(prob.model) : nothing,
+            :slack_hnoncvx => prob.nh > 0 ? @variable(prob.model) : nothing,
+        )
+        #@variable(prob.model, [1:1+prob.ng+prob.nh])  # anonymous construction of variable
+    else
+        slacks_L1 = nothing
+    end
+    
     # re-tune initial penalty weight if not provided
     if isnothing(algo.w)
         tune_initial_penalty_weight!(algo, prob, x_ref, u_ref, J_expected, K_w)
@@ -344,6 +348,16 @@ function solve!(
     if algo.use_trustregion_control
         append!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
     end
+
+    if algo.l1_penalty
+        append!(prob.model_nl_references, [:constraint_slack_gdyn])
+        if prob.ng > 0
+            append!(prob.model_nl_references, [:constraint_slack_gncvx])
+        end
+        if prob.nh > 0
+            append!(prob.model_nl_references, [:constraint_slack_hncvx])
+        end
+    end
     
     for it in 1:maxiter
         tcpu_start_iter = time()
@@ -374,7 +388,7 @@ function solve!(
 
         # solve convex subproblem
         tstart_cp = time()
-        solve_convex_subproblem!(algo, prob)
+        solve_convex_subproblem!(algo, prob, slacks_L1)
         push!(solution.info[:cpu_times][:time_subproblem], time() - tstart_cp)
 
         # check termination status
