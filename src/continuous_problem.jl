@@ -22,6 +22,9 @@ mutable struct ContinuousProblem <: OptimalControlProblem
     h_noncvx::Union{Function,Nothing}       # (x,u,y) -> h
     ∇h_noncvx::Union{Function,Nothing}      # (x,u,y) -> ∇h
 
+    g_cvx::Union{Function,Nothing}          # (x,u) -> g_cvx
+    h_cvx::Union{Function,Nothing}          # (x,u) -> h_cvx
+
     model::Model
     model_nl_references::Vector{Symbol}
 
@@ -234,6 +237,8 @@ See `set_dynamics_cache!` for more details.
 - `nh::Int`: number of non-convex inequality constraints
 - `h_noncvx::Union{Function,Nothing}`: non-convex inequality constraints with signature `(lincache, x, u) -> h`
 - `∇h_noncvx::Union{Function,Nothing}`: gradient of non-convex inequality constraints with signature `(lincache, x, u) -> ∇h`
+- `g_cvx::Union{Function,Nothing}`: convex equality constraints with signature `(cache,x,u) -> g_cvx`
+- `h_cvx::Union{Function,Nothing}`: convex inequality constraints with signature `(cache,x,u) -> h_cvx`
 - `ode_ensemble_method`: ensemble method for the ODE solver
 - `ode_method`: method for the ODE solver
 - `ode_reltol`: relative tolerance for the ODE solver
@@ -257,6 +262,7 @@ function ContinuousProblem(
     nh::Int = 0,
     h_noncvx::Union{Function,Nothing} = nothing,
     ∇h_noncvx::Union{Function,Nothing} = nothing,
+    g_cvx::Union{Function,Nothing} = nothing,
     ode_ensemble_method = EnsembleSerial(),
     ode_method = Tsit5(),
     ode_reltol::Float64 = 1e-12,
@@ -309,11 +315,12 @@ function ContinuousProblem(
         end
     end
 
-    # non-convex JuMP references
+    # initialize non-convex JuMP references
     model_nl_references = [:constraint_dynamics,
                            :constraint_trust_region_x_lb,
                            :constraint_trust_region_x_ub]
 
+    # control bias
     if isnothing(u_bias)
         u_bias = zeros(nu,N)
     else
@@ -337,6 +344,8 @@ function ContinuousProblem(
         ∇g_noncvx,
         h_noncvx,
         ∇h_noncvx,
+        g_cvx,
+        h_cvx,
         Model(optimizer),
         model_nl_references,
         lincache,
@@ -360,6 +369,7 @@ function ContinuousProblem(
         @variable(prob.model, ξ_dyn[i=1:nx, k=1:1])
     end
 
+    # append additional nonconvex references
     if ng > 0
         @variable(prob.model, ξ[i=1:ng])
         push!(prob.model_nl_references, :constraint_g_noncvx)
@@ -368,6 +378,14 @@ function ContinuousProblem(
     if nh > 0
         @variable(prob.model, ζ[i=1:nh] >= 0.0)
         push!(prob.model_nl_references, :constraint_h_noncvx)
+    end
+
+    # append convex references that must be updated as nonlinear cache is updated
+    if !isnothing(g_cvx)
+        push!(prob.model_nl_references, :constraint_g_cvx_fnl)
+    end
+    if !isnothing(h_cvx)
+        push!(prob.model_nl_references, :constraint_h_cvx_fnl)
     end
     return prob
 end

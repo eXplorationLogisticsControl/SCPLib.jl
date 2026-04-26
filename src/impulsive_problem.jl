@@ -23,6 +23,9 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
     h_noncvx::Union{Function,Nothing}       # (x,u,y) -> h
     ∇h_noncvx::Union{Function,Nothing}      # (x,u,y) -> ∇h
 
+    g_cvx::Union{Function,Nothing}          # (x,u) -> g_cvx
+    h_cvx::Union{Function,Nothing}          # (x,u) -> h_cvx
+
     model::Model
     model_nl_references::Vector{Symbol}
 
@@ -158,6 +161,8 @@ See `set_dynamics_cache!` for more details.
 - `nh::Int`: number of non-convex inequality constraints
 - `h_noncvx::Union{Function,Nothing}`: non-convex inequality constraints with signature `(lincache, x, u) -> h`
 - `∇h_noncvx::Union{Function,Nothing}`: gradient of non-convex inequality constraints with signature `(lincache, x, u) -> ∇h`
+- `g_cvx::Union{Function,Nothing}`: convex equality constraints with signature `(cache,x,u) -> g_cvx`
+- `h_cvx::Union{Function,Nothing}`: convex inequality constraints with signature `(cache,x,u) -> h_cvx`
 - `ode_ensemble_method`: ensemble method for the ODE solver
 - `ode_method`: method for the ODE solver
 - `ode_reltol`: relative tolerance for the ODE solver
@@ -182,6 +187,8 @@ function ImpulsiveProblem(
     nh::Int = 0,
     h_noncvx::Union{Function,Nothing} = nothing,
     ∇h_noncvx::Union{Function,Nothing} = nothing,
+    g_cvx::Union{Function,Nothing} = nothing,
+    h_cvx::Union{Function,Nothing} = nothing,
     ode_ensemble_method = EnsembleSerial(),
     ode_method = Tsit5(),
     ode_reltol::Float64 = 1e-12,
@@ -230,7 +237,8 @@ function ImpulsiveProblem(
     model_nl_references = [:constraint_dynamics,
                            :constraint_trust_region_x_lb,
                            :constraint_trust_region_x_ub]
-
+                           
+    # control bias
     if isnothing(u_bias)
         u_bias = zeros(nu,N)
     else
@@ -255,6 +263,8 @@ function ImpulsiveProblem(
         ∇g_noncvx,
         h_noncvx,
         ∇h_noncvx,
+        g_cvx,
+        h_cvx,
         Model(optimizer),
         model_nl_references,
         lincache,
