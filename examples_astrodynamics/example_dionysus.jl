@@ -148,7 +148,7 @@ tol_feas = 1e-6
 tol_opt = 1e-6
 
 # algo = SCPLib.SCvx(nx, N; w = 1/tol_feas)
-algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, Δ0=0.1, w_max=1e20)  # known to work: w0 = 1e0 with N = 500
+algo = SCPLib.SCvxStar(nx, N; ng=ng, w0 = 1e0, Δ0=0.1, w_max=1e20, l1_penalty=false)  # known to work: w0 = 1e0 with N = 500
 
 # algo = SCPLib.FixedTRWSCP(nx, N, 0.05)
 
@@ -190,7 +190,7 @@ ucolor_tol = 1e-2
 for (isol,sol) in enumerate(sols_opt)
     rvs = hcat([AstrodynamicsCore.mee2rv(Array(sol)[1:6,i], params.μ) for i in 1:length(sol.t)]...)
     lines!(ax3d, rvs[1,:], rvs[2,:], rvs[3,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.0)
-    lines!(ax2d, rvs[1,:], rvs[2,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.0)
+    # lines!(ax2d, rvs[1,:], rvs[2,:], color=u_ref[4,isol] > ucolor_tol ? :red : :black, linewidth=1.0)
 end
 
 axm = Axis(fig[2,1]; xlabel="Time, day", ylabel="Mass", xticks=0:500:3500)
