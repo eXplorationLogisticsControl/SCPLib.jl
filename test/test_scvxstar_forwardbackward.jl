@@ -147,7 +147,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
         _, _g_pls = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_pls, u_ref)
         _, _g_min = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_min, u_ref)
 
-        ∇g_dyn_fd[:,i] = -(_g_pls - _g_min) / (2e-6)    # forward segment has minus sign
+        ∇g_dyn_fd[:,i] = (_g_pls - _g_min) / (2e-6)
     end
 
     for i in 1:6
@@ -176,7 +176,32 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 
     # error in gradients
     err = prob.lincache.∇g_dyn - ∇g_dyn_fd
-    @test maximum(err) < 1e-6
+    @test maximum(abs.(err)) < 1e-6
+
+    # Default penalty tuning must use the forward-backward defect shape.
+    algo_default_w = SCPLib.SCvxStar(nx, N; shooting_method = :forwardbackward)
+    SCPLib.tune_initial_penalty_weight!(algo_default_w, prob, x_ref, u_ref)
+    @test isfinite(algo_default_w.w)
+
+    # Nonconvex constraints should flatten the two boundary states, not N state nodes.
+    g_noncvx(cache, x, u) = [x[1,2] - x[1,1]]
+    prob_noncvx = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        params,
+        (x,u) -> sum(u[4,:]),
+        times,
+        x_ref,
+        u_ref;
+        shooting_method = :forwardbackward,
+        ode_method = Vern7(),
+        ng = 1,
+        g_noncvx = g_noncvx,
+    )
+    set_silent(prob_noncvx.model)
+    g_dyn_ref_noncvx, g_ref_noncvx, _ = SCPLib.set_linearized_constraints!(prob_noncvx, x_ref, u_ref)
+    @test size(g_dyn_ref_noncvx) == (nx, 1)
+    @test g_ref_noncvx == g_noncvx(prob_noncvx.lincache, x_ref, u_ref)
 
 
     # ------------------------------------------------------------------------------------------------------------------------ #
