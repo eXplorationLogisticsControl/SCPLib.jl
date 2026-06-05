@@ -149,7 +149,7 @@ end
 Solve non-convex OCP with SCvx algorithm
 
 # Keyword arguments
-- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution)`
+- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`
 """
 function solve!(
     algo::SCvx,
@@ -308,7 +308,7 @@ function solve!(
         end
 
         if !isnothing(callback)
-            callback(algo, solution)
+            callback(algo, solution, it, J0, χ)
         end
 
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))

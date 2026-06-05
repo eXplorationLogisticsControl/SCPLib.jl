@@ -148,8 +148,19 @@ set_silent(prob.model)
 # -------------------- instantiate algorithm -------------------- #
 algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
 
+# define callback algorithm
+global reset_w = false
+function callback(algo, solution, iteration, J0, χ)
+    if iteration <= 30 && χ <= 1e-6 && !reset_w
+        algo.w = 1e2
+        global reset_w = true
+        println("Resetting penalty weight to $(algo.w)")
+    end
+end
+
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; 
+    maxiter = 100, callback = callback)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
