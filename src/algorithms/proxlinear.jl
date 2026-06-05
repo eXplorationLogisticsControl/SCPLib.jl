@@ -169,7 +169,7 @@ Solve non-convex OCP with prox-linear algorithm
 - `tol_J0::Real`: objective tolerance
 - `verbosity::Int`: verbosity level
 - `store_iterates::Bool`: whether to store iterates
-- `callback::Union{Nothing,Function}`: callback function
+- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`
 - `warmstart_primal::Bool`: whether to warmstart primal variables
 - `warmstart_dual::Bool`: whether to warmstart dual variables
 """
@@ -305,7 +305,7 @@ function solve!(
             solution.n_iter += 1
         end
         if !isnothing(callback)
-            callback(solution)
+            callback(algo, solution, it, J0, χ)
         end
 
         # update reference solution

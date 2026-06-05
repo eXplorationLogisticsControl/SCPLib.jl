@@ -20,7 +20,7 @@ mutable struct ControlParams_impulsive_tr_u
     end
 end
 
-function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bool = false)
+function test_scvx_impulsive_tr_u(;verbosity::Int = 0, get_plot::Bool = false)
     μ = 1.215058560962404e-02
     DU = 389703     # km
     TU = 382981     # sec
@@ -177,4 +177,4 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
     end
 end
 
-test_scvxstar_impulsive_dynamics_only(verbosity = verbosity, get_plot=get_plot)
+test_scvx_impulsive_tr_u(verbosity = verbosity, get_plot=get_plot)

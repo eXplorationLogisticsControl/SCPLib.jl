@@ -149,7 +149,7 @@ if !@isdefined(solution__)
     # callback to store solution
     xs_iter = []
     us_iter = []
-    function callback(solution)
+    function callback(algo, solution, iteration, J0, χ)
         push!(xs_iter, deepcopy(solution.x))
         push!(us_iter, deepcopy(solution.u))
     end

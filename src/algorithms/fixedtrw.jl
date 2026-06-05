@@ -121,6 +121,7 @@ penalized quadratically with a fixed weight.
 - `tol_J0::Real`: objective tolerance
 - `verbosity::Int`: verbosity level
 - `store_iterates::Bool`: whether to store iterates
+- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`
 """
 function solve!(
     algo::FixedTRWSCP,
@@ -134,6 +135,7 @@ function solve!(
     J_expected::Real = 1.0,
     verbosity::Int = 1,
     store_iterates::Bool = true,
+    callback::Union{Nothing,Function} = nothing,
 )
     tcpu_start = time()
 
@@ -245,6 +247,9 @@ function solve!(
             push!(solution.info[:ΔJ], ΔJ)
             push!(solution.info[:χ], χ)
             solution.n_iter += 1
+        end
+        if !isnothing(callback)
+            callback(algo, solution, it, J0, χ)
         end
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
