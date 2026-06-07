@@ -18,6 +18,23 @@ end
 
 
 """
+Invoke an iteration callback.
+
+The five-argument form is preferred, while the original one-argument
+`callback(solution)` form remains supported for existing callers.
+"""
+function call_iteration_callback(callback::Function, algo, solution, iteration::Int, J0, χ)
+    if applicable(callback, algo, solution, iteration, J0, χ)
+        return callback(algo, solution, iteration, J0, χ)
+    elseif applicable(callback, solution)
+        return callback(solution)
+    else
+        return callback(algo, solution, iteration, J0, χ)
+    end
+end
+
+
+"""
 Remove non-convex constraints from model within `OptimalControlProblem`'s JuMP model
 """
 function delete_noncvx_referencs!(prob::OptimalControlProblem, references::Vector{Symbol})

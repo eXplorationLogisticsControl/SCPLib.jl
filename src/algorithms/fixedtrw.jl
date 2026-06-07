@@ -121,7 +121,8 @@ penalized quadratically with a fixed weight.
 - `tol_J0::Real`: objective tolerance
 - `verbosity::Int`: verbosity level
 - `store_iterates::Bool`: whether to store iterates
-- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`
+- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`;
+  legacy `callback(solution)` callbacks are also supported
 """
 function solve!(
     algo::FixedTRWSCP,
@@ -249,7 +250,7 @@ function solve!(
             solution.n_iter += 1
         end
         if !isnothing(callback)
-            callback(algo, solution, it, J0, χ)
+            call_iteration_callback(callback, algo, solution, it, J0, χ)
         end
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal

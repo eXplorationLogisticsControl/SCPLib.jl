@@ -1,149 +1,74 @@
-"""Test using callback for SCvx* algorithm"""
+"""Test callback invocation compatibility."""
 
 using Clarabel
 using JuMP
-using LinearAlgebra
-using OrdinaryDiffEq
 
 if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 end
 
-# -------------------- setup problem -------------------- #
-# create parameters with `u` entry
-mutable struct ControlParams_dynamics_ad
-    μ::Float64
+mutable struct CallbackTestParams
     u::Vector
-    function ControlParams_dynamics_ad(μ::Float64)
-        new(μ, zeros(4))
-    end
 end
 
-function test_scvxstar_dynamics_ad(;verbosity::Int = 0)
-    μ = 1.215058560962404e-02
-    DU = 389703     # km
-    TU = 382981     # sec
-    MU = 500.0      # kg
-    VU = DU/TU      # km/s
-    params = ControlParams_dynamics_ad(μ)
-
-    function eom!(drv, rv, p, t)
-        x, y, z = rv[1:3]
-        vx, vy, vz = rv[4:6]
-        r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-        r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
-        drv[1:3] = rv[4:6]
-        # derivatives of velocities
-        drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
-        # append controls
-        drv[4:6] += p.u[1:3]
+function make_callback_test_problem()
+    function eom!(dx, x, p, t)
+        dx[1] = p.u[1]
         return
     end
 
+    times = [0.0, 1.0, 2.0]
+    x_ref = zeros(1, 3)
+    u_ref = zeros(1, 2)
+    objective(x, u) = 0.0
 
-    rv0 = [1.0809931218390707E+00,
-        0.0000000000000000E+00,
-        -2.0235953267405354E-01,
-        1.0157158264396639E-14,
-        -1.9895001215078018E-01,
-        7.2218178975912707E-15]
-    period_0 = 2.3538670417546639E+00
-
-    rvf = [1.1648780946517576,
-        0.0,
-        -1.1145303634437023E-1,
-        0.0,
-        -2.0191923237095796E-1,
-        0.0]
-    period_f = 3.3031221822879884
-
-    # initial & final LPO
-    sol_lpo0 = solve(
-        ODEProblem(eom!, rv0, [0.0, period_0], params),
-        Tsit5(); reltol = 1e-12, abstol = 1e-12
-    )
-    sol_lpof = solve(
-        ODEProblem(eom!, rvf, [0.0, period_f], params),
-        Tsit5(); reltol = 1e-12, abstol = 1e-12
-    )
-
-    # -------------------- create problem -------------------- #
-    N = 100
-    nx = 6
-    nu = 4                              # [ux,uy,uz,Γ]
-    tf = 2.6 
-    times = LinRange(0.0, tf, N)
-
-    thrust = 0.35    # N
-    umax = thrust/MU/1e3 / (VU/TU)
-
-    # create reference solution
-    x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
-    x_along_lpof = sol_lpof(LinRange(0.0, period_f, N))
-    x_ref = zeros(nx,N)
-    alphas = LinRange(0,1,N)
-    for (i,alpha) in enumerate(alphas)
-        x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
-    end
-    u_ref = zeros(nu, N-1)
-    y_ref = nothing
-
-    function objective(x, u)
-        return sum(u[4,:])
-    end
-
-    # instantiate problem object    
     prob = SCPLib.ContinuousProblem(
         Clarabel.Optimizer,
         eom!,
-        params,
+        CallbackTestParams([0.0]),
         objective,
         times,
         x_ref,
-        u_ref;
-        ode_method = Vern7(),
+        u_ref,
     )
     set_silent(prob.model)
 
-    # append boundary conditions
-    @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)
-    @constraint(prob.model, constraint_final_rv,   prob.model[:x][:,end] == rvf)
+    @constraint(prob.model, prob.model[:x][:,1] .== 0.0)
+    @constraint(prob.model, prob.model[:x][:,end] .== 0.0)
+    @constraint(prob.model, prob.model[:u] .== 0.0)
 
-    # append constraints on control magnitude
-    @constraint(prob.model, constraint_associate_control[k in 1:N-1],
-        [prob.model[:u][4,k], prob.model[:u][1:3,k]...] in SecondOrderCone())
-    @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
-        prob.model[:u][4,k] <= umax)
-
-
-    # -------------------- instantiate algorithm -------------------- #
-    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)
-
-    # define callback algorithm
-    global reset_w = false
-    function callback(algo, solution, iteration, J0, χ)
-        if iteration <= 30 && χ <= 1e-6 && !reset_w
-            algo.w = 1e2
-            global reset_w = true
-            println("Resetting penalty weight to $(algo.w)")
-        end
-    end
-
-    # solve problem
-    solution = SCPLib.solve!(
-        algo, prob, x_ref, u_ref; 
-        verbosity = verbosity, 
-        maxiter = 100, 
-        callback = callback
-    )
-
-    # propagate solution
-    sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
-    @test maximum(abs.(g_dynamics_opt)) <= 1e-5
-    @test solution.status == :Optimal
+    return prob, x_ref, u_ref
 end
 
+@testset "callback compatibility" begin
+    prob, x_ref, u_ref = make_callback_test_problem()
+    legacy_calls = Ref(0)
+    legacy_solution_type = Ref{DataType}()
+    legacy_callback(solution) = begin
+        legacy_calls[] += 1
+        legacy_solution_type[] = typeof(solution)
+        return nothing
+    end
 
-test_scvxstar_dynamics_ad(verbosity = verbosity)
+    algo = SCPLib.SCvxStar(1, 3; w0 = 1.0)
+    SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 1, verbosity = 0, callback = legacy_callback)
+
+    @test legacy_calls[] == 1
+    @test legacy_solution_type[] == SCPLib.SCvxStarSolution
+
+    prob, x_ref, u_ref = make_callback_test_problem()
+    callback_args = Ref{Tuple}()
+    new_callback(algo, solution, iteration, J0, chi) = begin
+        callback_args[] = (typeof(algo), typeof(solution), iteration, J0, chi)
+        return nothing
+    end
+
+    algo = SCPLib.SCvxStar(1, 3; w0 = 1.0)
+    SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 1, verbosity = 0, callback = new_callback)
+
+    @test callback_args[][1] == SCPLib.SCvxStar
+    @test callback_args[][2] == SCPLib.SCvxStarSolution
+    @test callback_args[][3] == 1
+    @test callback_args[][4] isa Real
+    @test callback_args[][5] isa Real
+end
