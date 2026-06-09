@@ -469,12 +469,11 @@ function solve!(
             solution.n_iter += 1
         end
 
-        if !isnothing(callback)
-            callback(algo, solution, it, J0, χ)
-        end
-
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
+            if !isnothing(callback)
+                callback(algo, solution, it, J0, χ)
+            end
             push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
@@ -514,15 +513,6 @@ function solve!(
         # update trust-region 
         flag_trust_region = update_trust_region!(algo, rho_i)
 
-        if verbosity >= 2
-            # extra information when verbosity >= 2
-            println()
-            @printf("       CPU time on iteration        : %1.2f sec\n", solution.info[:cpu_times][:time_iter_total][end])
-            @printf("       CPU time on subproblem       : %1.2f sec\n", solution.info[:cpu_times][:time_subproblem][end])
-            @printf("       CPU time on update reference : %1.2f sec\n", solution.info[:cpu_times][:time_update_reference][end])
-            println()
-        end
-        
         # handle termination status when maximum number of iterations is reached
         if it == maxiter && solution.status == :Solving
             if χ <= tol_feas
@@ -531,7 +521,21 @@ function solve!(
                 solution.status = :MaxIterReached
             end
         end
+
+        if !isnothing(callback)
+            callback(algo, solution, it, J0, χ)
+        end
+
         push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
+
+        if verbosity >= 2
+            # extra information when verbosity >= 2
+            println()
+            @printf("       CPU time on iteration        : %1.2f sec\n", solution.info[:cpu_times][:time_iter_total][end])
+            @printf("       CPU time on subproblem       : %1.2f sec\n", solution.info[:cpu_times][:time_subproblem][end])
+            @printf("       CPU time on update reference : %1.2f sec\n", solution.info[:cpu_times][:time_update_reference][end])
+            println()
+        end
     end
     tcpu_end = time()
     solution.info[:cpu_times][:time_total] = tcpu_end - tcpu_start
