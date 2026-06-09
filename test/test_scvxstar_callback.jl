@@ -9,7 +9,7 @@ if !@isdefined SCPLib
 end
 
 mutable struct CallbackStateParams
-    u::Vector{Float64}
+    u::Vector
 end
 
 function make_callback_state_problem()
