@@ -193,6 +193,12 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 
     set_silent(prob.model)
 
+    # Default `w0 = nothing` should tune with forward-backward dynamics residuals.
+    algo_tuned = SCPLib.SCvxStar(nx, N; shooting_method = :forwardbackward)
+    SCPLib.tune_initial_penalty_weight!(algo_tuned, prob, x_ref, u_ref)
+    @test !isnothing(algo_tuned.w)
+    @test isfinite(algo_tuned.w)
+
     # solve
     tol_opt = 1e-6
     tol_feas = 1e-6
