@@ -25,6 +25,74 @@ mutable struct ControlParamsForwardBackward
     end
 end
 
+mutable struct LinearParamsForwardBackward
+    u::Vector
+end
+
+function test_scvxstar_forwardbackward_regressions()
+    nx = 1
+    nu = 1
+    N = 3
+    times = [0.0, 1.0, 2.0]
+    x_ref = [0.0 1.0]
+    u_ref = zeros(nu, N-1)
+    params = LinearParamsForwardBackward(zeros(nu))
+
+    function eom!(dx, x, p, t)
+        dx[1] = p.u[1]
+        return
+    end
+
+    objective = (x,u) -> sum(u.^2)
+
+    prob = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        params,
+        objective,
+        times,
+        x_ref,
+        u_ref;
+        shooting_method = :forwardbackward,
+        ode_method = Tsit5(),
+    )
+    set_silent(prob.model)
+
+    algo_auto = SCPLib.SCvxStar(nx, N; shooting_method = :forwardbackward)
+    SCPLib.tune_initial_penalty_weight!(algo_auto, prob, x_ref, u_ref)
+    @test isfinite(algo_auto.w)
+    @test algo_auto.w > 0
+
+    g_dynamics_ref, _, _ = SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+    @constraint(prob.model, prob.model[:x][1,1] == x_ref[1,1])
+    @constraint(prob.model, prob.model[:x][1,2] == x_ref[1,2])
+    @constraint(prob.model, [k in 1:N-1], prob.model[:u][1,k] == u_ref[1,k])
+
+    algo = SCPLib.SCvxStar(nx, N; w0 = 10.0, shooting_method = :forwardbackward)
+    SCPLib.solve_convex_subproblem!(algo, prob, nothing)
+    @test termination_status(prob.model) in [OPTIMAL, ALMOST_OPTIMAL, LOCALLY_SOLVED]
+    @test value(prob.model[:ξ_dyn][1,1]) ≈ g_dynamics_ref[1,1] atol=1e-6
+
+    g_noncvx = (cache, x, u) -> [x[1,1] + x[1,2]]
+    prob_noncvx = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        params,
+        objective,
+        times,
+        x_ref,
+        u_ref;
+        ng = 1,
+        g_noncvx = g_noncvx,
+        shooting_method = :forwardbackward,
+        ode_method = Tsit5(),
+    )
+    set_silent(prob_noncvx.model)
+    SCPLib.set_linearized_constraints!(prob_noncvx, x_ref, u_ref)
+    @test prob_noncvx.lincache.∇g ≈ [1.0 1.0 0.0 0.0]
+    @test prob_noncvx.lincache.∇g_dyn ≈ [-1.0 1.0 -1.0 -1.0]
+end
+
 function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     # define dynamics constants
     μ = 1.215058560962404e-02
@@ -147,7 +215,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
         _, _g_pls = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_pls, u_ref)
         _, _g_min = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_min, u_ref)
 
-        ∇g_dyn_fd[:,i] = -(_g_pls - _g_min) / (2e-6)    # forward segment has minus sign
+        ∇g_dyn_fd[:,i] = (_g_pls - _g_min) / (2e-6)
     end
 
     for i in 1:6
@@ -176,7 +244,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 
     # error in gradients
     err = prob.lincache.∇g_dyn - ∇g_dyn_fd
-    @test maximum(err) < 1e-6
+    @test maximum(abs.(err)) < 1e-6
 
 
     # ------------------------------------------------------------------------------------------------------------------------ #
@@ -209,4 +277,5 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 end
 
 
+test_scvxstar_forwardbackward_regressions()
 test_scvxstar_forwardbackward(verbosity = verbosity)
