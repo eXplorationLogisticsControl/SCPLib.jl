@@ -290,6 +290,12 @@ function solve!(
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
+    if prob.shooting_method == :forwardbackward && isnothing(algo.tr_u)
+        # Forward-backward has only endpoint state variables, so fixed-endpoint
+        # problems need a control trust region to make rejected steps smaller.
+        algo.tr_u = TrustRegions(prob.nu, prob.N, 0.1)
+        algo.use_trustregion_control = true
+    end
     if algo.use_trustregion_control
         @assert prob.nu == size(algo.tr_u.Δ,1) "Number of control variables mismatch between problem and algorithm"
     end
