@@ -76,3 +76,28 @@ end
     @test callback_seen_w[] ≈ initial_w * algo.beta
     @test algo.w == callback_w
 end
+
+@testset "SCvxStar can reuse a problem across solves" begin
+    prob, x_ref, u_ref = make_callback_state_problem()
+
+    algo = SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 2.0, l1_penalty = true)
+    solution1 = SCPLib.solve!(
+        algo,
+        prob,
+        x_ref,
+        u_ref;
+        maxiter = 1,
+        verbosity = 0,
+    )
+    solution2 = SCPLib.solve!(
+        algo,
+        prob,
+        x_ref,
+        u_ref;
+        maxiter = 1,
+        verbosity = 0,
+    )
+
+    @test solution1.n_iter == 1
+    @test solution2.n_iter == 1
+end

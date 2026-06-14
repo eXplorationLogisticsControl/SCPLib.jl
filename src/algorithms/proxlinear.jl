@@ -224,6 +224,8 @@ function solve!(
     filter!(e->e≠:constraint_trust_region_x_lb, prob.model_nl_references)
     filter!(e->e≠:constraint_trust_region_x_ub, prob.model_nl_references)
 
+    delete_existing_references!(prob, prob.model_nl_references)
+
     for it in 1:maxiter
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference

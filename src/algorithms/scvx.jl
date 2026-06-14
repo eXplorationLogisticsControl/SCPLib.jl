@@ -208,9 +208,10 @@ function solve!(
 
     # append trust-region constraints references for nonlinear program
     if algo.use_trustregion_control
-        append!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
+        append_unique_references!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
     end
 
+    delete_existing_references!(prob, prob.model_nl_references)
 
     for it in 1:maxiter
         tcpu_start_iter = time()

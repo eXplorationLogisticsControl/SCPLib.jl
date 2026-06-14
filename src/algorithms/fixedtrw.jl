@@ -170,6 +170,8 @@ function solve!(
         println(header)
     end
 
+    delete_existing_references!(prob, prob.model_nl_references)
+
     for it in 1:maxiter
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference
