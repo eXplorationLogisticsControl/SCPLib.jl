@@ -21,10 +21,39 @@ end
 Remove non-convex constraints from model within `OptimalControlProblem`'s JuMP model
 """
 function delete_noncvx_referencs!(prob::OptimalControlProblem, references::Vector{Symbol})
-    for ref in references
-        delete(prob.model, prob.model[ref])
-        unregister(prob.model, ref)
+    for ref in unique(references)
+        delete_model_reference!(prob, ref)
     end
+end
+
+
+"""Remove a registered JuMP model reference if it currently exists."""
+function delete_existing_references!(prob::OptimalControlProblem, references::Vector{Symbol})
+    model_objects = object_dictionary(prob.model)
+    for ref in unique(references)
+        if haskey(model_objects, ref)
+            delete_model_reference!(prob, ref)
+        end
+    end
+    return
+end
+
+
+function delete_model_reference!(prob::OptimalControlProblem, ref::Symbol)
+    delete(prob.model, prob.model[ref])
+    unregister(prob.model, ref)
+    return
+end
+
+
+"""Append model references without creating duplicate cleanup entries."""
+function append_unique_references!(references::Vector{Symbol}, new_references::Vector{Symbol})
+    for ref in new_references
+        if ref ∉ references
+            push!(references, ref)
+        end
+    end
+    return
 end
 
 

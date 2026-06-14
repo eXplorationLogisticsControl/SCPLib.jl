@@ -346,7 +346,7 @@ function solve!(
 
     # append trust-region constraints references for nonlinear program
     if algo.use_trustregion_control
-        append!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
+        append_unique_references!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
     end
 
     if algo.l1_penalty
@@ -357,7 +357,12 @@ function solve!(
         if prob.nh > 0
             append!(l1_penalty_references, [:constraint_slack_hncvx])
         end
+    else
+        l1_penalty_references = Symbol[]
     end
+
+    delete_existing_references!(prob, prob.model_nl_references)
+    delete_existing_references!(prob, l1_penalty_references)
     
     for it in 1:maxiter
         tcpu_start_iter = time()
