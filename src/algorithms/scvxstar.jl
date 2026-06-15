@@ -261,7 +261,8 @@ Solve non-convex OCP with SCvx* algorithm
 - `K_w::Real`: initial penalty weight scaling factor
 - `verbosity::Int`: verbosity level
 - `store_iterates::Bool`: whether to store iterates
-- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`
+- `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`;
+  legacy `callback(algo, solution)` and `callback(solution)` callbacks are also supported
 - `warmstart_primal::Bool`: whether to warmstart primal variables
 - `warmstart_dual::Bool`: whether to warmstart dual variables
 """
@@ -472,7 +473,7 @@ function solve!(
         if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
             if !isnothing(callback)
-                callback(algo, solution, it, J0, χ)
+                call_iteration_callback(callback, algo, solution, it, J0, χ)
             end
             push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
@@ -523,7 +524,7 @@ function solve!(
         end
 
         if !isnothing(callback)
-            callback(algo, solution, it, J0, χ)
+            call_iteration_callback(callback, algo, solution, it, J0, χ)
         end
 
         push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)

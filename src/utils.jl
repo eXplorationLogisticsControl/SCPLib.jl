@@ -18,6 +18,22 @@ end
 
 
 """
+Invoke solver iteration callbacks while preserving callback signatures that were
+accepted by earlier releases.
+"""
+function call_iteration_callback(callback::Function, algo::SCPAlgorithm, solution::SCPSolution, iteration, J0, χ)
+    if applicable(callback, algo, solution, iteration, J0, χ)
+        return callback(algo, solution, iteration, J0, χ)
+    elseif applicable(callback, algo, solution)
+        return callback(algo, solution)
+    elseif applicable(callback, solution)
+        return callback(solution)
+    end
+    throw(ArgumentError("callback must accept (algo, solution, iteration, J0, χ), (algo, solution), or (solution)"))
+end
+
+
+"""
 Remove non-convex constraints from model within `OptimalControlProblem`'s JuMP model
 """
 function delete_noncvx_referencs!(prob::OptimalControlProblem, references::Vector{Symbol})

@@ -76,3 +76,50 @@ end
     @test callback_seen_w[] ≈ initial_w * algo.beta
     @test algo.w == callback_w
 end
+
+@testset "SCvxStar callback accepts legacy signatures" begin
+    prob, x_ref, u_ref = make_callback_state_problem()
+    algo = SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 2.0, beta = 2.0)
+    two_arg_calls = Ref(0)
+
+    function two_arg_callback(algo, solution)
+        two_arg_calls[] += 1
+        @test algo isa SCPLib.SCvxStar
+        @test solution isa SCPLib.SCvxStarSolution
+        return nothing
+    end
+
+    SCPLib.solve!(
+        algo,
+        prob,
+        x_ref,
+        u_ref;
+        maxiter = 1,
+        verbosity = 0,
+        callback = two_arg_callback,
+    )
+
+    @test two_arg_calls[] == 1
+
+    prob, x_ref, u_ref = make_callback_state_problem()
+    algo = SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 2.0, beta = 2.0)
+    one_arg_calls = Ref(0)
+
+    function one_arg_callback(solution)
+        one_arg_calls[] += 1
+        @test solution isa SCPLib.SCvxStarSolution
+        return nothing
+    end
+
+    SCPLib.solve!(
+        algo,
+        prob,
+        x_ref,
+        u_ref;
+        maxiter = 1,
+        verbosity = 0,
+        callback = one_arg_callback,
+    )
+
+    @test one_arg_calls[] == 1
+end
