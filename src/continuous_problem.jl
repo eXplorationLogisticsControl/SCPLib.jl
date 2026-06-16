@@ -295,16 +295,16 @@ function ContinuousProblem(
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
-        ∇g_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> g_noncvx(lincache, unpack_flattened_variables(prob, z)...),
+        ∇g_noncvx = function (cache,x,u)
+            return ForwardDiff.jacobian(z -> g_noncvx(cache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end
 
     # check if ∇h_noncvx is provided
     if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
-        ∇h_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> h_noncvx(lincache, unpack_flattened_variables(prob, z)...),
+        ∇h_noncvx = function (cache,x,u)
+            return ForwardDiff.jacobian(z -> h_noncvx(cache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end

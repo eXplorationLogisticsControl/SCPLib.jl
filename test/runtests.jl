@@ -14,6 +14,7 @@ get_plot = false
     include("test_scvxstar_dynamics_userdefined_oop.jl")
     include("test_scvxstar_dynamics_ad.jl")
     include("test_scvxstar_h_noncvx.jl")
+    include("test_noncvx_gradient_cache.jl")
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
     include("test_scvxstar_custom_propagate_func.jl")
