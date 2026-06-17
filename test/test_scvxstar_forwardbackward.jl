@@ -193,6 +193,33 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 
     set_silent(prob.model)
 
+    # Default `w0 = nothing` should tune with forward-backward dynamics residuals.
+    algo_tuned = SCPLib.SCvxStar(nx, N; shooting_method = :forwardbackward)
+    SCPLib.tune_initial_penalty_weight!(algo_tuned, prob, x_ref, u_ref)
+    @test !isnothing(algo_tuned.w)
+    @test isfinite(algo_tuned.w)
+
+    # Non-convex constraints should use the forward-backward variable layout.
+    g_noncvx(lincache, x, u) = [x[1,1] + x[1,2] - (rv0[1] + rvf[1])]
+    prob_g = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        params,
+        (x,u) -> sum(u[4,:]),
+        times,
+        x_ref,
+        u_ref;
+        ng = 1,
+        g_noncvx = g_noncvx,
+        shooting_method = :forwardbackward,
+        ode_method = Vern7(),
+    )
+    set_silent(prob_g.model)
+    _, g_ref, h_ref = SCPLib.set_linearized_constraints!(prob_g, x_ref, u_ref)
+    @test isapprox(g_ref, [0.0]; atol = 1e-12)
+    @test h_ref === nothing
+    @test size(prob_g.lincache.∇g) == (1, 2*nx + nu*(N-1))
+
     # solve
     tol_opt = 1e-6
     tol_feas = 1e-6
