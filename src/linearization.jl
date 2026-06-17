@@ -48,14 +48,14 @@ end
 
 
 """Set cache for non-convex equality constraints"""
-function set_g_noncvx_cache!(lincache::MultipleShootingCache, ∇g_noncvx::Function, x_ref, u_ref)
+function set_g_noncvx_cache!(lincache::AbstractLinearizationCache, ∇g_noncvx::Function, x_ref, u_ref)
     lincache.∇g[:,:] = ∇g_noncvx(x_ref, u_ref)
     return
 end
 
 
 """Set cache for non-convex inequality constraints"""
-function set_h_noncvx_cache!(lincache::MultipleShootingCache, ∇h_noncvx::Function, x_ref, u_ref)
+function set_h_noncvx_cache!(lincache::AbstractLinearizationCache, ∇h_noncvx::Function, x_ref, u_ref)
     lincache.∇h[:,:] = ∇h_noncvx(x_ref, u_ref)
     return
 end
@@ -85,7 +85,7 @@ function set_continuous_dynamics_cache!(lincache::ForwardBackwardCache, x_ref, u
     Φ_A_list = [reshape(sols[k].u[end][nx+1:nx*(nx+1)], (nx,nx)) for k in 1:Nu]
     Φ_B_list = [reshape(sols[k].u[end][nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) for k in 1:Nu]
 
-    lincache.∇g_dyn[1:nx,1:nx] = prod(reverse(Φ_A_list[1:Nu_fwd]))
+    lincache.∇g_dyn[1:nx,1:nx] = -prod(reverse(Φ_A_list[1:Nu_fwd]))
     lincache.∇g_dyn[1:nx,nx+1:2nx] = prod(Φ_A_list[Nu_fwd+1:end])
 
     for k in 1:Nu_fwd
