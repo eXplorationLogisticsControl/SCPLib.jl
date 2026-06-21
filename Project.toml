@@ -1,7 +1,7 @@
 name = "SCPLib"
 uuid = "372d3413-d610-491c-84c4-e7782b0b6c35"
-authors = ["Yuri <yuri.shimane@gmail.com>"]
 version = "0.1.0"
+authors = ["Yuri <yuri.shimane@gmail.com>"]
 
 [deps]
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
@@ -23,7 +23,7 @@ ForwardDiff = "^1.0.1"
 IJulia = "1.33.0"
 Ipopt = "^1.11.0"
 JuMP = "^1.20.0"
-OrdinaryDiffEq = "^6.0.0"
+OrdinaryDiffEq = "^6.0.0, 7"
 SparseDiffTools = "^2.20.0"
 
 [extras]
