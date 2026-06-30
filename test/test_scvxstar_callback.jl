@@ -8,12 +8,10 @@ if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 end
 
-mutable struct CallbackStateParams
-    u::Vector
-end
+struct CallbackStateParams end
 
 function make_callback_state_problem()
-    function eom!(dx, x, p, t)
+    function eom!(dx, x, pu, t)
         dx[1] = 0.0
         return
     end
@@ -26,7 +24,7 @@ function make_callback_state_problem()
     prob = SCPLib.ContinuousProblem(
         Clarabel.Optimizer,
         eom!,
-        CallbackStateParams([0.0]),
+        CallbackStateParams(),
         objective,
         times,
         x_ref,

@@ -11,13 +11,8 @@ end
 
 
 # -------------------- setup parameters -------------------- #
-# create parameters with `u` entry
-mutable struct ControlParams_impulsive_u_bias
+struct ControlParams_impulsive_u_bias
     μ::Float64
-    u::Vector
-    function ControlParams_impulsive_u_bias(μ::Float64)
-        new(μ, zeros(4))
-    end
 end
 
 function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = false)
@@ -28,34 +23,36 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
     VU = DU/TU      # km/s
     params = ControlParams_impulsive_u_bias(μ)
 
-    function eom!(drv, rv, p, t)
+    function eom!(drv, rv, pu, t)
+        (; params, u) = pu
         x, y, z = rv[1:3]
         vx, vy, vz = rv[4:6]
-        r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-        r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+        r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
+        r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
         drv[1:3] = rv[4:6]
         # derivatives of velocities
-        drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+        drv[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+        drv[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+        drv[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
         return
     end
 
 
-    function eom_aug!(dx_aug, x_aug, p, t)
+    function eom_aug!(dx_aug, x_aug, pu, t)
+        (; params, u) = pu
         x, y, z = x_aug[1:3]
         vx, vy, vz = x_aug[4:6]
 
-        r1vec = [x + p.μ, y, z]
-        r2vec = [x - 1 + p.μ, y, z]
+        r1vec = [x + params.μ, y, z]
+        r2vec = [x - 1 + params.μ, y, z]
         r1 = norm(r1vec)
         r2 = norm(r2vec)
 
         dx_aug[1:3] = x_aug[4:6]
         # derivatives of velocities
-        dx_aug[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        dx_aug[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        dx_aug[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+        dx_aug[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+        dx_aug[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+        dx_aug[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
         
         # Jacobian derivatives
         G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
@@ -87,11 +84,11 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
 
     # initial & final LPO
     sol_lpo0 = solve(
-        ODEProblem(eom!, rv0, [0.0, period_0], params),
+        ODEProblem(eom!, rv0, [0.0, period_0], (; params, u=zeros(4))),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
     sol_lpof = solve(
-        ODEProblem(eom!, rvf, [0.0, period_f], params),
+        ODEProblem(eom!, rvf, [0.0, period_f], (; params, u=zeros(4))),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
 

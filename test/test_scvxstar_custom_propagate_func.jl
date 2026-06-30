@@ -15,10 +15,9 @@ end
 # -------------------- setup parameters -------------------- #
 mutable struct ControlParams_custom_propagate_func
     μ::Float64
-    u::Vector
 
     function ControlParams_custom_propagate_func(μ::Float64)
-        new(μ, zeros(8))
+        new(μ)
     end
 end
 
@@ -26,38 +25,40 @@ end
 function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool = false)
     # ----------------------------------------------------------------------------------- #
     # equations of motion
-    function eom!(drv, rv, p, t)
+    function eom!(drv, rv, pu, t)
+        (; params) = pu
         x, y, z = rv[1:3]
         vx, vy, vz = rv[4:6]
-        r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-        r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+        r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
+        r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
         drv[1:3] = rv[4:6]
         # derivatives of velocities
-        drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+        drv[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+        drv[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+        drv[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
         return
     end
 
 
-    function eom_aug!(dx_aug, x_aug, p, t)
+    function eom_aug!(dx_aug, x_aug, pu, t)
+        (; params) = pu
         x, y, z = x_aug[1:3]
         vx, vy, vz = x_aug[4:6]
 
-        r1vec = [x + p.μ, y, z]
-        r2vec = [x - 1 + p.μ, y, z]
+        r1vec = [x + params.μ, y, z]
+        r2vec = [x - 1 + params.μ, y, z]
         r1 = norm(r1vec)
         r2 = norm(r2vec)
 
         dx_aug[1:3] = x_aug[4:6]
         # derivatives of velocities
-        dx_aug[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        dx_aug[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        dx_aug[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+        dx_aug[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+        dx_aug[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+        dx_aug[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
         
         # Jacobian derivatives
-        G1 = (1 - p.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-        G2 = p.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
+        G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
+        G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
         Omega = [0 2 0; -2 0 0; 0 0 0]
         A = [zeros(3,3)                  I(3);
             G1 + G2 + diagm([1,1,0])    Omega]
@@ -68,20 +69,21 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
     end
 
 
-    function multi_spacecraft_eom!(drv, rv, p, t)
+    function multi_spacecraft_eom!(drv, rv, pu, t)
         @views for i in 1:N_spacecraft
-            eom!(drv[1+6(i-1):6i], rv[1+6(i-1):6i], p, t)
+            eom!(drv[1+6(i-1):6i], rv[1+6(i-1):6i], pu, t)
         end
         return
     end
 
 
-    function multi_spacecraft_eom_aug!(dx_aug, x_aug, p, t)
+    function multi_spacecraft_eom_aug!(dx_aug, x_aug, pu, t)
+        (; params) = pu
         nx = 6 * N_spacecraft
         nx2 = nx^2
 
         @views for i in 1:N_spacecraft
-            eom!(dx_aug[1+6(i-1):6i], x_aug[1+6(i-1):6i], p, t)
+            eom!(dx_aug[1+6(i-1):6i], x_aug[1+6(i-1):6i], pu, t)
         end
         
         Phi_aug = reshape(x_aug[nx+1:end], (nx,nx))'
@@ -89,14 +91,14 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         for i in 1:N_spacecraft
             _x_copy = deepcopy(x_aug[1+6(i-1):6i])
             x, y, z = _x_copy[1:3]
-            r1vec = [x + p.μ, y, z]
-            r2vec = [x - 1 + p.μ, y, z]
+            r1vec = [x + params.μ, y, z]
+            r2vec = [x - 1 + params.μ, y, z]
             r1 = norm(r1vec)
             r2 = norm(r2vec)
 
             # Jacobian derivatives
-            G1 = (1 - p.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
-            G2 = p.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
+            G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
+            G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
             Omega = [0 2 0; -2 0 0; 0 0 0]
             A = [zeros(3,3)                  I(3);
                 G1 + G2 + diagm([1,1,0])    Omega]
@@ -130,31 +132,32 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
 
     # initial & final LPO
     sol_lpo0 = solve(
-        ODEProblem(eom!, rv0, [0.0, period_0], params),
+        ODEProblem(eom!, rv0, [0.0, period_0], (; params, u=zeros(4))),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
     sol_lpof = solve(
-        ODEProblem(eom!, rvf, [0.0, period_f], params),
+        ODEProblem(eom!, rvf, [0.0, period_f], (; params, u=zeros(4))),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
 
     # ----------------------------------------------------------------------------------- #
     # test ODE propagation 
+    dynamics_input = SCPLib.dynamics_input
     dx_foo = zeros(12)
-    multi_spacecraft_eom!(dx_foo, x0_concat, params, 0.0)
+    multi_spacecraft_eom!(dx_foo, x0_concat, dynamics_input(params, zeros(8)), 0.0)
 
     # check ODE propagation
-    ode_single_rv0 = ODEProblem(eom!, rv0, [0.0, π], params)
+    ode_single_rv0 = ODEProblem(eom!, rv0, [0.0, π], (; params, u=zeros(4)))
     sol_single_rv0 = solve(ode_single_rv0, Vern7(), reltol=1e-12, abstol=1e-12)
 
-    ode_single_rv1 = ODEProblem(eom!, rv1, [0.0, π], params)
+    ode_single_rv1 = ODEProblem(eom!, rv1, [0.0, π], (; params, u=zeros(4)))
     sol_single_rv1 = solve(ode_single_rv1, Vern7(), reltol=1e-12, abstol=1e-12)
 
-    ode_multiple = ODEProblem(multi_spacecraft_eom!, x0_concat, [0.0, π], params)
+    ode_multiple = ODEProblem(multi_spacecraft_eom!, x0_concat, [0.0, π], (; params, u=zeros(8)))
     sol_single_rvf = solve(ode_multiple, Vern7(), reltol=1e-12, abstol=1e-12)
 
     ode_multiple_aug = ODEProblem(multi_spacecraft_eom_aug!,
-        [x0_concat; reshape(I(6*N_spacecraft), (6*N_spacecraft)^2)], [0.0, π], params)
+        [x0_concat; reshape(I(6*N_spacecraft), (6*N_spacecraft)^2)], [0.0, π], (; params, u=zeros(8)))
     sol_aug = solve(ode_multiple_aug, Vern7(), reltol=1e-12, abstol=1e-12)
 
     @test maximum(abs.(sol_single_rvf.u[end][1:6] - sol_single_rv0.u[end])) < 1e-11
@@ -177,7 +180,12 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
                 x_ref[:,k] + prob.dfdu(x_ref[:,k], u_ref[:,k], prob.times[k]) * u_ref[:,k];
                 reshape(I(prob.nx), prob.nx^2)
             ]
-            _ode = ODEProblem(multi_spacecraft_eom_aug!, _x0_aug, [prob.times[k], prob.times[k+1]], params)
+            _ode = ODEProblem(
+                multi_spacecraft_eom_aug!,
+                _x0_aug,
+                [prob.times[k], prob.times[k+1]],
+                dynamics_input(params, u_ref[:,k]),
+            )
             push!(sols, solve(_ode, Vern7(), reltol=1e-12, abstol=1e-12))
             
             g_dynamics[:,k] = x_ref[:,k+1] - sols[k].u[end][1:prob.nx]
