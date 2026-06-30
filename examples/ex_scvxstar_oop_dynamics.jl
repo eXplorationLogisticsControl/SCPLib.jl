@@ -12,13 +12,8 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 
 # -------------------- setup problem -------------------- #
-# create parameters with `u` entry
-mutable struct ControlParams
+struct ControlParams
     μ::Float64
-    u::Vector
-    function ControlParams(μ::Float64)
-        new(μ, zeros(4))
-    end
 end
 
 μ = 1.215058560962404e-02
@@ -30,34 +25,36 @@ params = ControlParams(μ)
 nx = 6
 nu = 4                              # [ux,uy,uz,Γ]
 
-function eom(rv, p, t)
+function eom(rv, pu, t)
+    (; params, u) = pu
     drv = zeros(nx)
     x, y, z = rv[1:3]
     vx, vy, vz = rv[4:6]
-    r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-    r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+    r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
+    r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
     drv = [
         rv[4:6];
-         2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+         2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+        -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+        -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
 
     ]
     # append controls
-    drv[4:6] += p.u[1:3]
+    drv[4:6] += u[1:3]
     return drv
 end
 
 
-function eom_aug(x_aug, p, t)
+function eom_aug(x_aug, pu, t)
+    (; params, u) = pu
     dx_aug = zeros(nx*(nx+1)+nx*nu)
 
     # state derivatives
-    dx_aug[1:6] = eom(view(x_aug, 1:6), p, t)
+    dx_aug[1:6] = eom(view(x_aug, 1:6), pu, t)
     
     # STM derivatives
-    r1vec = [x_aug[1] + p.μ, x_aug[2], x_aug[3]]
-    r2vec = [x_aug[1] - 1 + p.μ, x_aug[2], x_aug[3]]
+    r1vec = [x_aug[1] + params.μ, x_aug[2], x_aug[3]]
+    r2vec = [x_aug[1] - 1 + params.μ, x_aug[2], x_aug[3]]
     G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
     G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
     Omega = [0 2 0; -2 0 0; 0 0 0]
@@ -90,11 +87,11 @@ period_f = 3.3031221822879884
 
 # initial & final LPO
 sol_lpo0 = solve(
-    ODEProblem(eom, rv0, [0.0, period_0], params),
+    ODEProblem(eom, rv0, [0.0, period_0], (; params, u=zeros(nu))),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 sol_lpof = solve(
-    ODEProblem(eom, rvf, [0.0, period_f], params),
+    ODEProblem(eom, rvf, [0.0, period_f], (; params, u=zeros(nu))),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 

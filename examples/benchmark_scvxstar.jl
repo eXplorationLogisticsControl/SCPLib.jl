@@ -9,34 +9,31 @@ using OrdinaryDiffEq
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 
-mutable struct ControlParams
+struct ControlParams_benchmark
     μ::Float64
-    u::Vector
-    function ControlParams(μ::Float64)
-        new(μ, zeros(4))
-    end
 end
 
-function eom!(drv, rv, p, t)
+function eom!(drv, rv, pu, t)
+    (; params, u) = pu
     x, y, z = rv[1:3]
     vx, vy, vz = rv[4:6]
-    r1 = sqrt((x + p.μ)^2 + y^2 + z^2)
-    r2 = sqrt((x - 1 + p.μ)^2 + y^2 + z^2)
+    r1 = sqrt((x + params.μ)^2 + y^2 + z^2)
+    r2 = sqrt((x - 1 + params.μ)^2 + y^2 + z^2)
     drv[1:3] = rv[4:6]
-    drv[4] = 2 * vy + x - ((1 - p.μ) / r1^3) * (p.μ + x) + (p.μ / r2^3) * (1 - p.μ - x)
-    drv[5] = -2 * vx + y - ((1 - p.μ) / r1^3) * y - (p.μ / r2^3) * y
-    drv[6] = -((1 - p.μ) / r1^3) * z - (p.μ / r2^3) * z
-    drv[4:6] += p.u[1:3]
+    drv[4] = 2 * vy + x - ((1 - params.μ) / r1^3) * (params.μ + x) + (params.μ / r2^3) * (1 - params.μ - x)
+    drv[5] = -2 * vx + y - ((1 - params.μ) / r1^3) * y - (params.μ / r2^3) * y
+    drv[6] = -((1 - params.μ) / r1^3) * z - (params.μ / r2^3) * z
+    drv[4:6] += u[1:3]
     return
 end
 
-const μ = 1.215058560962404e-02
-const DU = 389703
-const TU = 382981
-const MU = 500.0
-const VU = DU / TU
+μ = 1.215058560962404e-02
+DU = 389703
+TU = 382981
+MU = 500.0
+VU = DU / TU
 
-const rv0 = [
+rv0 = [
     1.0809931218390707E+00,
     0.0000000000000000E+00,
     -2.0235953267405354E-01,
@@ -44,9 +41,9 @@ const rv0 = [
     -1.9895001215078018E-01,
     7.2218178975912707E-15,
 ]
-const period_0 = 2.3538670417546639E+00
+period_0 = 2.3538670417546639E+00
 
-const rvf = [
+rvf = [
     1.1648780946517576,
     0.0,
     -1.1145303634437023E-1,
@@ -54,26 +51,26 @@ const rvf = [
     -2.0191923237095796E-1,
     0.0,
 ]
-const period_f = 3.3031221822879884
+period_f = 3.3031221822879884
 
-const N = 100
-const nx = 6
-const nu = 4
-const tf = 2.6
-const umax = 0.35 / MU / 1e3 / (VU / TU)
+N = 60
+nx = 6
+nu = 4
+tf = 2.6
+umax = 0.35 / MU / 1e3 / (VU / TU)
 
 objective(x, u) = sum(u[4, :])
 
 function build_problem()
-    params = ControlParams(μ)
+    params = ControlParams_benchmark(μ)
     times = LinRange(0.0, tf, N)
 
     sol_lpo0 = solve(
-        ODEProblem(eom!, rv0, [0.0, period_0], params),
+        ODEProblem(eom!, rv0, [0.0, period_0], (; params, u=zeros(nu))),
         Tsit5(); reltol=1e-12, abstol=1e-12,
     )
     sol_lpof = solve(
-        ODEProblem(eom!, rvf, [0.0, period_f], params),
+        ODEProblem(eom!, rvf, [0.0, period_f], (; params, u=zeros(nu))),
         Tsit5(); reltol=1e-12, abstol=1e-12,
     )
 

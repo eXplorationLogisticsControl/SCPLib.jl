@@ -22,29 +22,22 @@ end
 # Parameters
 nx = 7
 nu = 4
-mutable struct Params
-    u::Vector{Float64}
+struct Params
     I::Matrix{Float64}
     invI::Matrix{Float64}
 
-    function Params(u::Vector{Float64}, I::Matrix{Float64})
-        new(u, I, inv(I))
+    function Params(I::Matrix{Float64})
+        new(I, inv(I))
     end
 end
 
 inertia_matrix = diagm([1.0, 2.0, 3.0])
-params = Params(zeros(nu), inertia_matrix)
-
-# derivative function
-p_dual = deepcopy(params)
-f_u2dx! = function (dx,x,u,t)
-    p_dual.u = u             # replace control with dual vector
-    eom!(view(dx,1:nx),x[1:nx],p_dual,t)
-end
+params = Params(inertia_matrix)
 
 # Dynamics
 #   quaterinon convention: q = [q_scalar, q_vector]
-function eom!(dx, x, params, t)
+function eom!(dx, x, pu, t)
+    (; params, u) = pu
     q = x[1:4]
     ω = x[5:7]
     Ω = [-q[2] -q[3] -q[4];
@@ -52,15 +45,15 @@ function eom!(dx, x, params, t)
          q[4]  q[1] -q[2];
         -q[3]  q[2]  q[1]]
     dx[1:4] = 0.5 * Ω * ω
-    τ = params.u[1:3]
     Iω = params.I * ω
-    dx[5:7] = params.invI * (params.u[1:3] - cross(ω, Iω))
+    dx[5:7] = params.invI * (u[1:3] - cross(ω, Iω))
     return
 end
 
-function eom_aug!(dx_aug, x_aug, params, t)
-    eom!(view(dx_aug,1:7), x_aug[1:7], params, t)
-    A = ForwardDiff.jacobian((y,x) -> eom!(y,x,params,t), zeros(7), x_aug[1:7])
+function eom_aug!(dx_aug, x_aug, pu, t)
+    (; params, u) = pu
+    eom!(view(dx_aug,1:7), x_aug[1:7], pu, t)
+    A = ForwardDiff.jacobian((y,x) -> eom!(y,x,pu,t), zeros(7), x_aug[1:7])
     B = zeros(nx,nu)
     B[5:7,1:3] = params.invI
 
