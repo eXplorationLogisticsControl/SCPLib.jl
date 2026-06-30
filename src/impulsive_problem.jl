@@ -67,17 +67,21 @@ end
 
 function get_trajectory(prob::ImpulsiveProblem, x_ref, u_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
-    # set dynamics constraints
+    u_pool = make_u_pool(prob.nu, prob.N - 1)
+    p_placeholder = dynamics_input(prob.params, u_pool[1])
     prob_func = function(ode_problem, i, repeat)
-        _params = deepcopy(prob.params)
-        remake(ode_problem, u0=x_ref[:,i] + prob.dfdu(x_ref[:,i], u_ref[:,i], prob.times[i]) * (u_ref[:,i] + prob.u_bias[:,i]),
-            tspan=(prob.times[i], prob.times[i+1]), p=_params)
+        u_k = fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
+        remake(ode_problem,
+            u0 = x_ref[:,i] + prob.dfdu(x_ref[:,i], u_k, prob.times[i]) * u_k,
+            tspan = (prob.times[i], prob.times[i+1]),
+            p = dynamics_input(prob.params, u_k),
+        )
     end
     base_ode_problem = ODEProblem(
         prob.eom!,
         x_ref[:,1],
         [0.0, 1.0],   # place holder
-        prob.params,
+        p_placeholder,
     )
     ensemble_prob = EnsembleProblem(base_ode_problem, prob_func = prob_func)
     sols = solve(
@@ -102,18 +106,22 @@ evaluates dynamics residuals.
 """
 function get_trajectory_augmented(prob::ImpulsiveProblem, x_ref, u_ref)
     g_dynamics = zeros(prob.nx, prob.N-1)
-    # set dynamics constraints
+    u_pool = make_u_pool(prob.nu, prob.N - 1)
+    p_placeholder = dynamics_input(prob.params, u_pool[1])
     prob_func = function(ode_problem, i, repeat)
-        _x0_aug = init_impulsive_dynamics_xaug(prob.times[i], x_ref[:,i], u_ref[:,i] + prob.u_bias[:,i], prob.nx, prob.dfdu)
-        _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,i] + prob.u_bias[:,i]
-        remake(ode_problem, u0=_x0_aug, tspan=(prob.times[i], prob.times[i+1]), p=_params)
+        u_k = fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
+        _x0_aug = init_impulsive_dynamics_xaug(prob.times[i], x_ref[:,i], u_k, prob.nx, prob.dfdu)
+        remake(ode_problem,
+            u0 = _x0_aug,
+            tspan = (prob.times[i], prob.times[i+1]),
+            p = dynamics_input(prob.params, u_k),
+        )
     end
     base_ode_problem = ODEProblem(
         prob.eom_aug!,
         [x_ref[:,1]; reshape(I(prob.nx), prob.nx^2)],
         [0.0, 1.0],   # place holder
-        prob.params,
+        p_placeholder,
     )
     ensemble_prob = EnsembleProblem(base_ode_problem, prob_func = prob_func)
     sols = solve(
@@ -144,8 +152,8 @@ See `set_dynamics_cache!` for more details.
 
 # Arguments:
 - `optimizer`: optimizer for the JuMP model
-- `eom!::Function`: impulsive dynamics function
-- `params`: parameters for the problem
+- `eom!::Function`: impulsive dynamics with signature `(dx, x, (; params, u), t)`
+- `params`: immutable physical parameters (must not contain segment control)
 - `objective::Function`: objective function
 - `times`: time points
 - `x_ref`: reference state
