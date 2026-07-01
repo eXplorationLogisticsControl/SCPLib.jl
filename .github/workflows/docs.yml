@@ -1,0 +1,53 @@
+name: docs
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    tags: ["*"]
+  pull_request:
+  workflow_dispatch:
+
+# Publish static HTML from docs/build via GitHub Actions (not Jekyll /docs).
+# Repo Settings → Pages → Build and deployment → Source: GitHub Actions
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  actions: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "lts"
+      - uses: julia-actions/cache@v2
+      - uses: julia-actions/julia-buildpkg@v1
+      - name: Install and build documentation
+        run: |
+          julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+          julia --project=docs docs/make.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/build
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

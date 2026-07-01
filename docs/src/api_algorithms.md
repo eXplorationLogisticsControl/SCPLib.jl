@@ -40,4 +40,14 @@ Pages   = [
 ]
 ```
 
+## Trust regions
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
+  "trust_region.jl",
+]
+```
+
 

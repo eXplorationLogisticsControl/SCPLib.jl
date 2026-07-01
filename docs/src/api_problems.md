@@ -29,3 +29,33 @@ Pages   = [
   "dynamics.jl",
 ]
 ```
+
+## Linearization cache
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
+  "linearization.jl",
+]
+```
+
+## Nonlinear constraints
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
+  "nlconstraints.jl",
+]
+```
+
+## Utilities
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
+  "utils.jl",
+]
+```
