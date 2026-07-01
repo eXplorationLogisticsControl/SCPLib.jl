@@ -29,6 +29,7 @@ include("algorithms/proxlinear.jl")
 
 include("problems/quadcopter.jl")
 
+export dynamics_input, make_u_pool, fill_segment_control!
 export get_continuous_augmented_eom
 export get_impulsive_augmented_eom
 

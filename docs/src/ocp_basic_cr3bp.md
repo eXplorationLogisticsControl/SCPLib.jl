@@ -39,20 +39,16 @@ using SCPLib
 ## Define the dynamics
 
 We will solve the optimal control problem for a fixed-time transfer in the circular-restricted three-body problem (CR3BP).
-We will first define and instantiate a struct that will hold the control, along with any parameters we may want to pass to the equations of motion.
+We will first define and instantiate a struct for the physical parameters we want to pass to the equations of motion.
 
-!!! info "Parameter struct for ODE"
-    The parameter struct `p` to be given into the equations of motion `eom!(dx, x, p, t)` needs to have a vector named `u`, which will contain the control values. The vector should be compatible with either a `Vector{Float64}` or a `Vector{ForwardDiff.Dual}`.
+!!! info "Dynamics signature"
+    The third argument to `eom!(dx, x, pu, t)` is a NamedTuple `(; params, u)` bundling immutable physical parameters with the segment control vector. The control `u` should be compatible with either `Vector{Float64}` or `Vector{ForwardDiff.Dual}`.
 
 
 ```julia
-# create parameters with `u` entry
-mutable struct ControlParams
+# physical parameters (no segment control stored here)
+struct ControlParams
     μ::Float64
-    u::Vector
-    function ControlParams(μ::Float64)
-        new(μ, zeros(4))
-    end
 end
 
 μ = 1.215058560962404e-02
@@ -85,18 +81,19 @@ r_1 = \sqrt{(x + \mu)^2 + y^2 + z^2}, \quad r_2 = \sqrt{(x - 1 + \mu)^2 + y^2 + 
 and $\mu$ is the CR3BP mass parameter.
 
 ```julia
-function eom!(drv, rv, p, t)
+function eom!(drv, rv, pu, t)
+    (; params, u) = pu
     x, y, z = rv[1:3]
     vx, vy, vz = rv[4:6]
-    r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-    r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+    r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
+    r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
     drv[1:3] = rv[4:6]
     # derivatives of velocities
-    drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-    drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-    drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+    drv[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+    drv[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+    drv[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
     # append controls
-    drv[4:6] += p.u[1:3]
+    drv[4:6] += u[1:3]
     return
 end
 ```
@@ -169,11 +166,11 @@ We will now define an initial guess by propagating the initial and final boundar
 ```julia
 # initial & final LPO
 sol_lpo0 = solve(
-    ODEProblem(eom!, rv0, [0.0, period_0], params),
+    ODEProblem(eom!, rv0, [0.0, period_0], (; params, u=zeros(4))),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 sol_lpof = solve(
-    ODEProblem(eom!, rvf, [0.0, period_f], params),
+    ODEProblem(eom!, rvf, [0.0, period_f], (; params, u=zeros(4))),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 

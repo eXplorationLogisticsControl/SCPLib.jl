@@ -14,15 +14,10 @@ if !@isdefined(solution)
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
     # -------------------- setup problem -------------------- #
-    # create parameters with `u` entry
-    mutable struct ControlParams
+    struct ControlParams
         μ::Float64
         c1::Float64
         c2::Float64
-        u::Vector
-        function ControlParams(μ::Float64, c1::Float64, c2::Float64)
-            new(μ, c1, c2, zeros(5))
-        end
     end
 
     μ = 1.215058560962404e-02
@@ -34,24 +29,25 @@ if !@isdefined(solution)
     VU = DU/TU      # km/s
     params = ControlParams(μ, c1, c2)
 
-    function eom!(drvm, rvm, p, t)
+    function eom!(drvm, rvm, pu, t)
+        (; params, u) = pu
         x, y, z = rvm[1:3]
         vx, vy, vz = rvm[4:6]
-        r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-        r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+        r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
+        r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
         drvm[1:3] = rvm[4:6]
         # derivatives of velocities
-        drvm[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        drvm[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        drvm[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+        drvm[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+        drvm[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+        drvm[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
         # mass derivative
-        drvm[7] = -p.u[4] * p.c2
+        drvm[7] = -u[4] * params.c2
         # append controls
-        drvm[4:6] += p.u[1:3] * p.c1 / rvm[7]
+        drvm[4:6] += u[1:3] * params.c1 / rvm[7]
         # time derivative
         drvm[8] = 1.0
         # multiply by time factor
-        drvm[1:8] *= p.u[5]
+        drvm[1:8] *= u[5]
         return
     end
 
@@ -73,14 +69,16 @@ if !@isdefined(solution)
     period_f = 3.3031221822879884
 
     # initial & final LPO
-    params.u[5] = period_0
+    u_orbit = zeros(5)
+    u_orbit[5] = period_0
     sol_lpo0 = solve(
-        ODEProblem(eom!, [rv0; 1.0; 0.0], [0.0, 1.0], params),
+        ODEProblem(eom!, [rv0; 1.0; 0.0], [0.0, 1.0], (; params, u=u_orbit)),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
-    params.u[5] = period_f
+    u_orbit = zeros(5)
+    u_orbit[5] = period_f
     sol_lpof = solve(
-        ODEProblem(eom!, [rvf; 1.0; 0.0], [0.0, 1.0], params),
+        ODEProblem(eom!, [rvf; 1.0; 0.0], [0.0, 1.0], (; params, u=u_orbit)),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
 

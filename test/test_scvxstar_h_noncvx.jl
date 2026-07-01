@@ -11,9 +11,7 @@ if !@isdefined SCPLib
 end
 
 # ODE parameters
-mutable struct QuadroptorParams
-    u::Vector
-end
+struct QuadroptorParams end
 
 
 function test_scvxstar_h_noncvx(;verbosity::Int = 0)
@@ -41,10 +39,10 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
     p_obstacle_2 = [0, 7, -0.45]    # m, position of obstacle 2
 
     
-    params = QuadroptorParams(zeros(nu))
+    params = QuadroptorParams()
 
     # rhs and jacobian expressions for quadrotor dynamics
-    function quadrotor_dfdx(x, u, p, t)
+    function quadrotor_dfdx(x, u, params, t)
         v = x[4:6]
         v_norm = norm(v)
         dfdx = [zeros(3,3) I(3);
@@ -52,27 +50,27 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
         return dfdx
     end
 
-    function quadrotor_dfdu(x, u, p, t)
+    function quadrotor_dfdu(x, u, params, t)
         dfdu = [zeros(3,4); 1/m * I(3) zeros(3,1)];
         return dfdu
     end
 
-    function quadrotor_rhs!(dx, x, p, t)
+    function quadrotor_rhs!(dx, x, pu, t)
+        (; params, u) = pu
         dx[1:3] = x[4:6]
         dx[4:6] = -k_D*norm(x[4:6])*x[4:6] + g
-        B = quadrotor_dfdu(x[1:6], p.u, p, t)
-        dx[:] += B * p.u
+        B = quadrotor_dfdu(x[1:6], u, params, t)
+        dx[1:6] += B * u
         return
     end
 
 
-    function quadroptor_rhs_aug!(dx_aug, x_aug, p, t)
-        A = quadrotor_dfdx(x_aug[1:6], p.u, p, t)
-        B = quadrotor_dfdu(x_aug[1:6], p.u, p, t)
+    function quadroptor_rhs_aug!(dx_aug, x_aug, pu, t)
+        quadrotor_rhs!(dx_aug, x_aug, pu, t)
 
-        dx_aug[1:3] = x_aug[4:6]
-        dx_aug[4:6] = -k_D*norm(x_aug[4:6])*x_aug[4:6] + g
-        dx_aug[1:6] += B * p.u
+        (; params, u) = pu
+        A = quadrotor_dfdx(x_aug[1:6], u, params, t)
+        B = quadrotor_dfdu(x_aug[1:6], u, params, t)
 
         # derivatives of Phi_A, Phi_B
         dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
@@ -147,6 +145,7 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 89.5490390172954 atol=1e-5
 end
 
 

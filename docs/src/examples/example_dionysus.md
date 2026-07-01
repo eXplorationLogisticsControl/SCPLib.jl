@@ -16,14 +16,10 @@ using AstrodynamicsCore
 
 include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
-mutable struct ControlParams
+struct ControlParams
     μ::Float64
     c1::Float64
     c2::Float64
-    u::Vector
-    function ControlParams(μ::Float64, c1::Float64, c2::Float64)
-        new(μ, c1, c2, zeros(4))
-    end
 end
 
 MU_SUN = 132712440018.0
@@ -41,7 +37,8 @@ c1 = THRUST/1e3 / (MASS*DU/TU^2)               # canonical max thrust
 c2 = THRUST/1e3 / (ISP*G0/1e3) / (MASS/TU)     # canonical mass flow rate
 params = ControlParams(μ, c1, c2)
 
-function eom_mee!(drvm, rvm, params, t)
+function eom_mee!(drvm, rvm, pu, t)
+    (; params, u) = pu
     p,f,g,h,k,L,mass = rvm[1:7]   # unpack state
     cosL = cos(L)
     sinL = sin(L)
@@ -57,8 +54,8 @@ function eom_mee!(drvm, rvm, params, t)
          0    0                   1/w*hsinL_kcosL;
     ]
     D = [0.0, 0.0, 0.0, 0.0, 0.0, sqrt(params.μ/p^3) * (1 + f*cosL + g*sinL)^2]
-    drvm[1:6] = B_mee * (params.c1 / mass) * params.u[1:3] + D
-    drvm[7] = -params.u[4] * params.c2
+    drvm[1:6] = B_mee * (params.c1 / mass) * u[1:3] + D
+    drvm[7] = -u[4] * params.c2
     return
 end
 

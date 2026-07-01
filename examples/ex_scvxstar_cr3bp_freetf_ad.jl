@@ -11,13 +11,8 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 
 # -------------------- setup problem -------------------- #
-# create parameters with `u` entry
-mutable struct ControlParams
+struct ControlParams
     μ::Float64
-    u::Vector
-    function ControlParams(μ::Float64)
-        new(μ, zeros(5))
-    end
 end
 
 μ = 1.215058560962404e-02
@@ -27,20 +22,21 @@ MU = 500.0      # kg
 VU = DU/TU      # km/s
 params = ControlParams(μ)
 
-function eom!(drv, rv, p, t)
+function eom!(drv, rv, pu, t)
+    (; params, u) = pu
     x, y, z = rv[1:3]
     vx, vy, vz = rv[4:6]
-    r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-    r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+    r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
+    r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
     drv[1:3] = rv[4:6]
     # derivatives of velocities
-    drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-    drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-    drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+    drv[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+    drv[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+    drv[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
     # append controls
-    drv[4:6] += p.u[1:3]
+    drv[4:6] += u[1:3]
     # multiply by time factor
-    drv[1:6] *= p.u[5]
+    drv[1:6] *= u[5]
     return
 end
 
@@ -62,14 +58,16 @@ rvf = [1.1648780946517576,
 period_f = 3.3031221822879884
 
 # initial & final LPO
-params.u[5] = period_0
+u_orbit = zeros(5)
+u_orbit[5] = period_0
 sol_lpo0 = solve(
-    ODEProblem(eom!, rv0, [0.0, 1.0], params),
+    ODEProblem(eom!, rv0, [0.0, 1.0], (; params, u=u_orbit)),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
-params.u[5] = period_f
+u_orbit = zeros(5)
+u_orbit[5] = period_f
 sol_lpof = solve(
-    ODEProblem(eom!, rvf, [0.0, 1.0], params),
+    ODEProblem(eom!, rvf, [0.0, 1.0], (; params, u=u_orbit)),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 

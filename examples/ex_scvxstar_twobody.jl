@@ -11,15 +11,10 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 
 
 # -------------------- setup problem -------------------- #
-# create parameters with `u` entry
-mutable struct ControlParams
+struct ControlParams
     μ::Float64
     c1::Float64
     c2::Float64
-    u::Vector
-    function ControlParams(μ::Float64, c1::Float64, c2::Float64)
-        new(μ, c1, c2, zeros(5))
-    end
 end
 
 MU_SUN = 132712000000.0
@@ -37,14 +32,15 @@ c1 = THRUST/1e3 / (MASS*DU/TU^2)               # canonical max thrust
 c2 = THRUST/1e3 / (ISP*G0/1e3) / (MASS/TU)     # canonical mass flow rate
 params = ControlParams(μ, c1, c2)
 
-function eom!(drvm, rvm, p, t)
+function eom!(drvm, rvm, pu, t)
+    (; params, u) = pu
     drvm[1:3] =  rvm[4:6]
-    drvm[4:6] = -p.μ / norm(rvm[1:3])^3 * rvm[1:3] + p.u[1:3] * p.c1 / rvm[7]
-    drvm[7]   = -p.u[4] * p.c2
+    drvm[4:6] = -params.μ / norm(rvm[1:3])^3 * rvm[1:3] + u[1:3] * params.c1 / rvm[7]
+    drvm[7]   = -u[4] * params.c2
     drvm[8]   = 1.0                 # time
 
     # multiply by time factor
-    drvm[1:8] *= p.u[5]
+    drvm[1:8] *= u[5]
     return
 end
 
@@ -54,14 +50,16 @@ period_0 = 2π * sqrt(1.0^3/μ)
 period_f = 2π * sqrt(1.5^3/μ)
 
 # initial & final orbits
-params.u[5] = period_0
+u_orbit = zeros(5)
+u_orbit[5] = period_0
 sol_orbit0 = solve(
-    ODEProblem(eom!, [rv0; 1.0; 0.0], [0.0, 1.0], params),
+    ODEProblem(eom!, [rv0; 1.0; 0.0], [0.0, 1.0], (; params, u=u_orbit)),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
-params.u[5] = period_f
+u_orbit = zeros(5)
+u_orbit[5] = period_f
 sol_orbitf = solve(
-    ODEProblem(eom!, [rvf; 1.0; 0.0], [0.0, 1.0], params),
+    ODEProblem(eom!, [rvf; 1.0; 0.0], [0.0, 1.0], (; params, u=u_orbit)),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 

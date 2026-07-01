@@ -67,17 +67,21 @@ end
 
 function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     g_dynamics = zeros(prob.nx, prob.N-1)
-    # set dynamics constraints
+    u_pool = make_u_pool(prob.nu, prob.N - 1)
+    p_placeholder = dynamics_input(prob.params, u_pool[1])
     prob_func = function(ode_problem, i, repeat)
-        _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,i] + prob.u_bias[:,i]
-        remake(ode_problem, u0=x_ref[:,i], tspan=(prob.times[i], prob.times[i+1]), p=_params)
+        fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
+        remake(ode_problem,
+            u0 = x_ref[:, i],
+            tspan = (prob.times[i], prob.times[i+1]),
+            p = dynamics_input(prob.params, u_pool[i]),
+        )
     end
     base_ode_problem = ODEProblem(
         prob.eom!,
         x_ref[:,1],
         [0.0, 1.0],   # place holder
-        prob.params,
+        p_placeholder,
     )
     ensemble_prob = EnsembleProblem(base_ode_problem, prob_func = prob_func)
     sols = solve(
@@ -102,18 +106,22 @@ evaluates dynamics residuals.
 """
 function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     g_dynamics = zeros(prob.nx, prob.N-1)
-    # set dynamics constraints
+    u_pool = make_u_pool(prob.nu, prob.N - 1)
+    p_placeholder = dynamics_input(prob.params, u_pool[1])
     prob_func = function(ode_problem, i, repeat)
         _x0_aug = init_continuous_dynamics_xaug(x_ref[:,i], prob.nx, prob.nu)
-        _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,i] + prob.u_bias[:,i]
-        remake(ode_problem, u0=_x0_aug, tspan=(prob.times[i], prob.times[i+1]), p=_params)
+        fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
+        remake(ode_problem,
+            u0 = _x0_aug,
+            tspan = (prob.times[i], prob.times[i+1]),
+            p = dynamics_input(prob.params, u_pool[i]),
+        )
     end
     base_ode_problem = ODEProblem(
         prob.eom_aug!,
         init_continuous_dynamics_xaug(x_ref[:,1], prob.nx, prob.nu),
         [0.0, 1.0],   # place holder
-        prob.params,
+        p_placeholder,
     )
     ensemble_prob = EnsembleProblem(base_ode_problem, prob_func = prob_func)
     sols = solve(
@@ -132,32 +140,39 @@ end
 
 
 function get_trajectory_forwardbackward(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
-    # define base ODE & storage
+    _u_k = zeros(prob.nu)
+    p_placeholder = dynamics_input(prob.params, _u_k)
     base_ode_problem = ODEProblem(
         prob.eom!,
         x_ref[:,1],
         [0.0, 1.0],   # place holder
-        prob.params,
+        p_placeholder,
     )
     sols = Vector{ODESolution}(undef, prob.N-1)
     
     # forward shooting
     Nu_fwd = div(prob.N, 2)
-    xk_fwd = deepcopy(x_ref[:,1])
+    xk_fwd = copy(x_ref[:,1])
     for k in 1:Nu_fwd
-        _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,k] + prob.u_bias[:,k]
-        ode_problem = remake(base_ode_problem, u0=xk_fwd, tspan=(prob.times[k], prob.times[k+1]), p=_params)
+        fill_segment_control!(_u_k, u_ref, prob.u_bias, k)
+        ode_problem = remake(base_ode_problem,
+            u0 = xk_fwd,
+            tspan = (prob.times[k], prob.times[k+1]),
+            p = dynamics_input(prob.params, _u_k),
+        )
         sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
         xk_fwd = sols[k].u[end][1:prob.nx]
     end
     
     # backward shooting
-    xk_bwd = deepcopy(x_ref[:,end])
+    xk_bwd = copy(x_ref[:,end])
     for k in prob.N-1:-1:Nu_fwd+1
-        _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,k] + prob.u_bias[:,k]
-        ode_problem = remake(base_ode_problem, u0=xk_bwd, tspan=(prob.times[k+1], prob.times[k]), p=_params)
+        fill_segment_control!(_u_k, u_ref, prob.u_bias, k)
+        ode_problem = remake(base_ode_problem,
+            u0 = xk_bwd,
+            tspan = (prob.times[k+1], prob.times[k]),
+            p = dynamics_input(prob.params, _u_k),
+        )
         sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
         xk_bwd = sols[k].u[end][1:prob.nx]
     end
@@ -172,32 +187,39 @@ Propagate augmented dynamics with continuous control
 This function also constructs state-transition matrices and evaluates dynamics residual at the match point.
 """
 function get_trajectory_augmented_forwardbackward(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
-    # define base ODE & storage
+    _u_k = zeros(prob.nu)
+    p_placeholder = dynamics_input(prob.params, _u_k)
     base_ode_problem = ODEProblem(
         prob.eom_aug!,
         init_continuous_dynamics_xaug(x_ref[:,1], prob.nx, prob.nu),
         [0.0, 1.0],   # place holder
-        prob.params,
+        p_placeholder,
     )
     sols = Vector{ODESolution}(undef, prob.N-1)
     
     # forward shooting
     Nu_fwd = div(prob.N, 2)
-    xk_fwd = deepcopy(x_ref[:,1])
+    xk_fwd = copy(x_ref[:,1])
     for k in 1:Nu_fwd
-        _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,k] + prob.u_bias[:,k]
-        ode_problem = remake(base_ode_problem, u0=init_continuous_dynamics_xaug(xk_fwd, prob.nx, prob.nu), tspan=(prob.times[k], prob.times[k+1]), p=_params)
+        fill_segment_control!(_u_k, u_ref, prob.u_bias, k)
+        ode_problem = remake(base_ode_problem,
+            u0 = init_continuous_dynamics_xaug(xk_fwd, prob.nx, prob.nu),
+            tspan = (prob.times[k], prob.times[k+1]),
+            p = dynamics_input(prob.params, _u_k),
+        )
         sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
         xk_fwd = sols[k].u[end][1:prob.nx]
     end
     
     # backward shooting
-    xk_bwd = deepcopy(x_ref[:,end])
+    xk_bwd = copy(x_ref[:,end])
     for k in prob.N-1:-1:Nu_fwd+1
-        _params = deepcopy(prob.params)
-        _params.u[:] = u_ref[:,k] + prob.u_bias[:,k]
-        ode_problem = remake(base_ode_problem, u0=init_continuous_dynamics_xaug(xk_bwd, prob.nx, prob.nu), tspan=(prob.times[k+1], prob.times[k]), p=_params)
+        fill_segment_control!(_u_k, u_ref, prob.u_bias, k)
+        ode_problem = remake(base_ode_problem,
+            u0 = init_continuous_dynamics_xaug(xk_bwd, prob.nx, prob.nu),
+            tspan = (prob.times[k+1], prob.times[k]),
+            p = dynamics_input(prob.params, _u_k),
+        )
         sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
         xk_bwd = sols[k].u[end][1:prob.nx]
     end
@@ -221,8 +243,8 @@ See `set_dynamics_cache!` for more details.
     
 # Arguments:
 - `optimizer`: optimizer for the JuMP model
-- `eom!::Function`: continuous dynamics function
-- `params`: parameters for the problem
+- `eom!::Function`: continuous dynamics with signature `(dx, x, (; params, u), t)`
+- `params`: immutable physical parameters (must not contain segment control)
 - `objective::Function`: objective function
 - `times`: time points
 - `x_ref`: reference state
@@ -281,7 +303,7 @@ function ContinuousProblem(
 
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
-        eom_aug! = get_continuous_augmented_eom(eom!, params, nx)
+        eom_aug! = get_continuous_augmented_eom(eom!, params, nx, nu)
     end
 
     # initialize linearization cache

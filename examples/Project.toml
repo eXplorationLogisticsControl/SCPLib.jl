@@ -1,8 +1,9 @@
 uuid = "372d3413-d610-491c-84c4-e7782b0b6c35"
-authors = ["Yuri <yuri.shimane@gmail.com>"]
 version = "0.1.0"
+authors = ["Yuri <yuri.shimane@gmail.com>"]
 
 [deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 Clarabel = "61c947e1-3e6d-4ee4-985a-eec8c727bd6e"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"

@@ -16,13 +16,8 @@ seed = 1234
 Random.seed!(seed)
 
 # -------------------- setup problem -------------------- #
-# create parameters with `u` entry
-mutable struct ControlParamsForwardBackward
+struct ControlParamsForwardBackward
     μ::Float64
-    u::Vector
-    function ControlParamsForwardBackward(μ::Float64)
-        new(μ, zeros(4))
-    end
 end
 
 function test_scvxstar_forwardbackward(;verbosity::Int = 0)
@@ -34,28 +29,30 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     VU = DU/TU      # km/s
     params = ControlParamsForwardBackward(μ)
 
-    function eom!(drv, rv, p, t)
+    function eom!(drv, rv, pu, t)
+        (; params, u) = pu
         x, y, z = rv[1:3]
         vx, vy, vz = rv[4:6]
-        r1 = sqrt( (x+p.μ)^2 + y^2 + z^2 );
-        r2 = sqrt( (x-1+p.μ)^2 + y^2 + z^2 );
+        r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
+        r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
         drv[1:3] = rv[4:6]
         # derivatives of velocities
-        drv[4] =  2*vy + x - ((1-p.μ)/r1^3)*(p.μ+x) + (p.μ/r2^3)*(1-p.μ-x);
-        drv[5] = -2*vx + y - ((1-p.μ)/r1^3)*y - (p.μ/r2^3)*y;
-        drv[6] = -((1-p.μ)/r1^3)*z - (p.μ/r2^3)*z;
+        drv[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
+        drv[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
+        drv[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
         # append controls
-        drv[4:6] += p.u[1:3]
+        drv[4:6] += u[1:3]
         return
     end
 
-    function eom_aug!(dx_aug, x_aug, p, t)
+    function eom_aug!(dx_aug, x_aug, pu, t)
+        (; params, u) = pu
         # state derivatives
-        eom!(view(dx_aug, 1:6), x_aug[1:6], p, t)
+        eom!(view(dx_aug, 1:6), x_aug[1:6], pu, t)
         
         # STM derivatives
-        r1vec = [x_aug[1] + p.μ, x_aug[2], x_aug[3]]
-        r2vec = [x_aug[1] - 1 + p.μ, x_aug[2], x_aug[3]]
+        r1vec = [x_aug[1] + params.μ, x_aug[2], x_aug[3]]
+        r2vec = [x_aug[1] - 1 + params.μ, x_aug[2], x_aug[3]]
         G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
         G2 = params.μ / norm(r2vec)^5*(3*r2vec*r2vec' - norm(r2vec)^2*I(3))
         Omega = [0 2 0; -2 0 0; 0 0 0]
@@ -96,11 +93,11 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 
     # initial & final LPO
     sol_lpo0 = solve(
-        ODEProblem(eom!, rv0, [0.0, period_0], params),
+        ODEProblem(eom!, rv0, [0.0, period_0], (; params, u=zeros(4))),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
     sol_lpof = solve(
-        ODEProblem(eom!, rvf, [0.0, period_f], params),
+        ODEProblem(eom!, rvf, [0.0, period_f], (; params, u=zeros(4))),
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
 
@@ -206,6 +203,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory_augmented_forwardbackward(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 1.5812496920535764 atol=1e-8
 end
 
 
