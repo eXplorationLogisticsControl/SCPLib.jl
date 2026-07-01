@@ -73,4 +73,6 @@ end
     @test only(algo.λ_dyn) ≈ initial_w * only(g_dynamics) atol = 1e-8
     @test callback_seen_w[] ≈ initial_w * algo.beta
     @test algo.w == callback_w
+
+    @test solution.info[:J0][end] ≈ 0.0 atol=1e-8
 end

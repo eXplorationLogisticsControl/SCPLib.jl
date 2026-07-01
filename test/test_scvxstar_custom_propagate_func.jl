@@ -290,6 +290,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
     sols_opt, g_dynamics_opt = custom_get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 0.4395338463661471 atol=1e-5
 
     # -------------------- plot -------------------- #
     if get_plot

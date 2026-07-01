@@ -164,7 +164,7 @@ function test_proxlinear_dynamics_only(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
-    @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 4.894709719459637 atol=1e-8
 end
 
 test_proxlinear_dynamics_only(verbosity = verbosity)

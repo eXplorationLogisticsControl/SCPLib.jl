@@ -153,8 +153,9 @@ function test_scvx_impulsive_tr_u(;verbosity::Int = 0, get_plot::Bool = false)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
-    # @test maximum(abs.(g_dynamics_opt)) <= tol_feas
-    # @test solution.status == :Optimal
+    @test maximum(abs.(g_dynamics_opt)) <= tol_feas
+    @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 0.21467113355383033 atol=1e-8
 
     # -------------------- plot -------------------- #
     if get_plot

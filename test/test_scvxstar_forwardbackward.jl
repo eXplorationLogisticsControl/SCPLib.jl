@@ -203,6 +203,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory_augmented_forwardbackward(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 1.5812496920535764 atol=1e-8
 end
 
 

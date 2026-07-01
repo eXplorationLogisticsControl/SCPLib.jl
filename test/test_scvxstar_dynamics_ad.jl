@@ -129,6 +129,7 @@ function test_scvxstar_dynamics_ad(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-5
     @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 4.894668144046125 atol=1e-5
 end
 
 

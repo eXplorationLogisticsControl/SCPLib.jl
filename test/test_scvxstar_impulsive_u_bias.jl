@@ -112,7 +112,9 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
     sols_opt_list = []
     solution_list = []
 
-    for u_bias in u_bias_list
+    J0_list = [0.21345370366368666, 0.19431135495138557]
+
+    for (idx,u_bias) in enumerate(u_bias_list)  # idx = 1: without bias, idx = 2: with bias
         # create reference solution
         x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
         x_along_lpof = sol_lpof(LinRange(0.0, period_f, N))
@@ -164,6 +166,8 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
         sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
         @test maximum(abs.(g_dynamics_opt)) <= tol_feas
         @test solution.status == :Optimal
+        # @test solution.info[:J0][end] ≈ J0_list[idx] atol=1e-8
+        @show solution.info[:J0][end]
 
         push!(sols_opt_list, sols_opt)
         push!(solution_list, solution)

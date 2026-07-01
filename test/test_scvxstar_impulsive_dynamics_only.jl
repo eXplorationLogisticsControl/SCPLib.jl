@@ -156,6 +156,7 @@ function test_scvxstar_impulsive_dynamics_only(;verbosity::Int = 0, get_plot::Bo
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
+    @test solution.info[:J0][end] ≈ 0.21345370023350235 atol=1e-8
 
     # -------------------- plot -------------------- #
     if get_plot
