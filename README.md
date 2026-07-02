@@ -50,8 +50,8 @@ For now, `git clone` the repo & add via `pkg> dev ./path/to/SCPLib.jl`.
 
 We first need to define a few things:
 
-- a `mutable struct` parameter for the ODE, which includes a vector `u` (the control vector),
-- the controlled equations of motion `eom!`, which takes as parameter the aforementioned `mutable struct`,
+- an immutable parameter struct for physical constants (must not contain segment control),
+- the controlled equations of motion `eom!`, with signature `eom!(dx, x, (; params, u), t)` where `params` is the physical parameter struct and `u` is the segment control vector,
 - (optionally) the augmented equations of motion which propagates the state together with the STM's $\Phi_A$ and $\Phi_B$,
 - an objective function, dispatched for both JuMP variables and reals,
 - an array of time-stamps corresponding to the discretized nodes, and
@@ -62,19 +62,20 @@ We first need to define a few things:
 # 0. define dynamics, define initial reference (i.e. initial guess), etc.
 nx = 6   # state dimension
 nu = 4   # control dimension
-mutable struct MyODEParams
+struct MyODEParams
     p           # ODE Parameters
-    u::Vector   # control vector, length `nu`
 end
 
-params = MyODEParams(p, zeros(nu))
+params = MyODEParams(p)
 
-eom! = function (dx, x, params, t)
+eom! = function (dx, x, pu, t)
+    (; params, u) = pu
     # compute derivative of state 
     ...
 end
 
-eom_aug! = function (dx_aug, x_aug, params, t)              # optional
+eom_aug! = function (dx_aug, x_aug, pu, t)              # optional
+    (; params, u) = pu
     # compute derivative of state & Phi_A & Phi_B
     ...
 end
