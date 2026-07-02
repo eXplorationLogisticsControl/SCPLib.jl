@@ -3,11 +3,13 @@
 </p>
 
 <p align="center">
-  <img src="https://github.com/exPLorationLogisticsControl/SCPLib.jl/actions/workflows/test.yml/badge.svg" alt="test workflow"/>
-</p>
-
-<p align="center">
-  <a href="https://explorationlogisticscontrol.github.io/SCPLib.jl/">📚Read the docs📚</a>
+  <a href="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/test.yml">
+    <img src="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/test.yml/badge.svg" alt="test workflow"/>
+  </a>
+  <a href="https://explorationlogisticscontrol.github.io/SCPLib.jl">
+    <img src="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/docs.yml/badge.svg" alt="docs workflow"/>
+  </a>
+  <!-- <a href="https://yuricst.github.io/HighFidelityEphemerisModel.jl/">📚Read the docs📚</a> -->
 </p>
 
 # `SCPLib.jl`: Sequential Convex Programming library
