@@ -22,7 +22,7 @@ ForwardDiff = "^1.0.1"
 IJulia = "1.33.0"
 Ipopt = "^1.11.0"
 JuMP = "^1.20.0"
-OrdinaryDiffEq = "^6.0.0"
+OrdinaryDiffEq = "^6.0.0, 7"
 
 [extras]
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
