@@ -167,7 +167,6 @@ function test_scvxstar_impulsive_u_bias(;verbosity::Int = 0, get_plot::Bool = fa
         @test maximum(abs.(g_dynamics_opt)) <= tol_feas
         @test solution.status == :Optimal
         # @test solution.info[:J0][end] ≈ J0_list[idx] atol=1e-8
-        @show solution.info[:J0][end]
 
         push!(sols_opt_list, sols_opt)
         push!(solution_list, solution)

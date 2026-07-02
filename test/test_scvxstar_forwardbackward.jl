@@ -130,7 +130,6 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     # ------------------------------------------------------------------------------------------------------------------------ #
     # evaluate nonlinear constraints Jacobian analytically
     Φ_A_list, Φ_B_list = SCPLib.set_continuous_dynamics_cache!(prob.lincache, x_ref, u_ref, sols_ref)
-    # @show prob.lincache.∇g_dyn
 
     # ------------------------------------------------------------------------------------------------------------------------ #
     # evaluate nonlinear constraints Jacobian via finite difference
