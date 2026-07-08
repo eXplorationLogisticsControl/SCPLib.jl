@@ -13,7 +13,7 @@ function test_scvxstar_forwardbackward_regressions()
     nx = 1
     nu = 1
     N = 5
-    times = range(0.0, 1.0; length=N)
+    times = LinRange(0.0, 1.0, N)
     x_ref = [0.0 1.0]
     u_ref = zeros(nu, N-1)
 
