@@ -396,14 +396,16 @@ end
 
 
 function stack_flatten_variables(prob::ContinuousProblem, x, u)
-    Δz = [reshape(x, prob.nx * prob.N);
+    Nx = prob.shooting_method == :forwardbackward ? 2 : prob.N
+    Δz = [reshape(x, prob.nx * Nx);
           reshape(u, prob.nu * (prob.N-1))];
     return Δz
 end
 
 
 function unpack_flattened_variables(prob::ContinuousProblem, z)
-    x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
-    u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
+    Nx = prob.shooting_method == :forwardbackward ? 2 : prob.N
+    x = reshape(z[1:prob.nx * Nx], prob.nx, Nx)
+    u = reshape(z[prob.nx * Nx + 1:prob.nx * Nx + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
     return x, u
 end
