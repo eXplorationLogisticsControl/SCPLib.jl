@@ -143,7 +143,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
         _, _g_pls = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_pls, u_ref)
         _, _g_min = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_min, u_ref)
 
-        ∇g_dyn_fd[:,i] = -(_g_pls - _g_min) / (2e-6)    # forward segment has minus sign
+        ∇g_dyn_fd[:,i] = (_g_pls - _g_min) / (2e-6)
     end
 
     for i in 1:6
@@ -172,7 +172,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 
     # error in gradients
     err = prob.lincache.∇g_dyn - ∇g_dyn_fd
-    @test maximum(err) < 1e-6
+    @test maximum(abs.(err)) < 1e-6
 
 
     # ------------------------------------------------------------------------------------------------------------------------ #

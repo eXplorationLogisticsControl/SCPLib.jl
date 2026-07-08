@@ -224,7 +224,13 @@ end
 function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref, J_expected::Real = 1.0, K_w::Real = 10.0)
     # evaluate nonlinear constraints
     if isnothing(prob.fun_get_trajectory)
-        _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        if prob.shooting_method == :multiple
+            _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        elseif prob.shooting_method == :forwardbackward
+            _, g_dynamics = get_trajectory_forwardbackward(prob, x_ref, u_ref)
+        else
+            @error "Invalid shooting method: $(prob.shooting_method)"
+        end
     else
         _, g_dynamics = prob.fun_get_trajectory(prob, x_ref, u_ref)
     end
