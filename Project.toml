@@ -18,7 +18,7 @@ BlockDiagonals = "^0.2.0"
 Clarabel = "^0.11.0"
 ForwardDiff = "^1"
 JuMP = "^1.20.0"
-OrdinaryDiffEq = "^6.0.0"
+OrdinaryDiffEq = "^6.0.0, 7"
 
 [extras]
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
