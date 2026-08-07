@@ -224,7 +224,13 @@ end
 function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref, J_expected::Real = 1.0, K_w::Real = 10.0)
     # evaluate nonlinear constraints
     if isnothing(prob.fun_get_trajectory)
-        _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        if prob.shooting_method == :multiple
+            _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        elseif prob.shooting_method == :forwardbackward
+            _, g_dynamics = get_trajectory_forwardbackward(prob, x_ref, u_ref)
+        else
+            @error "Invalid shooting method: $(prob.shooting_method)"
+        end
     else
         _, g_dynamics = prob.fun_get_trajectory(prob, x_ref, u_ref)
     end
@@ -284,6 +290,12 @@ function solve!(
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
+    if prob.shooting_method == :forwardbackward && isnothing(algo.tr_u)
+        # Forward-backward has only endpoint state variables, so fixed-endpoint
+        # problems need a control trust region to make rejected steps smaller.
+        algo.tr_u = TrustRegions(prob.nu, prob.N, 0.1)
+        algo.use_trustregion_control = true
+    end
     if algo.use_trustregion_control
         @assert prob.nu == size(algo.tr_u.Δ,1) "Number of control variables mismatch between problem and algorithm"
     end

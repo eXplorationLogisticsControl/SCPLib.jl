@@ -61,9 +61,9 @@ function set_linearized_constraints!(
             g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
         end
 
-        Δz = vcat(prob.model[:x] - x_ref..., prob.model[:u] - u_ref...)
+        Δz = stack_flatten_variables(prob, prob.model[:x] - x_ref, prob.model[:u] - u_ref)
         @constraint(prob.model, constraint_dynamics,
-            g_dynamics_ref + prob.lincache.∇g_dyn * Δz == zeros(prob.nx)
+            vec(g_dynamics_ref) + prob.lincache.∇g_dyn * Δz .== prob.model[:ξ_dyn][:,1]
         )
     end
 
