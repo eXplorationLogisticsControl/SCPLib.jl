@@ -47,16 +47,24 @@ function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u
 end
 
 
+function evaluate_noncvx_jacobian(∇noncvx::Function, lincache::AbstractLinearizationCache, x_ref, u_ref)
+    if applicable(∇noncvx, lincache, x_ref, u_ref)
+        return ∇noncvx(lincache, x_ref, u_ref)
+    end
+    return ∇noncvx(x_ref, u_ref)
+end
+
+
 """Set cache for non-convex equality constraints"""
-function set_g_noncvx_cache!(lincache::MultipleShootingCache, ∇g_noncvx::Function, x_ref, u_ref)
-    lincache.∇g[:,:] = ∇g_noncvx(x_ref, u_ref)
+function set_g_noncvx_cache!(lincache::AbstractLinearizationCache, ∇g_noncvx::Function, x_ref, u_ref)
+    lincache.∇g[:,:] = evaluate_noncvx_jacobian(∇g_noncvx, lincache, x_ref, u_ref)
     return
 end
 
 
 """Set cache for non-convex inequality constraints"""
-function set_h_noncvx_cache!(lincache::MultipleShootingCache, ∇h_noncvx::Function, x_ref, u_ref)
-    lincache.∇h[:,:] = ∇h_noncvx(x_ref, u_ref)
+function set_h_noncvx_cache!(lincache::AbstractLinearizationCache, ∇h_noncvx::Function, x_ref, u_ref)
+    lincache.∇h[:,:] = evaluate_noncvx_jacobian(∇h_noncvx, lincache, x_ref, u_ref)
     return
 end
 
