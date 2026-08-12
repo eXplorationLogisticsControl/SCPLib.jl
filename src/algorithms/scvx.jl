@@ -186,6 +186,9 @@ function solve!(
 
     # initialize solution struct
     solution = SCvxSolution(prob, size(u_ref,2))
+    if prob.shooting_method == :forwardbackward
+        solution.x = zeros(prob.nx, 2)
+    end
 
     # print initial information
     header = "\nIter |     J0     |    ΔJ_i    |    ΔL_i    |     χ_i    |    ρ_i    |    r_i    |     w     |  acpt. |"
@@ -263,7 +266,7 @@ function solve!(
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
 
         # evaluate nonlinear constraints
-        _, g_dynamics = get_trajectory(prob, _x, _u)
+        _, g_dynamics = get_dynamics_trajectory(prob, _x, _u)
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 

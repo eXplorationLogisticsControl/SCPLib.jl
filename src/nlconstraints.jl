@@ -36,6 +36,19 @@ function set_dynamics_cache_forwardbackward!(prob::ContinuousProblem, x_ref::Uni
 end
 
 
+function get_dynamics_trajectory(prob::OptimalControlProblem, x_ref, u_ref)
+    if !isnothing(prob.fun_get_trajectory)
+        return prob.fun_get_trajectory(prob, x_ref, u_ref)
+    elseif prob.shooting_method == :multiple
+        return get_trajectory(prob, x_ref, u_ref)
+    elseif prob.shooting_method == :forwardbackward && prob isa ContinuousProblem
+        return get_trajectory_forwardbackward(prob, x_ref, u_ref)
+    else
+        error("Invalid shooting method: $(prob.shooting_method)")
+    end
+end
+
+
 """
 Set linearized constraints for non-convex constraints
 """
