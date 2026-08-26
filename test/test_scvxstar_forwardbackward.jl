@@ -206,4 +206,50 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 end
 
 
+function test_scvxstar_forwardbackward_default_penalty_and_nonconvex()
+    function eom!(dx, x, p, t)
+        dx[1] = p.u[1]
+        return
+    end
+
+    x_ref = [0.0 1.0]
+    u_ref = zeros(1, 3)
+    times = LinRange(0.0, 1.0, 4)
+
+    prob_default = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        (x, u) -> sum(u),
+        times,
+        x_ref,
+        u_ref;
+        shooting_method = :forwardbackward,
+    )
+    algo_default = SCPLib.SCvxStar(1, 4; shooting_method = :forwardbackward)
+    solution = SCPLib.solve!(algo_default, prob_default, x_ref, u_ref; maxiter = 0, verbosity = 0)
+    @test isfinite(algo_default.w)
+    @test size(solution.x) == (1, 2)
+
+    h_noncvx(cache, x, u) = [x[1, 1] - 2.0]
+    prob_noncvx = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        (x, u) -> sum(u),
+        times,
+        x_ref,
+        u_ref;
+        shooting_method = :forwardbackward,
+        nh = 1,
+        h_noncvx = h_noncvx,
+    )
+    g_dyn_ref, _, _ = SCPLib.set_linearized_constraints!(prob_noncvx, x_ref, u_ref)
+    @test size(g_dyn_ref) == (1, 1)
+    @test size(prob_noncvx.lincache.∇h) == (1, 5)
+    @test prob_noncvx.lincache.∇h ≈ [1.0 0.0 0.0 0.0 0.0]
+end
+
+
 test_scvxstar_forwardbackward(verbosity = verbosity)
+test_scvxstar_forwardbackward_default_penalty_and_nonconvex()
