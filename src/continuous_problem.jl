@@ -317,16 +317,16 @@ function ContinuousProblem(
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
-        ∇g_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> g_noncvx(lincache, unpack_flattened_variables(prob, z)...),
+        ∇g_noncvx = function (cache, x, u)
+            return ForwardDiff.jacobian(z -> g_noncvx(cache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end
 
     # check if ∇h_noncvx is provided
     if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
-        ∇h_noncvx = function (x,u)
-            return ForwardDiff.jacobian(z -> h_noncvx(lincache, unpack_flattened_variables(prob, z)...),
+        ∇h_noncvx = function (cache, x, u)
+            return ForwardDiff.jacobian(z -> h_noncvx(cache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
     end
@@ -396,14 +396,16 @@ end
 
 
 function stack_flatten_variables(prob::ContinuousProblem, x, u)
-    Δz = [reshape(x, prob.nx * prob.N);
+    Nx = prob.shooting_method == :forwardbackward ? 2 : prob.N
+    Δz = [reshape(x, prob.nx * Nx);
           reshape(u, prob.nu * (prob.N-1))];
     return Δz
 end
 
 
 function unpack_flattened_variables(prob::ContinuousProblem, z)
-    x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
-    u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
+    Nx = prob.shooting_method == :forwardbackward ? 2 : prob.N
+    x = reshape(z[1:prob.nx * Nx], prob.nx, Nx)
+    u = reshape(z[prob.nx * Nx + 1:prob.nx * Nx + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
     return x, u
 end
