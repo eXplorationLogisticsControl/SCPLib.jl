@@ -221,13 +221,25 @@ function Base.show(io::IO, solution::SCvxStarSolution)
 end
 
 
-function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref, J_expected::Real = 1.0, K_w::Real = 10.0)
-    # evaluate nonlinear constraints
+function get_nonlinear_dynamics(prob::OptimalControlProblem, x_ref, u_ref)
     if isnothing(prob.fun_get_trajectory)
-        _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        if prob.shooting_method == :multiple
+            _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        elseif prob.shooting_method == :forwardbackward
+            _, g_dynamics = get_trajectory_forwardbackward(prob, x_ref, u_ref)
+        else
+            error("Invalid shooting method: $(prob.shooting_method)")
+        end
     else
         _, g_dynamics = prob.fun_get_trajectory(prob, x_ref, u_ref)
     end
+    return g_dynamics
+end
+
+
+function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref, J_expected::Real = 1.0, K_w::Real = 10.0)
+    # evaluate nonlinear constraints
+    g_dynamics = get_nonlinear_dynamics(prob, x_ref, u_ref)
     g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, x_ref, u_ref) : nothing
     h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, x_ref, u_ref), 0) : nothing
     χ = norm(g_dynamics,Inf)
@@ -414,17 +426,7 @@ function solve!(
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
 
         # evaluate nonlinear constraints
-        if isnothing(prob.fun_get_trajectory)
-            if prob.shooting_method == :multiple
-                _, g_dynamics = get_trajectory(prob, _x, _u)
-            elseif prob.shooting_method == :forwardbackward
-                _, g_dynamics = get_trajectory_forwardbackward(prob, _x, _u)
-            else
-                @error "Invalid shooting method: $(prob.shooting_method)"
-            end
-        else
-            _, g_dynamics = prob.fun_get_trajectory(prob, _x, _u)
-        end
+        g_dynamics = get_nonlinear_dynamics(prob, _x, _u)
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 
