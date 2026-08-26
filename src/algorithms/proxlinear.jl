@@ -61,10 +61,11 @@ function solve_convex_subproblem!(
     @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
 
     # L1 penalty on dynamics constraints
-    ϵ_noncvx_dyn = @variable(prob.model, [1:prob.nx,1:prob.N-1])
+    Nξ_dyn = size(prob.model[:ξ_dyn], 2)
+    ϵ_noncvx_dyn = @variable(prob.model, [1:prob.nx,1:Nξ_dyn])
     @constraint(prob.model, ϵ_noncvx_dyn .>= 0.0)
-    @constraint(prob.model, [k in 1:prob.N-1], prob.model[:ξ_dyn][:,k] .<=  ϵ_noncvx_dyn[:,k])
-    @constraint(prob.model, [k in 1:prob.N-1], prob.model[:ξ_dyn][:,k] .>= -ϵ_noncvx_dyn[:,k])
+    @constraint(prob.model, [k in 1:Nξ_dyn], prob.model[:ξ_dyn][:,k] .<=  ϵ_noncvx_dyn[:,k])
+    @constraint(prob.model, [k in 1:Nξ_dyn], prob.model[:ξ_dyn][:,k] .>= -ϵ_noncvx_dyn[:,k])
 
     # L1 penalty on non-convex equality constraints
     if prob.ng > 0
@@ -202,6 +203,9 @@ function solve!(
 
     # initialize solution object
     solution = ProxLinearSolution(prob, size(u_ref,2))
+    if prob.shooting_method == :forwardbackward
+        solution.x = zeros(prob.nx, 2)
+    end
 
     # print initial information
     header = "\nIter |     J0     |  nrm(G,1)  |  nrm(H,1)  |  nrm(ΔZ,2) |    χ_i    |  acpt. |"
@@ -265,7 +269,7 @@ function solve!(
         ΔJ = J0 - J0_ref
 
         # evaluate nonlinear constraints
-        _, g_dynamics = get_trajectory(prob, _x, _u)
+        _, g_dynamics = get_dynamics_trajectory(prob, _x, _u)
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 

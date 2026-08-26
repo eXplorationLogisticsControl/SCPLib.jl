@@ -53,9 +53,9 @@ end
 
 function set_trust_region_constraints!(algo::FixedTRWSCP, prob::OptimalControlProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     # define trust-region constraints
-    @constraint(prob.model, constraint_trust_region_x_lb[k in 1:prob.N],
+    @constraint(prob.model, constraint_trust_region_x_lb[k in 1:size(x_ref,2)],
         -(prob.model[:x][:,k] - x_ref[:,k]) <= algo.tr.Δ[:,k])
-    @constraint(prob.model, constraint_trust_region_x_ub[k in 1:prob.N],
+    @constraint(prob.model, constraint_trust_region_x_ub[k in 1:size(x_ref,2)],
           prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
     return
 end
@@ -164,6 +164,9 @@ function solve!(
     g_ref = prob.ng > 0 ? zeros(prob.ng) : nothing
     h_ref = prob.nh > 0 ? zeros(prob.nh) : nothing
     solution = FixedTRWSCPSolution(prob, size(u_ref,2))
+    if prob.shooting_method == :forwardbackward
+        solution.x = zeros(prob.nx, 2)
+    end
 
     header = "\nIter |      J0      |    ΔJ_i     |    ΔL_i     |     χ_i     |     ρ_i     |"
     if verbosity > 0
@@ -204,7 +207,7 @@ function solve!(
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
 
         # evaluate nonlinear constraints
-        _, g_dynamics = get_trajectory(prob, _x, _u)
+        _, g_dynamics = get_dynamics_trajectory(prob, _x, _u)
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 
