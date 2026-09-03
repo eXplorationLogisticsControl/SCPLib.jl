@@ -15,6 +15,7 @@ abstract type TrustRegionAlgorithm <: SCPAlgorithm end
 
 include("utils.jl")
 include("dynamics/dynamics.jl")
+include("dynamics/stm_utils.jl")
 
 include("linearization.jl")
 include("continuous_problem.jl")
@@ -32,7 +33,6 @@ include("problems/quadcopter.jl")
 export dynamics_input, make_u_pool, fill_segment_control!
 export get_continuous_augmented_eom
 export get_impulsive_augmented_eom
-export cut, cut_sigma_points
 
 export ContinuousProblem
 export ImpulsiveProblem
