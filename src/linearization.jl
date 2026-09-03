@@ -22,7 +22,7 @@ mutable struct MultipleShootingCache <: AbstractLinearizationCache
 end
 
 
-"""Set cache for continuous dynamics"""
+"""Set cache for continuous dynamics from array of ODESolutions"""
 function set_continuous_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, sols::Union{Vector{ODESolution},EnsembleSolution})
     nx, N = size(x_ref)
     nu, _ = size(u_ref)
@@ -35,7 +35,7 @@ function set_continuous_dynamics_cache!(lincache::MultipleShootingCache, x_ref, 
 end
 
 
-"""Set cache for impulsive dynamics"""
+"""Set cache for impulsive dynamics from array of ODESolutions"""
 function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, sols::Union{Vector{ODESolution},EnsembleSolution}, dfdu::Function)
     nx, N = size(x_ref)
     for (k,sol) in enumerate(sols)
@@ -43,6 +43,28 @@ function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u
         lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))
         lincache.Φ_B[:,:,k] = lincache.Φ_A[:,:,k] * dfdu(x_ref[:,k], u_ref[:,k], sol.t[1])
         lincache.Φ_c[:,k]   = xf_aug[1:nx] - lincache.Φ_A[:,:,k] * x_ref[:,k] - lincache.Φ_B[:,:,k] * u_ref[:,k]
+    end
+end
+
+
+"""Set cache for continuous dynamics from array of tuples containing augmented state, Φ_A, and Φ_B for each stage"""
+function set_continuous_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, stms::Vector{Tuple})
+    nx, N = size(x_ref)
+    for (k,(_xf_aug, _Φ_A, _Φ_B)) in enumerate(stms)
+        lincache.Φ_A[:,:,k] = _Φ_A
+        lincache.Φ_B[:,:,k] = _Φ_B
+        lincache.Φ_c[:,k]   = _xf_aug[1:nx] - lincache.Φ_A[:,:,k] * x_ref[:,k] - lincache.Φ_B[:,:,k] * u_ref[:,k]
+    end
+end
+
+
+"""Set cache for impulsive dynamics from array of tuples containing augmented state, Φ_A, and Φ_B for each stage"""
+function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, stms::Vector{Tuple}, dfdu::Function)
+    nx, N = size(x_ref)
+    for (k,(_xf_aug, _Φ_A)) in enumerate(stms)
+        lincache.Φ_A[:,:,k] = _Φ_A
+        lincache.Φ_B[:,:,k] = lincache.Φ_A[:,:,k] * dfdu(x_ref[:,k], u_ref[:,k], sol.t[1])
+        lincache.Φ_c[:,k]   = _xf_aug[1:nx] - lincache.Φ_A[:,:,k] * x_ref[:,k] - lincache.Φ_B[:,:,k] * u_ref[:,k]
     end
 end
 

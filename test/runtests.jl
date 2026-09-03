@@ -36,6 +36,6 @@ end
     include("test_scvx_impulsive_tr_u.jl")
 end
 
-@testset "CUT" begin
-    include("test_cut.jl")
+@testset "STM" begin
+    include("test_stm_utils.jl")
 end

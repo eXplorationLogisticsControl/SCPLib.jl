@@ -6,6 +6,7 @@ authors = ["Yuri <yuri.shimane@gmail.com>"]
 [deps]
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 Clarabel = "61c947e1-3e6d-4ee4-985a-eec8c727bd6e"
+DiffResults = "163ba53b-c6d8-5494-b064-1a9d43ac40c5"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 JuMP = "4076af6c-e467-56ae-b986-b466b2749572"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
@@ -16,6 +17,7 @@ Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 [compat]
 BlockDiagonals = "^0.2.0"
 Clarabel = "^0.11.0"
+DiffResults = "1"
 ForwardDiff = "0.10, 1"
 JuMP = "^1.20.0"
 OrdinaryDiffEq = "^6.0.0"

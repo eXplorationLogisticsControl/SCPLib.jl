@@ -2,6 +2,7 @@ module SCPLib
 
 using JuMP
 using LinearAlgebra
+using DiffResults
 using ForwardDiff
 using OrdinaryDiffEq
 using Printf
