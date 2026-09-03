@@ -190,7 +190,7 @@ function ImpulsiveProblem(
     nh::Int = 0,
     h_noncvx::Union{Function,Nothing} = nothing,
     ∇h_noncvx::Union{Function,Nothing} = nothing,
-    ode_ensemble_method = EnsembleSerial(),
+    ode_ensemble_method = SciMLBase.EnsembleSerial(),
     ode_method = Tsit5(),
     ode_reltol::Float64 = 1e-12,
     ode_abstol::Float64 = 1e-12,

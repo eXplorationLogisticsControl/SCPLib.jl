@@ -136,7 +136,7 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
         u_ref;
         eom_aug! = eom_aug!,
         ode_method = Vern8(),
-        ode_ensemble_method = EnsembleSerial(), #EnsembleThreads(),
+        ode_ensemble_method = SciMLBase.EnsembleSerial(), #EnsembleThreads(),
     )
     set_silent(prob.model)
 
