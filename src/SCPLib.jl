@@ -15,7 +15,6 @@ abstract type TrustRegionAlgorithm <: SCPAlgorithm end
 
 include("utils.jl")
 include("dynamics/dynamics.jl")
-include("dynamics/cut.jl")
 
 include("linearization.jl")
 include("continuous_problem.jl")
