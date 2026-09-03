@@ -35,3 +35,7 @@ end
     include("test_scvx_dynamics_ad.jl")
     include("test_scvx_impulsive_tr_u.jl")
 end
+
+@testset "CUT" begin
+    include("test_cut.jl")
+end
