@@ -69,7 +69,8 @@ function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u
     g_dynamics = zeros(prob.nx, prob.N-1)
     u_pool = make_u_pool(prob.nu, prob.N - 1)
     p_placeholder = dynamics_input(prob.params, u_pool[1])
-    prob_func = function(ode_problem, i, repeat)
+    prob_func = function(ode_problem, ctx_or_i, repeat = nothing)
+        i = ensemble_sim_id(ctx_or_i)
         fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
         remake(ode_problem,
             u0 = x_ref[:, i],
@@ -92,7 +93,7 @@ function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
     )
-    for (k,sol) in enumerate(sols)
+    for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
     end
     return sols, g_dynamics
@@ -108,7 +109,8 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,A
     g_dynamics = zeros(prob.nx, prob.N-1)
     u_pool = make_u_pool(prob.nu, prob.N - 1)
     p_placeholder = dynamics_input(prob.params, u_pool[1])
-    prob_func = function(ode_problem, i, repeat)
+    prob_func = function(ode_problem, ctx_or_i, repeat = nothing)
+        i = ensemble_sim_id(ctx_or_i)
         _x0_aug = init_continuous_dynamics_xaug(x_ref[:,i], prob.nx, prob.nu)
         fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
         remake(ode_problem,
@@ -132,7 +134,7 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,A
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
     )
-    for (k,sol) in enumerate(sols)
+    for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
     end
     return sols, g_dynamics
@@ -279,7 +281,7 @@ function ContinuousProblem(
     nh::Int = 0,
     h_noncvx::Union{Function,Nothing} = nothing,
     ∇h_noncvx::Union{Function,Nothing} = nothing,
-    ode_ensemble_method = EnsembleSerial(),
+    ode_ensemble_method = SciMLBase.EnsembleSerial(),
     ode_method = Tsit5(),
     ode_reltol::Float64 = 1e-12,
     ode_abstol::Float64 = 1e-12,
