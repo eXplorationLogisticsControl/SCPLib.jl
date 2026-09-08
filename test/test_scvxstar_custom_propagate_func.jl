@@ -86,7 +86,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
             eom!(dx_aug[1+6(i-1):6i], x_aug[1+6(i-1):6i], pu, t)
         end
         
-        Phi_aug = reshape(x_aug[nx+1:end], (nx,nx))'
+        Phi_aug = reshape(x_aug[nx+1:end], (nx,nx))
         A_aug = zeros(nx,nx)
         for i in 1:N_spacecraft
             _x_copy = deepcopy(x_aug[1+6(i-1):6i])
@@ -104,7 +104,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
                 G1 + G2 + diagm([1,1,0])    Omega]
             A_aug[1+6(i-1):6i,1+6(i-1):6i] = A
         end
-        dx_aug[nx+1:end] = reshape((A_aug * Phi_aug)', nx2)   # julia is column-major
+        dx_aug[nx+1:end] = reshape((A_aug * Phi_aug), nx2)   # julia is column-major
         return
     end
 
@@ -203,7 +203,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         nx, N = size(x_ref)
         for (k,sol) in enumerate(sols)
             xf_aug = sol.u[end]
-            prob.lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))'
+            prob.lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))
             prob.lincache.Φ_B[:,:,k] = prob.lincache.Φ_A[:,:,k] * prob.dfdu(x_ref[:,k], u_ref[:,k], sol.t[1])
             prob.lincache.Φ_c[:,k]   = xf_aug[1:nx] - prob.lincache.Φ_A[:,:,k] * x_ref[:,k] - prob.lincache.Φ_B[:,:,k] * u_ref[:,k]
         end
