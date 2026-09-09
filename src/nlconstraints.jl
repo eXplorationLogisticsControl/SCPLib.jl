@@ -45,30 +45,30 @@ function set_linearized_constraints!(
     u_ref::Union{Matrix,Adjoint},
 )
     if hasproperty(prob, :set_linearized_constraints!) && !isnothing(prob.set_linearized_constraints!)
-        return prob.set_linearized_constraints!(prob, x_ref, u_ref)
-    end
+        g_dynamics_ref, _, _ = prob.set_linearized_constraints!(prob, x_ref, u_ref)
+    else
+        # set dynamics constraints
+        if prob.shooting_method == :multiple
+            if isnothing(prob.set_dynamics_cache!)
+                g_dynamics_ref = set_dynamics_cache!(prob, x_ref, u_ref)         # default implementation
+            else
+                g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
+            end
+            @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
+                prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
+            )
+        elseif prob.shooting_method == :forwardbackward
+            if isnothing(prob.set_dynamics_cache!)
+                g_dynamics_ref = set_dynamics_cache_forwardbackward!(prob, x_ref, u_ref)         # default implementation
+            else
+                g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
+            end
 
-    # set dynamics constraints
-    if prob.shooting_method == :multiple
-        if isnothing(prob.set_dynamics_cache!)
-            g_dynamics_ref = set_dynamics_cache!(prob, x_ref, u_ref)         # default implementation
-        else
-            g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
+            Δz = vcat(prob.model[:x] - x_ref..., prob.model[:u] - u_ref...)
+            @constraint(prob.model, constraint_dynamics,
+                g_dynamics_ref + prob.lincache.∇g_dyn * Δz == zeros(prob.nx)
+            )
         end
-        @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
-            prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
-        )
-    elseif prob.shooting_method == :forwardbackward
-        if isnothing(prob.set_dynamics_cache!)
-            g_dynamics_ref = set_dynamics_cache_forwardbackward!(prob, x_ref, u_ref)         # default implementation
-        else
-            g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
-        end
-
-        Δz = vcat(prob.model[:x] - x_ref..., prob.model[:u] - u_ref...)
-        @constraint(prob.model, constraint_dynamics,
-            g_dynamics_ref + prob.lincache.∇g_dyn * Δz == zeros(prob.nx)
-        )
     end
 
     # define stacked flattened variables difference

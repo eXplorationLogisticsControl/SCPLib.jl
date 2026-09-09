@@ -175,7 +175,9 @@ See `set_dynamics_cache!` for more details.
 - `ode_abstol`: absolute tolerance for the ODE solver
 - `fun_get_trajectory::Union{Function,Nothing}`: user-defined function to get the trajectory
 - `set_dynamics_cache!::Union{Function,Nothing}`: user-defined function to set the dynamics cache
-- `set_linearized_constraints!::Union{Function,Nothing}`: optional override for `set_linearized_constraints!`
+- `set_linearized_constraints!::Union{Function,Nothing}`: optional override for `set_linearized_constraints!`.
+  Signature: `(prob, x_ref, u_ref) -> (g_dynamics_ref, g_ref, h_ref)`. Must register JuMP name
+  `:constraint_dynamics`; SCPLib still registers `g_noncvx`/`h_noncvx` constraints when configured.
 - `lincache`: optional linearization cache; defaults to `MultipleShootingCache`
 - `u_bias::Union{Matrix,Nothing}`: bias on the control
 """
