@@ -37,7 +37,14 @@ Remove non-convex constraints from model within `OptimalControlProblem`'s JuMP m
 """
 function delete_noncvx_referencs!(prob::OptimalControlProblem, references::Vector{Symbol})
     for ref in references
-        delete(prob.model, prob.model[ref])
+        cons = prob.model[ref]
+        if cons isa ConstraintRef
+            delete(prob.model, cons)
+        else
+            for c in cons
+                delete(prob.model, c)
+            end
+        end
         unregister(prob.model, ref)
     end
 end

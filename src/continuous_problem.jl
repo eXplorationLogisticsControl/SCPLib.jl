@@ -34,6 +34,7 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 
     fun_get_trajectory::Union{Function,Nothing}
     set_dynamics_cache!::Union{Function,Nothing}
+    set_linearized_constraints!::Union{Function,Nothing}
 
     u_bias::Matrix
     shooting_method::Symbol
@@ -264,6 +265,9 @@ See `set_dynamics_cache!` for more details.
 - `ode_abstol`: absolute tolerance for the ODE solver
 - `fun_get_trajectory::Union{Function,Nothing}`: user-defined function to get the trajectory
 - `set_dynamics_cache!::Union{Function,Nothing}`: user-defined function to set the dynamics cache
+- `set_linearized_constraints!::Union{Function,Nothing}`: optional override for `set_linearized_constraints!`.
+  Signature: `(prob, x_ref, u_ref) -> (g_dynamics_ref, g_ref, h_ref)` with `g_ref`/`h_ref` `nothing` when `ng=nh=0`.
+  Must register JuMP name `:constraint_dynamics`.
 - `u_bias::Union{Matrix,Nothing}`: bias on the control
 """
 function ContinuousProblem(
@@ -287,6 +291,7 @@ function ContinuousProblem(
     ode_abstol::Float64 = 1e-12,
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
+    set_linearized_constraints!::Union{Function,Nothing} = nothing,
     u_bias::Union{Matrix,Nothing} = nothing,
     shooting_method::Symbol = :multiple,
 )
@@ -370,6 +375,7 @@ function ContinuousProblem(
         ode_abstol,
         fun_get_trajectory,
         set_dynamics_cache!,
+        set_linearized_constraints!,
         u_bias,
         shooting_method,
     )

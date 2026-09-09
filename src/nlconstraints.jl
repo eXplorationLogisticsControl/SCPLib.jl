@@ -44,6 +44,10 @@ function set_linearized_constraints!(
     x_ref::Union{Matrix,Adjoint},
     u_ref::Union{Matrix,Adjoint},
 )
+    if hasproperty(prob, :set_linearized_constraints!) && !isnothing(prob.set_linearized_constraints!)
+        return prob.set_linearized_constraints!(prob, x_ref, u_ref)
+    end
+
     # set dynamics constraints
     if prob.shooting_method == :multiple
         if isnothing(prob.set_dynamics_cache!)

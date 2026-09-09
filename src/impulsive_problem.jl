@@ -35,6 +35,7 @@ mutable struct ImpulsiveProblem <: OptimalControlProblem
 
     fun_get_trajectory::Union{Function,Nothing}
     set_dynamics_cache!::Union{Function,Nothing}
+    set_linearized_constraints!::Union{Function,Nothing}
 
     u_bias::Matrix
     shooting_method::Symbol
@@ -174,6 +175,8 @@ See `set_dynamics_cache!` for more details.
 - `ode_abstol`: absolute tolerance for the ODE solver
 - `fun_get_trajectory::Union{Function,Nothing}`: user-defined function to get the trajectory
 - `set_dynamics_cache!::Union{Function,Nothing}`: user-defined function to set the dynamics cache
+- `set_linearized_constraints!::Union{Function,Nothing}`: optional override for `set_linearized_constraints!`
+- `lincache`: optional linearization cache; defaults to `MultipleShootingCache`
 - `u_bias::Union{Matrix,Nothing}`: bias on the control
 """
 function ImpulsiveProblem(
@@ -198,6 +201,8 @@ function ImpulsiveProblem(
     ode_abstol::Float64 = 1e-12,
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
+    set_linearized_constraints!::Union{Function,Nothing} = nothing,
+    lincache = nothing,
     u_bias::Union{Matrix,Nothing} = nothing,
     shooting_method::Symbol = :multiple,
 )
@@ -208,9 +213,11 @@ function ImpulsiveProblem(
     nx, _ = size(x_ref)
     nu, _ = size(u_ref)
 
-    # check on size of dfdu function
-    _dfdu_test = dfdu(x_ref[:,1], u_ref[:,1], times[1])
-    @assert size(_dfdu_test) == (nx, nu) "Size of output from dfdu is not (nx,nu)"
+    # check on size of dfdu function unless a custom dynamics cache is used
+    if isnothing(set_dynamics_cache!)
+        _dfdu_test = dfdu(x_ref[:,1], u_ref[:,1], times[1])
+        @assert size(_dfdu_test) == (nx, nu) "Size of output from dfdu is not (nx,nu)"
+    end
 
     # construct augmented EOM using automatic differentiation
     if isnothing(eom_aug!)
@@ -218,7 +225,9 @@ function ImpulsiveProblem(
     end
 
     # initialize linearization cache
-    lincache = MultipleShootingCache(nx, nu, N, Nu, ng, nh)
+    if isnothing(lincache)
+        lincache = MultipleShootingCache(nx, nu, N, Nu, ng, nh)
+    end
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
@@ -274,6 +283,7 @@ function ImpulsiveProblem(
         ode_abstol,
         fun_get_trajectory,
         set_dynamics_cache!,
+        set_linearized_constraints!,
         u_bias,
         shooting_method,
     )
