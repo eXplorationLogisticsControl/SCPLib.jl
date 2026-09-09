@@ -118,7 +118,9 @@ function test_scvxstar_impulsive_custom_linearized_constraints(;verbosity::Int =
     u_ref = zeros(nu, N)
 
     custom_set_linearized_constraints! = function (prob, x_ref, u_ref)
-        g_dyn = SCPLib.set_dynamics_cache!(prob, x_ref, u_ref)
+        g_dyn = isnothing(prob.set_dynamics_cache!) ?
+            SCPLib.set_dynamics_cache!(prob, x_ref, u_ref) :
+            prob.set_dynamics_cache!(prob, x_ref, u_ref)
         @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
             prob.model[:x][:,k+1] - (
                 prob.lincache.Φ_A[:,:,k] * prob.model[:x][:,k] +

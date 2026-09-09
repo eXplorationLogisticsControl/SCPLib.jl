@@ -35,8 +35,16 @@ function test_custom_linearized_constraints_preserves_nonconvex_constraints()
     h_noncvx(cache, x, u) = [x[1, 2] - 0.25]
     ∇h_noncvx(x, u) = [0.0 1.0 0.0 0.0 0.0]
 
+    cache_calls = Ref(0)
+    custom_set_dynamics_cache! = function (prob, x_ref, u_ref)
+        cache_calls[] += 1
+        return SCPLib.set_dynamics_cache!(prob, x_ref, u_ref)
+    end
+
     custom_set_linearized_constraints! = function (prob, x_ref, u_ref)
-        g_dyn = SCPLib.set_dynamics_cache!(prob, x_ref, u_ref)
+        g_dyn = isnothing(prob.set_dynamics_cache!) ?
+            SCPLib.set_dynamics_cache!(prob, x_ref, u_ref) :
+            prob.set_dynamics_cache!(prob, x_ref, u_ref)
         @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
             prob.model[:x][1,k+1] - (
                 prob.lincache.Φ_A[1,1,k] * prob.model[:x][1,k] +
@@ -62,6 +70,7 @@ function test_custom_linearized_constraints_preserves_nonconvex_constraints()
         nh = 1,
         h_noncvx = h_noncvx,
         ∇h_noncvx = ∇h_noncvx,
+        set_dynamics_cache! = custom_set_dynamics_cache!,
         set_linearized_constraints! = custom_set_linearized_constraints!,
     )
 
@@ -69,6 +78,7 @@ function test_custom_linearized_constraints_preserves_nonconvex_constraints()
 
     @test g_ref == [-0.5]
     @test h_ref == [0.0]
+    @test cache_calls[] == 1
     @test haskey(JuMP.object_dictionary(prob.model), :constraint_g_noncvx)
     @test haskey(JuMP.object_dictionary(prob.model), :constraint_h_noncvx)
 end
@@ -190,7 +200,9 @@ function test_scvxstar_custom_linearized_constraints(;verbosity::Int = 0)
     end
 
     custom_set_linearized_constraints! = function (prob, x_ref, u_ref)
-        g_dyn = SCPLib.set_dynamics_cache!(prob, x_ref, u_ref)
+        g_dyn = isnothing(prob.set_dynamics_cache!) ?
+            SCPLib.set_dynamics_cache!(prob, x_ref, u_ref) :
+            prob.set_dynamics_cache!(prob, x_ref, u_ref)
         @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
             prob.model[:x][:,k+1] - (
                 prob.lincache.Φ_A[:,:,k] * prob.model[:x][:,k] +
