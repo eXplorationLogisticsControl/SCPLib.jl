@@ -9,6 +9,80 @@ if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 end
 
+function test_custom_linearized_constraints_preserves_nonconvex_constraints()
+    nx = 1
+    nu = 1
+    N = 3
+    times = LinRange(0.0, 1.0, N)
+    x_ref = zeros(nx, N)
+    u_ref = zeros(nu, N - 1)
+
+    function eom!(dx, x, pu, t)
+        dx[1] = pu.u[1]
+        return
+    end
+
+    function eom_aug!(dx_aug, x_aug, pu, t)
+        dx_aug[1] = pu.u[1]
+        dx_aug[2] = 0.0
+        dx_aug[3] = 1.0
+        return
+    end
+
+    objective(x, u) = sum(u)
+    g_noncvx(cache, x, u) = [x[1, end] - 0.5]
+    ∇g_noncvx(x, u) = [0.0 0.0 1.0 0.0 0.0]
+    h_noncvx(cache, x, u) = [x[1, 2] - 0.25]
+    ∇h_noncvx(x, u) = [0.0 1.0 0.0 0.0 0.0]
+
+    cache_calls = Ref(0)
+    custom_set_dynamics_cache! = function (prob, x_ref, u_ref)
+        cache_calls[] += 1
+        return SCPLib.set_dynamics_cache!(prob, x_ref, u_ref)
+    end
+
+    custom_set_linearized_constraints! = function (prob, x_ref, u_ref)
+        g_dyn = isnothing(prob.set_dynamics_cache!) ?
+            SCPLib.set_dynamics_cache!(prob, x_ref, u_ref) :
+            prob.set_dynamics_cache!(prob, x_ref, u_ref)
+        @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
+            prob.model[:x][1,k+1] - (
+                prob.lincache.Φ_A[1,1,k] * prob.model[:x][1,k] +
+                prob.lincache.Φ_B[1,1,k] * prob.model[:u][1,k] +
+                prob.lincache.Φ_c[1,k]
+            ) == prob.model[:ξ_dyn][1,k]
+        )
+        return g_dyn, nothing, nothing
+    end
+
+    prob = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        objective,
+        times,
+        x_ref,
+        u_ref;
+        eom_aug! = eom_aug!,
+        ng = 1,
+        g_noncvx = g_noncvx,
+        ∇g_noncvx = ∇g_noncvx,
+        nh = 1,
+        h_noncvx = h_noncvx,
+        ∇h_noncvx = ∇h_noncvx,
+        set_dynamics_cache! = custom_set_dynamics_cache!,
+        set_linearized_constraints! = custom_set_linearized_constraints!,
+    )
+
+    _, g_ref, h_ref = SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+
+    @test g_ref == [-0.5]
+    @test h_ref == [0.0]
+    @test cache_calls[] == 1
+    @test haskey(JuMP.object_dictionary(prob.model), :constraint_g_noncvx)
+    @test haskey(JuMP.object_dictionary(prob.model), :constraint_h_noncvx)
+end
+
 
 # -------------------- setup problem -------------------- #
 struct ControlParams_custom_linearized_constraints
@@ -126,7 +200,9 @@ function test_scvxstar_custom_linearized_constraints(;verbosity::Int = 0)
     end
 
     custom_set_linearized_constraints! = function (prob, x_ref, u_ref)
-        g_dyn = SCPLib.set_dynamics_cache!(prob, x_ref, u_ref)
+        g_dyn = isnothing(prob.set_dynamics_cache!) ?
+            SCPLib.set_dynamics_cache!(prob, x_ref, u_ref) :
+            prob.set_dynamics_cache!(prob, x_ref, u_ref)
         @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
             prob.model[:x][:,k+1] - (
                 prob.lincache.Φ_A[:,:,k] * prob.model[:x][:,k] +
@@ -178,4 +254,5 @@ function test_scvxstar_custom_linearized_constraints(;verbosity::Int = 0)
 end
 
 
+test_custom_linearized_constraints_preserves_nonconvex_constraints()
 test_scvxstar_custom_linearized_constraints(;verbosity = verbosity)
