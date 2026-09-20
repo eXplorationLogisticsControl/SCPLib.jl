@@ -192,6 +192,10 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     # solve
     tol_opt = 1e-6
     tol_feas = 1e-6
+    algo_default_w = SCPLib.SCvxStar(nx, N; shooting_method = :forwardbackward)
+    SCPLib.tune_initial_penalty_weight!(algo_default_w, prob, x_ref, u_ref)
+    @test isfinite(algo_default_w.w)
+
     algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, shooting_method = :forwardbackward)
 
     # solve problem
@@ -206,4 +210,48 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 end
 
 
+function test_scvxstar_forwardbackward_nonconvex_linearization()
+    nx = 1
+    nu = 1
+    N = 4
+    times = LinRange(0.0, 1.0, N)
+    x_ref = [0.0 0.0]
+    u_ref = zeros(nu, N-1)
+
+    function eom!(dx, x, pu, t)
+        (; u) = pu
+        dx[1] = u[1]
+        return
+    end
+
+    g_noncvx(cache, x, u) = [x[1,1] - x[1,2] + sum(u)]
+    ∇g_noncvx(cache, x, u) = [1.0 -1.0 1.0 1.0 1.0]
+    h_noncvx(cache, x, u) = [sum(x) + sum(u) - 1.0]
+
+    prob = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        (x, u) -> sum(u),
+        times,
+        x_ref,
+        u_ref;
+        shooting_method = :forwardbackward,
+        ng = 1,
+        g_noncvx = g_noncvx,
+        ∇g_noncvx = ∇g_noncvx,
+        nh = 1,
+        h_noncvx = h_noncvx,
+    )
+
+    SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+
+    @test size(prob.lincache.∇g) == (1, nx * 2 + nu * (N-1))
+    @test prob.lincache.∇g ≈ [1.0 -1.0 1.0 1.0 1.0]
+    @test size(prob.lincache.∇h) == (1, nx * 2 + nu * (N-1))
+    @test prob.lincache.∇h ≈ [1.0 1.0 1.0 1.0 1.0]
+end
+
+
 test_scvxstar_forwardbackward(verbosity = verbosity)
+test_scvxstar_forwardbackward_nonconvex_linearization()
