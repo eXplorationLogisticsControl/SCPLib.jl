@@ -30,6 +30,7 @@ makedocs(
         ],
         "Examples" => Any[
           "Brachistochrone" => "examples/example_brachistochrone.md",
+          "Supersonic time-to-climb" => "examples/example_supersonic.md",
           "Dionysus problem" => "examples/example_dionysus.md",
         ],
         "API" => Any[
