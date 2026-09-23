@@ -10,7 +10,7 @@
     <img src="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/test.yml/badge.svg" alt="test workflow"/>
   </a>
   <a href="https://app.codecov.io/gh/eXplorationLogisticsControl/SCPLib.jl">
-    <img src="https://codecov.io/gh/eXplorationLogisticsControl/SCPLib.jl/branch/master/graph/badge.svg" alt="codecov"/>
+    <img src="https://codecov.io/gh/eXplorationLogisticsControl/SCPLib.jl/branch/main/graph/badge.svg" alt="codecov"/>
   </a>
   <!-- <a href="https://yuricst.github.io/HighFidelityEphemerisModel.jl/">📚Read the docs📚</a> -->
 </p>
