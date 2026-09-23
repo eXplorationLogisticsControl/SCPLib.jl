@@ -20,6 +20,7 @@ get_plot = false
 
     include("test_scvxstar_forwardbackward.jl")
     include("test_scvxstar_callback.jl")
+    include("test_scvxstar_forwardbackward.jl")
 end
 
 @testset "Biased control" begin
