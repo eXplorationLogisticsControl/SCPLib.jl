@@ -118,3 +118,26 @@ algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)   # as an example, setting `w0` to a non
 # 4. solve problem
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 ```
+
+## Gallery
+
+**Supersonic minimum time to climb**
+`examples/supersonic/ex_scvxstar_time_to_climb.jl`
+
+<p align="center">
+  <img src="examples/supersonic/plots/supersonic_time_to_climb_scvxstar.png" alt="Supersonic example" width="95%"/>
+</p>
+
+**CR3BP transfer**
+`examples/cr3bp/ex_scvxstar_cr3bp_mass_freetf_ad.jl`
+
+<p align="center">
+  <img src="examples/cr3bp/plots/cr3bp_mass_freetf_scvxstar.png" alt="CR3BP example" width="95%"/>
+</p>
+
+**Dionysus transfer**
+`examples_astrodynamics/example_dionysus.jl`
+
+<p align="center">
+  <img src="examples_astrodynamics/plots/advanced_dionysus.png" alt="Dionysus example" width="95%"/>
+</p>
