@@ -15,6 +15,68 @@ end
 seed = 1234
 Random.seed!(seed)
 
+
+function make_forwardbackward_scalar_problem(; ng::Int = 0, g_noncvx = nothing, ∇g_noncvx = nothing)
+    nx = 1
+    nu = 1
+    N = 3
+    times = LinRange(0.0, 1.0, N)
+    x_ref = [0.0 1.0]
+    u_ref = zeros(nu, N - 1)
+
+    function eom!(dx, x, pu, t)
+        dx[1] = pu.u[1]
+        return
+    end
+
+    function eom_aug!(dx_aug, x_aug, pu, t)
+        dx_aug[1] = pu.u[1]
+        dx_aug[2] = 0.0
+        dx_aug[3] = 1.0
+        return
+    end
+
+    prob = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        (x, u) -> sum(u),
+        times,
+        x_ref,
+        u_ref;
+        eom_aug! = eom_aug!,
+        shooting_method = :forwardbackward,
+        ng = ng,
+        g_noncvx = g_noncvx,
+        ∇g_noncvx = ∇g_noncvx,
+    )
+    return prob, x_ref, u_ref
+end
+
+
+function test_forwardbackward_penalty_tuning_uses_forwardbackward_trajectory()
+    prob, x_ref, u_ref = make_forwardbackward_scalar_problem()
+    algo = SCPLib.SCvxStar(1, 3; shooting_method = :forwardbackward, w0 = nothing)
+
+    SCPLib.tune_initial_penalty_weight!(algo, prob, x_ref, u_ref)
+
+    @test algo.w ≈ 10.0
+end
+
+
+function test_forwardbackward_nonconvex_constraints_use_endpoint_state_shape()
+    g_noncvx(cache, x, u) = [x[1, 2] + sum(u) - 1.0]
+    prob, x_ref, u_ref = make_forwardbackward_scalar_problem(ng = 1, g_noncvx = g_noncvx)
+
+    _, g_ref, h_ref = SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+
+    @test g_ref == [0.0]
+    @test h_ref === nothing
+    @test size(prob.lincache.∇g) == (1, 4)
+    @test prob.lincache.∇g == [0.0 1.0 1.0 1.0]
+end
+
+
 # -------------------- setup problem -------------------- #
 struct ControlParamsForwardBackward
     μ::Float64
@@ -207,4 +269,6 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 end
 
 
+test_forwardbackward_penalty_tuning_uses_forwardbackward_trajectory()
+test_forwardbackward_nonconvex_constraints_use_endpoint_state_shape()
 test_scvxstar_forwardbackward(verbosity = verbosity)
