@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="SCPLib.jl Logo" width="55%"/>
+  <img src="docs/src/assets/logo.png" alt="SCPLib.jl Logo" width="55%"/>
 </p>
 
 <p align="center">
