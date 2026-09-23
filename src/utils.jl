@@ -16,13 +16,6 @@ ensemble_trajectories(sols::SciMLBase.AbstractEnsembleSolution) = sols.u
 ensemble_trajectories(sols::AbstractVector) = sols
 
 
-function vprintf(verbosity::Int, str::String)
-    if verbosity > 0
-        println(str)
-    end
-end
-
-
 function message_accept_step(accept::Bool)
     if accept
         return "yes"
