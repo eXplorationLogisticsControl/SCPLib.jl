@@ -26,7 +26,7 @@ end
 function set_continuous_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, sols::Union{Vector{ODESolution},SciMLBase.EnsembleSolution})
     nx, N = size(x_ref)
     nu, _ = size(u_ref)
-    for (k,sol) in enumerate(sols)
+    for (k,sol) in enumerate(ensemble_trajectories(sols))
         xf_aug = sol.u[end]
         lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))
         lincache.Φ_B[:,:,k] = reshape(xf_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu))
@@ -38,7 +38,7 @@ end
 """Set cache for impulsive dynamics"""
 function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, sols::Union{Vector{ODESolution},SciMLBase.EnsembleSolution}, dfdu::Function)
     nx, N = size(x_ref)
-    for (k,sol) in enumerate(sols)
+    for (k,sol) in enumerate(ensemble_trajectories(sols))
         xf_aug = sol.u[end]
         lincache.Φ_A[:,:,k] = reshape(xf_aug[nx+1:nx*(nx+1)], (nx,nx))
         lincache.Φ_B[:,:,k] = lincache.Φ_A[:,:,k] * dfdu(x_ref[:,k], u_ref[:,k], sol.t[1])
