@@ -73,8 +73,8 @@ function eom_aug!(dx_aug, x_aug, p, t)
     B = [zeros(3,4); I(3) zeros(3,1)]
     
     # extract STMs (note: julia is column-major)
-    #Phi_A = reshape(x_aug[nx+1:nx*(nx+1)], (nx,nx))'
-    Phi_B = reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nu,nx))'  # note: julia is column-major
+    #Phi_A = reshape(x_aug[nx+1:nx*(nx+1)], (nx,nx))
+    Phi_B = reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu))
 
     # derivatives of Phi_A, Phi_B
     dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)

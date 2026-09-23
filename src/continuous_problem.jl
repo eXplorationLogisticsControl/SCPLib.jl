@@ -34,6 +34,7 @@ mutable struct ContinuousProblem <: OptimalControlProblem
 
     fun_get_trajectory::Union{Function,Nothing}
     set_dynamics_cache!::Union{Function,Nothing}
+    set_linearized_constraints!::Union{Function,Nothing}
 
     u_bias::Matrix
     shooting_method::Symbol
@@ -69,7 +70,8 @@ function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u
     g_dynamics = zeros(prob.nx, prob.N-1)
     u_pool = make_u_pool(prob.nu, prob.N - 1)
     p_placeholder = dynamics_input(prob.params, u_pool[1])
-    prob_func = function(ode_problem, i, repeat)
+    prob_func = function(ode_problem, ctx_or_i, repeat = nothing)
+        i = ensemble_sim_id(ctx_or_i)
         fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
         remake(ode_problem,
             u0 = x_ref[:, i],
@@ -92,7 +94,7 @@ function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
     )
-    for (k,sol) in enumerate(sols)
+    for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
     end
     return sols, g_dynamics
@@ -108,7 +110,8 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,A
     g_dynamics = zeros(prob.nx, prob.N-1)
     u_pool = make_u_pool(prob.nu, prob.N - 1)
     p_placeholder = dynamics_input(prob.params, u_pool[1])
-    prob_func = function(ode_problem, i, repeat)
+    prob_func = function(ode_problem, ctx_or_i, repeat = nothing)
+        i = ensemble_sim_id(ctx_or_i)
         _x0_aug = init_continuous_dynamics_xaug(x_ref[:,i], prob.nx, prob.nu)
         fill_segment_control!(u_pool[i], u_ref, prob.u_bias, i)
         remake(ode_problem,
@@ -132,7 +135,7 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,A
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
     )
-    for (k,sol) in enumerate(sols)
+    for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
     end
     return sols, g_dynamics
@@ -262,6 +265,9 @@ See `set_dynamics_cache!` for more details.
 - `ode_abstol`: absolute tolerance for the ODE solver
 - `fun_get_trajectory::Union{Function,Nothing}`: user-defined function to get the trajectory
 - `set_dynamics_cache!::Union{Function,Nothing}`: user-defined function to set the dynamics cache
+- `set_linearized_constraints!::Union{Function,Nothing}`: optional override for `set_linearized_constraints!`.
+  Signature: `(prob, x_ref, u_ref) -> (g_dynamics_ref, g_ref, h_ref)`. Must register JuMP name
+  `:constraint_dynamics`; SCPLib still registers `g_noncvx`/`h_noncvx` constraints when configured.
 - `u_bias::Union{Matrix,Nothing}`: bias on the control
 """
 function ContinuousProblem(
@@ -279,12 +285,13 @@ function ContinuousProblem(
     nh::Int = 0,
     h_noncvx::Union{Function,Nothing} = nothing,
     ∇h_noncvx::Union{Function,Nothing} = nothing,
-    ode_ensemble_method = EnsembleSerial(),
+    ode_ensemble_method = SciMLBase.EnsembleSerial(),
     ode_method = Tsit5(),
     ode_reltol::Float64 = 1e-12,
     ode_abstol::Float64 = 1e-12,
     fun_get_trajectory::Union{Function,Nothing} = nothing,
     set_dynamics_cache!::Union{Function,Nothing} = nothing,
+    set_linearized_constraints!::Union{Function,Nothing} = nothing,
     u_bias::Union{Matrix,Nothing} = nothing,
     shooting_method::Symbol = :multiple,
 )
@@ -368,6 +375,7 @@ function ContinuousProblem(
         ode_abstol,
         fun_get_trajectory,
         set_dynamics_cache!,
+        set_linearized_constraints!,
         u_bias,
         shooting_method,
     )
@@ -396,14 +404,18 @@ end
 
 
 function stack_flatten_variables(prob::ContinuousProblem, x, u)
-    Δz = [reshape(x, prob.nx * prob.N);
+    nx_cols = prob.shooting_method == :forwardbackward ? 2 : prob.N
+    Δz = [reshape(x, prob.nx * nx_cols);
           reshape(u, prob.nu * (prob.N-1))];
     return Δz
 end
 
 
 function unpack_flattened_variables(prob::ContinuousProblem, z)
-    x = reshape(z[1:prob.nx * prob.N], prob.nx, prob.N)
-    u = reshape(z[prob.nx * prob.N + 1:prob.nx * prob.N + prob.nu * (prob.N-1)], prob.nu, prob.N-1)
+    nx_cols = prob.shooting_method == :forwardbackward ? 2 : prob.N
+    nx_len = prob.nx * nx_cols
+    u_len = prob.nu * (prob.N - 1)
+    x = reshape(z[1:nx_len], prob.nx, nx_cols)
+    u = reshape(z[nx_len + 1:nx_len + u_len], prob.nu, prob.N-1)
     return x, u
 end

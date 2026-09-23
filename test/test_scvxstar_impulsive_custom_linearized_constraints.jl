@@ -1,4 +1,4 @@
-"""Test problem with non-convex dynamics only, user-defined eom_aug!"""
+"""Test impulsive problem with user-defined set_linearized_constraints!"""
 
 using Clarabel
 using JuMP
@@ -10,18 +10,18 @@ if !@isdefined SCPLib
 end
 
 
-# -------------------- setup problem -------------------- #
-struct ControlParams_dynamics_userdefined
+# -------------------- setup parameters -------------------- #
+struct ControlParams_impulsive_custom_linearized_constraints
     μ::Float64
 end
 
-function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
+function test_scvxstar_impulsive_custom_linearized_constraints(;verbosity::Int = 0, get_plot::Bool = false)
     μ = 1.215058560962404e-02
     DU = 389703     # km
     TU = 382981     # sec
     MU = 500.0      # kg
     VU = DU/TU      # km/s
-    params = ControlParams_dynamics_userdefined(μ)
+    params = ControlParams_impulsive_custom_linearized_constraints(μ)
 
     function eom!(drv, rv, pu, t)
         (; params, u) = pu
@@ -34,8 +34,6 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
         drv[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
         drv[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
         drv[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
-        # append controls
-        drv[4:6] += u[1:3]
         return
     end
 
@@ -55,9 +53,6 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
         dx_aug[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
         dx_aug[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
         dx_aug[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
-
-        # append controls
-        dx_aug[4:6] += u[1:3]
         
         # Jacobian derivatives
         G1 = (1 - params.μ) / norm(r1vec)^5*(3*r1vec*r1vec' - norm(r1vec)^2*I(3))
@@ -65,12 +60,9 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
         Omega = [0 2 0; -2 0 0; 0 0 0]
         A = [zeros(3,3)                  I(3);
             G1 + G2 + diagm([1,1,0])    Omega]
-        B = [zeros(3,4); I(3) zeros(3,1)]
 
         # derivatives of Phi_A, Phi_B
         dx_aug[7:42] = reshape((A * reshape(x_aug[7:42],6,6)), 36)
-        dx_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu] = reshape((A * reshape(x_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nu], (nx,nu)) + B), nx*nu)
-        return
     end
 
 
@@ -100,6 +92,11 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
         Tsit5(); reltol = 1e-12, abstol = 1e-12
     )
 
+    # -------------------- define objective -------------------- #
+    function objective(x, u)
+        return sum(u[4,:])
+    end
+
     # -------------------- create problem -------------------- #
     N = 60
     nx = 6
@@ -118,15 +115,24 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
     for (i,alpha) in enumerate(alphas)
         x_ref[:,i] = (1-alpha)*x_along_lpo0[:,i] + alpha*x_along_lpof[:,i]
     end
-    u_ref = zeros(nu, N-1)
-    y_ref = nothing
+    u_ref = zeros(nu, N)
 
-    function objective(x, u)
-        return sum(u[4,:])
+    custom_set_linearized_constraints! = function (prob, x_ref, u_ref)
+        g_dyn = isnothing(prob.set_dynamics_cache!) ?
+            SCPLib.set_dynamics_cache!(prob, x_ref, u_ref) :
+            prob.set_dynamics_cache!(prob, x_ref, u_ref)
+        @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
+            prob.model[:x][:,k+1] - (
+                prob.lincache.Φ_A[:,:,k] * prob.model[:x][:,k] +
+                prob.lincache.Φ_B[:,:,k] * prob.model[:u][:,k] +
+                prob.lincache.Φ_c[:,k]
+            ) == prob.model[:ξ_dyn][:,k]
+        )
+        return g_dyn, nothing, nothing
     end
 
     # instantiate problem object    
-    prob = SCPLib.ContinuousProblem(
+    prob = SCPLib.ImpulsiveProblem(
         Clarabel.Optimizer,
         eom!,
         params,
@@ -135,40 +141,54 @@ function test_scvxstar_dynamics_userdefined(;verbosity::Int = 0)
         x_ref,
         u_ref;
         eom_aug! = eom_aug!,
-        ode_method = Vern8(),
-        ode_ensemble_method = SciMLBase.EnsembleSerial(), #EnsembleThreads(),
+        ode_method = Vern7(),
+        set_linearized_constraints! = custom_set_linearized_constraints!,
     )
     set_silent(prob.model)
 
     # append boundary conditions
     @constraint(prob.model, constraint_initial_rv, prob.model[:x][:,1] == rv0)
-    @constraint(prob.model, constraint_final_rv,   prob.model[:x][:,end] == rvf)
+    @constraint(prob.model, constraint_final_r,    prob.model[:x][1:3,end] == rvf[1:3])
+    @constraint(prob.model, constraint_final_v,    prob.model[:x][4:6,end] + prob.model[:u][1:3,end] == rvf[4:6])
 
     # append constraints on control magnitude
-    @constraint(prob.model, constraint_associate_control[k in 1:N-1],
+    @constraint(prob.model, constraint_associate_control[k in 1:N],
         [prob.model[:u][4,k], prob.model[:u][1:3,k]...] in SecondOrderCone())
-    @constraint(prob.model, constraint_control_magnitude[k in 1:N-1],
+    @constraint(prob.model, constraint_control_magnitude[k in 1:N],
         prob.model[:u][4,k] <= umax)
 
-    # # propagate initial guess
-    # sols_ig, g_dynamics_ig = SCPLib.get_trajectory(prob, x_ref, u_ref, y_ref)
-    # for _sol in sols_ig
-    #     lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
-    # end
-
     # -------------------- instantiate algorithm -------------------- #
-    algo = SCPLib.SCvxStar(nx, N; w0 = nothing)
+    Δ0 = [0.05, 0.05, 0.05, 0.1, 0.1, 0.1]
+    algo = SCPLib.SCvxStar(nx, N; w0 = 1e4, Δ0 = Δ0, l1_penalty = true)
 
     # solve problem
-    solution = SCPLib.solve!(algo, prob, x_ref, u_ref; verbosity = verbosity, maxiter = 100)
+    tol_opt = 1e-6
+    tol_feas = 1e-8
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+        verbosity = verbosity, maxiter = 100, tol_opt = tol_opt, tol_feas = tol_feas)
 
     # propagate solution
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
-    @test maximum(abs.(g_dynamics_opt)) <= 1e-6
+    @test maximum(abs.(g_dynamics_opt)) <= tol_feas
     @test solution.status == :Optimal
-    @test solution.info[:J0][end] ≈ 4.894728467119614 atol=1e-8
-    return solution
+    @test solution.info[:J0][end] ≈ 0.21345370023350235 atol=1e-8
+
+    # -------------------- plot -------------------- #
+    if get_plot
+        fig = Figure(size=(800, 500))
+        ax3d = Axis3(fig[1,1]; aspect=:equal, xlabel="x", ylabel="y", zlabel="z")
+        for (isol, _sol) in enumerate(sols_opt)
+            lines!(ax3d, Array(_sol)[1,:], Array(_sol)[2,:], Array(_sol)[3,:], color=:black)
+            scatter!(ax3d, Array(_sol)[1,1], Array(_sol)[2,1], Array(_sol)[3,1], color=:black)
+            scatter!(ax3d, Array(_sol)[1,end], Array(_sol)[2,end], Array(_sol)[3,end], color=:black)
+        end
+        lines!(ax3d, Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
+        lines!(ax3d, Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
+        
+        axu = Axis(fig[1,2], xlabel="Time", ylabel="Control magnitude")
+        stem!(axu, times, solution.u[4,:], color=:black)
+        display(fig)
+    end
 end
 
-
-test_scvxstar_dynamics_userdefined(;verbosity = verbosity)
+test_scvxstar_impulsive_custom_linearized_constraints(verbosity = verbosity, get_plot=get_plot)

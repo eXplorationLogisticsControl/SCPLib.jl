@@ -1,6 +1,21 @@
 """Utility functions"""
 
 
+"""
+Trajectory index for `EnsembleProblem` `prob_func`.
+
+OrdinaryDiffEq v6 / SciMLBase called `prob_func(prob, i, repeat)` with integer `i`.
+OrdinaryDiffEq v7 calls `prob_func(prob, ctx)` with `ctx.sim_id`.
+"""
+ensemble_sim_id(i::Integer) = i
+ensemble_sim_id(ctx) = ctx.sim_id
+
+
+"""Per-trajectory solutions from an ensemble (`sols.u`) or a plain vector."""
+ensemble_trajectories(sols::SciMLBase.AbstractEnsembleSolution) = sols.u
+ensemble_trajectories(sols::AbstractVector) = sols
+
+
 function vprintf(verbosity::Int, str::String)
     if verbosity > 0
         println(str)
@@ -22,7 +37,14 @@ Remove non-convex constraints from model within `OptimalControlProblem`'s JuMP m
 """
 function delete_noncvx_referencs!(prob::OptimalControlProblem, references::Vector{Symbol})
     for ref in references
-        delete(prob.model, prob.model[ref])
+        cons = prob.model[ref]
+        if cons isa ConstraintRef
+            delete(prob.model, cons)
+        else
+            for c in cons
+                delete(prob.model, c)
+            end
+        end
         unregister(prob.model, ref)
     end
 end
