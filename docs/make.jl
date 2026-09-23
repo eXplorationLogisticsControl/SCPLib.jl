@@ -29,6 +29,7 @@ makedocs(
           "Non-convex path constraints" => "ocp_ncvx.md",
         ],
         "Examples" => Any[
+          "Brachistochrone" => "examples/example_brachistochrone.md",
           "Dionysus problem" => "examples/example_dionysus.md",
         ],
         "API" => Any[

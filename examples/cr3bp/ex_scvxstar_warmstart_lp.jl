@@ -1,20 +1,20 @@
 """Dev for continuous problem"""
 
 using Clarabel
-using Gurobi
-using Hypatia
-using HiGHS
-using OSQP
-using SCS
-using Ipopt
+# using Gurobi
+# using Hypatia
+# using HiGHS
+# using OSQP
+# using SCS
+# using Ipopt
 
 using ForwardDiff
-using GLMakie
+using CairoMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+include(joinpath(@__DIR__, "../../src/SCPLib.jl"))
 
 
 # -------------------- setup problem -------------------- #
@@ -107,11 +107,10 @@ lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:
 prob = SCPLib.ContinuousProblem(
     # Gurobi.Optimizer,
     # HiGHS.Optimizer,
-    Ipopt.Optimizer,
     # Hypatia.Optimizer,
     # COSMO.Optimizer,
     # SCS.Optimizer,
-    # Clarabel.Optimizer,
+    Clarabel.Optimizer,
     # OSQP.Optimizer,
     eom!,
     params,

@@ -6,7 +6,7 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+include(joinpath(@__DIR__, "../../src/SCPLib.jl"))
 
 
 struct ControlParams_benchmark
@@ -149,7 +149,7 @@ outfile = joinpath(outdir, "benchmark_scvxstar.txt")
 
 open(outfile, "w") do io
     println(io, "SCvx* CR3BP benchmark")
-    println(io, "Source: examples/ex_scvxstar_cr3bp.jl")
+    println(io, "Source: examples/cr3bp/ex_scvxstar_cr3bp.jl")
     println(io, "Julia: ", VERSION)
     println(io, "N = ", N, ", nx = ", nx, ", nu = ", nu)
     println(io, "Warmup status: ", warmup_solution.status, " (", warmup_solution.n_iter, " iterations)")
