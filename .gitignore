@@ -31,5 +31,8 @@ JuliaLocalPreferences.toml
 .DS_Store
 *.so
 
+# Dev tmp directory
+.cursor/
+
 # animation temp images
 examples_astrodynamics/img_*
