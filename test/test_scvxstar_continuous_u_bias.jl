@@ -142,7 +142,7 @@ function test_scvxstar_continuous_u_bias(;verbosity::Int = 0, get_plot::Bool = f
             u_ref;
             eom_aug! = eom_aug!,
             ode_method = Vern8(),
-            ode_ensemble_method = EnsembleSerial(), #EnsembleThreads(),
+            ode_ensemble_method = SciMLBase.EnsembleSerial(), #EnsembleThreads(),
             u_bias = u_bias,
         )
         set_silent(prob.model)

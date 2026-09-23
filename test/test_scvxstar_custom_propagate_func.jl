@@ -252,7 +252,7 @@ function test_scvxstar_custom_propagate_func(;verbosity::Int = 0, get_plot::Bool
         u_ref;
         dfdu = dfdu,
         eom_aug! = multi_spacecraft_eom_aug!,
-        ode_ensemble_method = EnsembleSerial(),
+        ode_ensemble_method = SciMLBase.EnsembleSerial(),
         ode_method = Vern7(),
         ode_reltol = 1e-12,
         ode_abstol = 1e-12,
