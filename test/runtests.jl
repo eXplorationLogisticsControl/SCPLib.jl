@@ -8,6 +8,10 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 verbosity = 0
 get_plot = false
 
+@testset "Utils" begin
+    include("test_utils.jl")
+end
+
 @testset "SCvxStar" begin
     include("test_scvxstar_subproblem.jl")
     include("test_scvxstar_dynamics_userdefined.jl")
@@ -33,7 +37,15 @@ end
     include("test_proxlinear_dynamics_only.jl")
 end
 
+@testset "FixedTRW" begin
+    include("test_fixedtrw_impulsive_dynamics_only.jl")
+end
+
 @testset "SCvx" begin
     include("test_scvx_dynamics_ad.jl")
     include("test_scvx_impulsive_tr_u.jl")
+end
+
+@testset "Problem sets" begin
+    include("test_quadcopter.jl")
 end
