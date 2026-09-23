@@ -1,13 +1,13 @@
-"""Quadcoptor example with SCvx*"""
+"""Quadcoptor example with prox-linear algorithm"""
 
 using Clarabel
 using ForwardDiff
-using GLMakie
+using CairoMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+include(joinpath(@__DIR__, "../../src/SCPLib.jl"))
 
 
 # -------------------- setup problem -------------------- #
@@ -129,7 +129,9 @@ set_silent(prob.model)
 
 
 # -------------------- instantiate algorithm -------------------- #
-algo = SCPLib.SCvxStar(nx, N; nh=nh, w0 = 10.0, l1_penalty=true)
+w_ep = 1e1
+w_prox = 1e0
+algo = SCPLib.ProxLinear(w_ep, w_prox)
 
 # solve problem
 tol_feas = 1e-8
@@ -166,19 +168,17 @@ hlines!(ax_u, [-T_max, T_max], color=:red, linestyle=:dot, label="||u|| bounds")
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
-colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
 ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
-scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+scatterlines!(ax_χ, 1:length(solution.info[:χ]), solution.info[:χ], color=:black, marker=:circle, markersize=7)
 
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="J0", yscale=log10)
+scatterlines!(ax_w, 1:length(solution.info[:χ]), solution.info[:J0], color=:black, marker=:circle, markersize=7)
 
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
-scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
+scatterlines!(ax_J, 1:length(solution.info[:χ]), abs.(solution.info[:ΔJ]), color=:black, marker=:circle, markersize=7)
 
-ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
-scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
+# ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+# scatterlines!(ax_Δ, 1:length(solution.info[:χ]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
 
-save(joinpath(@__DIR__, "plots/quadcoptor_traj_scvxstar.png"), fig; px_per_unit=3)
 display(fig)
 println("Done!")

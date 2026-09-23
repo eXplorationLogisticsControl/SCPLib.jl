@@ -2,12 +2,12 @@
 
 using LinearAlgebra
 using Clarabel
-using GLMakie
+using CairoMakie
 using JuMP
 using OrdinaryDiffEq
 using ForwardDiff
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+include(joinpath(@__DIR__, "../../src/SCPLib.jl"))
 
 function quat2rotm(q::Vector{T}) where T<:Real
     qw, qx, qy, qz = q

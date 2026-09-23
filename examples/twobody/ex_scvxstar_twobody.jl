@@ -1,89 +1,70 @@
-"""Example with CR3BP + mass dynamics with free final time"""
+"""Two-body transfer problem"""
 
 using Clarabel
-using Gurobi
 using ForwardDiff
-using GLMakie
+using CairoMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+include(joinpath(@__DIR__, "../../src/SCPLib.jl"))
 
 
 # -------------------- setup problem -------------------- #
-struct ControlParams_CR3BP_mass_freetf
+struct ControlParams
     μ::Float64
     c1::Float64
     c2::Float64
 end
 
-μ = 1.215058560962404e-02
-c1 = 0.1
-c2 = 0.1
-DU = 389703     # km
-TU = 382981     # sec
-MU = 500.0      # kg
-VU = DU/TU      # km/s
-params = ControlParams_CR3BP_mass_freetf(μ, c1, c2)
+MU_SUN = 132712000000.0
+G0 = 9.81
+DU = 149.6e6
+VU = sqrt(MU_SUN / DU)          # velocity scale, m/s
+TU = DU / VU                    # time scale, s
+MASS = 2000.0                   # kg
+
+THRUST = 0.4                    # Newtons
+ISP = 3000.0                    # seconds
+
+μ  = MU_SUN / (VU^2 * DU)
+c1 = THRUST/1e3 / (MASS*DU/TU^2)               # canonical max thrust
+c2 = THRUST/1e3 / (ISP*G0/1e3) / (MASS/TU)     # canonical mass flow rate
+params = ControlParams(μ, c1, c2)
 
 function eom!(drvm, rvm, pu, t)
     (; params, u) = pu
-    x, y, z = rvm[1:3]
-    vx, vy, vz = rvm[4:6]
-    r1 = sqrt( (x+params.μ)^2 + y^2 + z^2 );
-    r2 = sqrt( (x-1+params.μ)^2 + y^2 + z^2 );
-    drvm[1:3] = rvm[4:6]
-    # derivatives of velocities
-    drvm[4] =  2*vy + x - ((1-params.μ)/r1^3)*(params.μ+x) + (params.μ/r2^3)*(1-params.μ-x);
-    drvm[5] = -2*vx + y - ((1-params.μ)/r1^3)*y - (params.μ/r2^3)*y;
-    drvm[6] = -((1-params.μ)/r1^3)*z - (params.μ/r2^3)*z;
-    # mass derivative
-    drvm[7] = -u[4] * params.c2
-    # append controls
-    drvm[4:6] += u[1:3] * params.c1 / rvm[7]
-    # time derivative
-    drvm[8] = 1.0
+    drvm[1:3] =  rvm[4:6]
+    drvm[4:6] = -params.μ / norm(rvm[1:3])^3 * rvm[1:3] + u[1:3] * params.c1 / rvm[7]
+    drvm[7]   = -u[4] * params.c2
+    drvm[8]   = 1.0                 # time
+
     # multiply by time factor
     drvm[1:8] *= u[5]
     return
 end
 
-# boundary conditions
-rv0 = [1.0809931218390707E+00,
-    0.0000000000000000E+00,
-    -2.0235953267405354E-01,
-    1.0157158264396639E-14,
-    -1.9895001215078018E-01,
-    7.2218178975912707E-15]
-period_0 = 2.3538670417546639E+00
+rv0 = [1.0, 0.0, 0.0, 0.0, sqrt(μ/1.0), 0.0]
+rvf = [1.5, 0.0, 0.0, 0.0, sqrt(μ/1.5), 0.1]
+period_0 = 2π * sqrt(1.0^3/μ)
+period_f = 2π * sqrt(1.5^3/μ)
 
-rvf = [1.1648780946517576,
-    0.0,
-    -1.1145303634437023E-1,
-    0.0,
-    -2.0191923237095796E-1,
-    0.0]
-period_f = 3.3031221822879884
-
-# initial & final LPO
+# initial & final orbits
 u_orbit = zeros(5)
 u_orbit[5] = period_0
-sol_lpo0 = solve(
+sol_orbit0 = solve(
     ODEProblem(eom!, [rv0; 1.0; 0.0], [0.0, 1.0], (; params, u=u_orbit)),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 u_orbit = zeros(5)
 u_orbit[5] = period_f
-sol_lpof = solve(
+sol_orbitf = solve(
     ODEProblem(eom!, [rvf; 1.0; 0.0], [0.0, 1.0], (; params, u=u_orbit)),
     Tsit5(); reltol = 1e-12, abstol = 1e-12
 )
 
 # -------------------- define objective -------------------- #
-function objective(x, u)
-    return -x[7,end] #sum(u[4,:])
-end
+function objective(x, u) return -x[7,end] end
 
 # -------------------- create problem -------------------- #
 N = 100
@@ -93,27 +74,27 @@ tf = 1.0                            # fixed to unity
 times = LinRange(0.0, tf, N)
 
 # create reference solution
-x_along_lpo0 = sol_lpo0(LinRange(0.0, 1.0, N))
-x_along_lpof = sol_lpof(LinRange(0.0, 1.0, N))
+tf_guess = 2π
+x_along_orbit0 = sol_orbit0(LinRange(0.0, 1.0, N))
+x_along_orbitf = sol_orbitf(LinRange(0.0, 1.0, N))
 x_ref = ones(nx,N)
 alphas = LinRange(0,1,N)
 for (i,alpha) in enumerate(alphas)
-    x_ref[1:6,i] = (1-alpha)*x_along_lpo0[1:6,i] + alpha*x_along_lpof[1:6,i]
+    x_ref[1:6,i] = (1-alpha)*x_along_orbit0[1:6,i] + alpha*x_along_orbitf[1:6,i]
 end
-tf_guess = 3.0
+x_ref[1:6,end] = rvf[1:6]   # to avoid initial infeasibility
 x_ref[8,:] = LinRange(0.0, tf_guess, N)
 u_ref = [zeros(nu-1, N-1); tf_guess*ones(1,N-1)]
 
 # plot initial guess
-fig = Figure(size=(1400,600))
+fig = Figure(size=(1600,800))
 ax3d = Axis3(fig[1,1]; aspect=:data)
-lines!(Array(sol_lpo0)[1,:], Array(sol_lpo0)[2,:], Array(sol_lpo0)[3,:], color=:blue)
-lines!(Array(sol_lpof)[1,:], Array(sol_lpof)[2,:], Array(sol_lpof)[3,:], color=:green)
+lines!(Array(sol_orbit0)[1,:], Array(sol_orbit0)[2,:], Array(sol_orbit0)[3,:], color=:blue)
+lines!(Array(sol_orbitf)[1,:], Array(sol_orbitf)[2,:], Array(sol_orbitf)[3,:], color=:green)
 
 # instantiate problem object    
 prob = SCPLib.ContinuousProblem(
-    # Clarabel.Optimizer,
-    Gurobi.Optimizer,
+    Clarabel.Optimizer,
     eom!,
     params,
     objective,
@@ -136,7 +117,7 @@ set_silent(prob.model)
     prob.model[:u][4,k] <= 1.0)
 
 # append constraints on time factor
-tf_span = [2.0, 4.0]
+tf_span = [1.5π, 3π]
 # @constraint(prob.model, constraint_tf_lb, prob.model[:u][5,1] >= tf_span[1])
 # @constraint(prob.model, constraint_tf_ub, prob.model[:u][5,end] <= tf_span[2])
 # @constraint(prob.model, constraint_tf_uniform[k in 1:N-2],
@@ -148,12 +129,10 @@ tf_span = [2.0, 4.0]
 
 
 # -------------------- instantiate algorithm -------------------- #
-w_ep = 1e1
-w_prox = 1e0
-algo = SCPLib.ProxLinear(w_ep, w_prox)
+algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, w_max=1e20)
 
 # solve problem
-solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100, warmstart_primal=true, warmstart_dual=false)
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
@@ -176,8 +155,6 @@ for (i, _sol) in enumerate(sols_opt)
     push!(udirs, [solution.u[1,i] * ones(1,length(_sol.t)); solution.u[2,i] * ones(1,length(_sol.t)); solution.u[3,i] * ones(1,length(_sol.t))])
 end
 udirs = hcat(udirs...)
-times_u = [el for el in times_u]
-umags = [el for el in umags]
 for i in 1:3
     stairs!(ax_u, times_u, udirs[i,:], label="u[$i]", step=:pre, linewidth=1.0)
 end
@@ -185,28 +162,23 @@ stairs!(ax_u, times_u, umags, label="||u||", step=:pre, linewidth=0.5, color=:bl
 axislegend(ax_u, position=:cc)
 
 # plot iterate information
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])] 
 ax_χ = Axis(fig[1,2]; xlabel="Iteration", ylabel="χ", yscale=log10)
-scatterlines!(ax_χ, 1:length(solution.info[:χ]), solution.info[:χ], color=:black, marker=:circle, markersize=7)
+scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
 
-ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="J0", yscale=log10)
-scatterlines!(ax_w, 1:length(solution.info[:χ]), abs.(solution.info[:J0]), color=:black, marker=:circle, markersize=7)
+ax_w = Axis(fig[2,2]; xlabel="Iteration", ylabel="w", yscale=log10)
+scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
 
 ax_J = Axis(fig[1,3]; xlabel="Iteration", ylabel="ΔJ", yscale=log10)
-scatterlines!(ax_J, 1:length(solution.info[:χ]), abs.(solution.info[:ΔJ]), color=:black, marker=:circle, markersize=7)
+scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color=colors_accept, marker=:circle, markersize=7)
 
-ax_m = Axis(fig[2,3]; xlabel="Time", ylabel="mass")
+ax_Δ = Axis(fig[2,3]; xlabel="Iteration", ylabel="trust region radius", yscale=log10)
+scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)
+
+ax_m = Axis(fig[1,4]; xlabel="Time", ylabel="mass")
 for (i, _sol) in enumerate(sols_opt)
     lines!(ax_m, Array(_sol)[8,:], Array(_sol)[7,:], color=arc_colors[i])
 end
-
-# make plot of times spent
-ax_cpsolve = Axis(fig[1,4]; xlabel="Iteration", ylabel="CPU time in CP solve, s")
-iters = collect(1:length(solution.info[:cpu_times][:time_subproblem]))
-scatterlines!(ax_cpsolve, iters, solution.info[:cpu_times][:time_subproblem], color=:black, marker=:utriangle, markersize=7, label="CP solve")
-
-ax_nlcon = Axis(fig[2,4]; xlabel="Iteration", ylabel="CPU time in reference update, s", yscale=log10)
-iters = collect(1:length(solution.info[:cpu_times][:time_update_reference]))
-scatterlines!(ax_nlcon, iters, solution.info[:cpu_times][:time_update_reference], color=:black, marker=:utriangle, markersize=7, label="Update reference")
 
 display(fig)
 println("Done!")

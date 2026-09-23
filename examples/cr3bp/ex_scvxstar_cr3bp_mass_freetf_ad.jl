@@ -2,12 +2,12 @@
 
 using Clarabel
 using ForwardDiff
-using GLMakie
+using CairoMakie
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 
-include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+include(joinpath(@__DIR__, "../../src/SCPLib.jl"))
 
 
 # -------------------- setup problem -------------------- #
