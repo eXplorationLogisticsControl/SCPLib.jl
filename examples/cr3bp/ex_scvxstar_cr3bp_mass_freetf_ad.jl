@@ -199,5 +199,6 @@ for (i, _sol) in enumerate(sols_opt)
     lines!(ax_m, Array(_sol)[8,:], Array(_sol)[7,:], color=arc_colors[i])
 end
 
+save(joinpath(@__DIR__, "plots/cr3bp_mass_freetf_scvxstar.png"), fig)
 display(fig)
 println("Done!")
