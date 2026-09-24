@@ -21,6 +21,7 @@ end
     include("test_scvxstar_h_noncvx.jl")
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
+    include("test_scvxstar_impulsive_tr_u.jl")
     include("test_scvxstar_impulsive_custom_linearized_constraints.jl")
     include("test_scvxstar_custom_propagate_func.jl")
 
@@ -48,6 +49,10 @@ end
     include("test_scvx_dynamics_ad.jl")
     include("test_scvx_impulsive_tr_u.jl")
     include("test_scvx_coverage.jl")
+end
+
+@testset "Impulsive problem" begin
+    include("test_impulsive_problem_coverage.jl")
 end
 
 @testset "Problem sets" begin
