@@ -4,9 +4,20 @@ using Clarabel
 using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
+using Test
 
 if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
+end
+
+
+function test_ode_verbose()
+    v = SCPLib.ode_verbose()
+    if isdefined(OrdinaryDiffEq, :DEVerbosity)
+        @test v isa OrdinaryDiffEq.DEVerbosity
+    else
+        @test v === false
+    end
 end
 
 
@@ -30,6 +41,7 @@ function test_ensemble_trajectories()
         Tsit5(),
         SciMLBase.EnsembleSerial();
         trajectories = 2,
+        verbose = SCPLib.ode_verbose(),
     )
     @test SCPLib.ensemble_trajectories(sols) === sols.u
     @test length(SCPLib.ensemble_trajectories(sols)) == 2
@@ -138,11 +150,14 @@ function test_get_constraint_solutions_unsolved(;verbosity::Int = 0)
     @variable(model, x[1:2])
     @constraint(model, constraint_sum, x[1] + x[2] == 1.0)
 
-    constraint_solution = SCPLib.get_constraint_solutions(model)
+    constraint_solution = @test_logs (:warn,) (:info,) match_mode=:any begin
+        SCPLib.get_constraint_solutions(model)
+    end
     @test isempty(constraint_solution)
 end
 
 
+test_ode_verbose()
 test_ensemble_sim_id()
 test_ensemble_trajectories()
 test_message_accept_step()
