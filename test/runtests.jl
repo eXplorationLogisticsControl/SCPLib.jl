@@ -12,6 +12,10 @@ get_plot = false
     include("test_utils.jl")
 end
 
+@testset "Dynamics" begin
+    include("test_dynamics.jl")
+end
+
 @testset "SCvxStar" begin
     include("test_scvxstar_subproblem.jl")
     include("test_scvxstar_dynamics_userdefined.jl")
