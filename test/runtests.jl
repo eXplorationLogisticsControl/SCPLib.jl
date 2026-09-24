@@ -26,6 +26,7 @@ end
 
     include("test_scvxstar_forwardbackward.jl")
     include("test_scvxstar_callback.jl")
+    include("test_scvxstar_coverage.jl")
 end
 
 @testset "Biased control" begin
@@ -35,15 +36,18 @@ end
 
 @testset "ProxLinear" begin
     include("test_proxlinear_dynamics_only.jl")
+    include("test_proxlinear_coverage.jl")
 end
 
 @testset "FixedTRW" begin
     include("test_fixedtrw_impulsive_dynamics_only.jl")
+    include("test_fixedtrw_coverage.jl")
 end
 
 @testset "SCvx" begin
     include("test_scvx_dynamics_ad.jl")
     include("test_scvx_impulsive_tr_u.jl")
+    include("test_scvx_coverage.jl")
 end
 
 @testset "Problem sets" begin
