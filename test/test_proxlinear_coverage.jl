@@ -5,6 +5,7 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 using SCS
+using Test
 
 if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
@@ -26,7 +27,8 @@ function make_proxlinear_coverage_problem(optimizer;
     u_ref = zeros(nu, N-1)
 
     function eom!(dx, x, pu, t)
-        dx[1] = pu.u[1]
+        # unit drift so the initial-step estimator is never near machine epsilon
+        dx[1] = 1.0
         return
     end
 
@@ -105,8 +107,10 @@ function test_proxlinear_infeasible_subproblem()
     prob, x_ref, u_ref = make_proxlinear_coverage_problem(Clarabel.Optimizer; infeasible = true)
     algo = SCPLib.ProxLinear(1e2, 1e0)
 
-    solution = redirect_stdout(devnull) do
-        SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 3, verbosity = 1)
+    solution = @test_logs (:warn,) match_mode=:any begin
+        redirect_stdout(devnull) do
+            SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 3, verbosity = 1)
+        end
     end
 
     @test solution.status == :CPFailed

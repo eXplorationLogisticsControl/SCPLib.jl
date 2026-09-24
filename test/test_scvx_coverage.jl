@@ -5,6 +5,7 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 using SCS
+using Test
 
 if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
@@ -31,7 +32,8 @@ function make_scvx_coverage_problem(optimizer;
     u_ref = zeros(nu, N-1)
 
     function eom!(dx, x, pu, t)
-        dx[1] = pu.u[1]
+        # unit drift so the initial-step estimator is never near machine epsilon
+        dx[1] = 1.0
         return
     end
 
@@ -116,8 +118,10 @@ function test_scvx_infeasible_subproblem()
     prob, x_ref, u_ref = make_scvx_coverage_problem(Clarabel.Optimizer; infeasible = true)
     algo = SCPLib.SCvx(1, 3; w = 1e3, Δ0 = 5.0)
 
-    solution = redirect_stdout(devnull) do
-        SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 3, verbosity = 1)
+    solution = @test_logs (:warn,) match_mode=:any begin
+        redirect_stdout(devnull) do
+            SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 3, verbosity = 1)
+        end
     end
 
     @test solution.status == :CPFailed

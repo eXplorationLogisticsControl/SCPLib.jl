@@ -5,6 +5,7 @@ using JuMP
 using LinearAlgebra
 using OrdinaryDiffEq
 using SCS
+using Test
 
 if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
@@ -51,7 +52,8 @@ function make_scvxstar_coverage_problem(optimizer;
     u_ref = zeros(nu, N-1)
 
     function eom!(dx, x, pu, t)
-        dx[1] = pu.u[1]
+        # unit drift so the initial-step estimator is never near machine epsilon
+        dx[1] = 1.0
         return
     end
 
@@ -82,7 +84,9 @@ end
 
 
 function test_scvxstar_invalid_shooting_method_constructor()
-    @test_throws UndefVarError SCPLib.SCvxStar(1, 3; shooting_method = :bogus)
+    @test_logs (:error,) match_mode=:any begin
+        @test_throws UndefVarError SCPLib.SCvxStar(1, 3; shooting_method = :bogus)
+    end
 end
 
 
@@ -120,7 +124,9 @@ function test_scvxstar_tune_invalid_shooting_method()
     algo = SCPLib.SCvxStar(1, 3; w0 = nothing)
     prob.shooting_method = :bogus
 
-    @test_throws UndefVarError SCPLib.tune_initial_penalty_weight!(algo, prob, x_ref, u_ref)
+    @test_logs (:error,) match_mode=:any begin
+        @test_throws UndefVarError SCPLib.tune_initial_penalty_weight!(algo, prob, x_ref, u_ref)
+    end
 end
 
 
@@ -130,8 +136,10 @@ function test_scvxstar_invalid_shooting_method_solve()
     algo = SCPLib.SCvxStar(1, 3; w0 = 10.0, Δ0 = 5.0)
     prob.shooting_method = :bogus
 
-    @test_throws UndefVarError SCPLib.solve!(algo, prob, x_ref, u_ref;
-        maxiter = 1, verbosity = 0)
+    @test_logs (:error,) match_mode=:any begin
+        @test_throws UndefVarError SCPLib.solve!(algo, prob, x_ref, u_ref;
+            maxiter = 1, verbosity = 0)
+    end
 end
 
 
@@ -203,8 +211,10 @@ function test_scvxstar_infeasible_subproblem()
     prob, x_ref, u_ref = make_scvxstar_coverage_problem(Clarabel.Optimizer; infeasible = true)
     algo = SCPLib.SCvxStar(1, 3; w0 = 10.0, Δ0 = 5.0)
 
-    solution = redirect_stdout(devnull) do
-        SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 3, verbosity = 1)
+    solution = @test_logs (:warn,) match_mode=:any begin
+        redirect_stdout(devnull) do
+            SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 3, verbosity = 1)
+        end
     end
 
     @test solution.status == :CPFailed
