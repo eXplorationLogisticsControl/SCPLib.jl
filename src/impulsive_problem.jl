@@ -93,6 +93,7 @@ function get_trajectory(prob::ImpulsiveProblem, x_ref, u_ref)
         trajectories = prob.N - 1,
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
+        verbose = ode_verbose(),
     )
     for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
@@ -134,6 +135,7 @@ function get_trajectory_augmented(prob::ImpulsiveProblem, x_ref, u_ref)
         trajectories = prob.N - 1,
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
+        verbose = ode_verbose(),
     )
     for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
