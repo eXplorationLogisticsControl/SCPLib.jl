@@ -337,6 +337,8 @@ function solve!(
         # update trust-region 
         flag_trust_region = update_trust_region!(algo, rho_i)
 
+        push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
+
         if verbosity >= 2
             # extra information when verbosity >= 2
             println()
@@ -354,7 +356,6 @@ function solve!(
                 solution.status = :MaxIterReached
             end
         end
-        push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
     end
     tcpu_end = time()
     solution.info[:cpu_times][:time_total] = tcpu_end - tcpu_start
