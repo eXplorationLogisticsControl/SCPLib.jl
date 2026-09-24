@@ -2,6 +2,20 @@
 
 
 """
+Solver verbosity for `OrdinaryDiffEq`.
+
+v6 accepted `verbose = false`. v7 requires a `DEVerbosity` object.
+"""
+function ode_verbose()
+    if isdefined(OrdinaryDiffEq, :DEVerbosity)
+        return OrdinaryDiffEq.DEVerbosity(OrdinaryDiffEq.SciMLLogging.None())
+    else
+        return false
+    end
+end
+
+
+"""
 Trajectory index for `EnsembleProblem` `prob_func`.
 
 OrdinaryDiffEq v6 / SciMLBase called `prob_func(prob, i, repeat)` with integer `i`.
