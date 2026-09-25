@@ -70,6 +70,22 @@ end
 
 
 """
+    trust_region_at_lower_bound(algo::SCPAlgorithm)
+
+True when every trust-region radius is already at its lower bound, so a rejected
+step cannot shrink the subproblem any further.
+"""
+function trust_region_at_lower_bound(algo::SCPAlgorithm)
+    Δ_min = algo.Δ_bounds[1]
+    at_bound = all(==(Δ_min), algo.tr.Δ)
+    if algo.use_trustregion_control
+        at_bound &= all(==(Δ_min), algo.tr_u.Δ)
+    end
+    return at_bound
+end
+
+
+"""
     set_trust_region_constraints!(
         algo::SCPAlgorithm,
         prob::OptimalControlProblem,

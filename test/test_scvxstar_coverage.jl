@@ -237,6 +237,22 @@ function test_scvxstar_callback_on_convergence()
 end
 
 
+function test_scvxstar_stalled_at_trust_region_lower_bound()
+    prob, x_ref, u_ref = make_scvxstar_coverage_problem(Clarabel.Optimizer)
+    # floor high enough that rejected steps run out of room to shrink;
+    # rhos reject every step, and tol_feas < 0 keeps the exit off :Feasible
+    algo = SCPLib.SCvxStar(1, 3; w0 = 10.0, Δ0 = 1.0, beta = 1.0,
+        Δ_bounds = (1e-2, 1e0), rhos = (1e16, 1e16, 1e16))
+
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+        maxiter = 20, tol_opt = -1.0, tol_feas = -1.0, verbosity = 0)
+
+    @test solution.status == :Stalled
+    @test solution.n_iter == 8
+    @test all(==(1e-2), algo.tr.Δ)
+end
+
+
 test_scvxstar_invalid_shooting_method_constructor()
 test_scvxstar_trustregion_control_without_nu()
 test_scvxstar_tune_initial_penalty_weight()
@@ -249,3 +265,4 @@ test_scvxstar_trustregion_control_rejected_steps()
 test_scvxstar_warmstart()
 test_scvxstar_infeasible_subproblem()
 test_scvxstar_callback_on_convergence()
+test_scvxstar_stalled_at_trust_region_lower_bound()

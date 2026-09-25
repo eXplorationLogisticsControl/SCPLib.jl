@@ -129,8 +129,25 @@ function test_scvx_infeasible_subproblem()
 end
 
 
+function test_scvx_stalled_at_trust_region_lower_bound()
+    prob, x_ref, u_ref = make_scvx_coverage_problem(Clarabel.Optimizer)
+    # floor high enough that rejected steps run out of room to shrink;
+    # rhos reject every step, and tol_feas < 0 keeps the exit off :Feasible
+    algo = SCPLib.SCvx(1, 3; w = 1e3, Δ0 = 1.0,
+        Δ_bounds = (1e-2, 1e0), rhos = (1e16, 1e16, 1e16))
+
+    solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+        maxiter = 20, tol_opt = -1.0, tol_feas = -1.0, verbosity = 0)
+
+    @test solution.status == :Stalled
+    @test solution.n_iter == 8
+    @test all(==(1e-2), algo.tr.Δ)
+end
+
+
 test_scvx_trustregion_control_without_nu()
 test_scvx_verbose_run_to_maxiter()
 test_scvx_feasible_at_maxiter()
 test_scvx_warmstart()
 test_scvx_infeasible_subproblem()
+test_scvx_stalled_at_trust_region_lower_bound()
