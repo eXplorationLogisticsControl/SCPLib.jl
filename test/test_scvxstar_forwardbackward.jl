@@ -77,6 +77,28 @@ function test_forwardbackward_nonconvex_constraints_use_endpoint_state_shape()
 end
 
 
+function test_forwardbackward_nonconvex_gradient_accepts_cache_argument()
+    saw_forwardbackward_cache = Ref(false)
+    g_noncvx(cache, x, u) = [x[1, 2] + sum(u) - 1.0]
+    function ∇g_noncvx(cache, x, u)
+        saw_forwardbackward_cache[] = cache isa SCPLib.ForwardBackwardCache
+        return [0.0 1.0 1.0 1.0]
+    end
+    prob, x_ref, u_ref = make_forwardbackward_scalar_problem(
+        ng = 1,
+        g_noncvx = g_noncvx,
+        ∇g_noncvx = ∇g_noncvx,
+    )
+
+    _, g_ref, h_ref = SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+
+    @test saw_forwardbackward_cache[]
+    @test g_ref == [0.0]
+    @test h_ref === nothing
+    @test prob.lincache.∇g == [0.0 1.0 1.0 1.0]
+end
+
+
 # -------------------- setup problem -------------------- #
 struct ControlParamsForwardBackward
     μ::Float64
@@ -271,4 +293,5 @@ end
 
 test_forwardbackward_penalty_tuning_uses_forwardbackward_trajectory()
 test_forwardbackward_nonconvex_constraints_use_endpoint_state_shape()
+test_forwardbackward_nonconvex_gradient_accepts_cache_argument()
 test_scvxstar_forwardbackward(verbosity = verbosity)

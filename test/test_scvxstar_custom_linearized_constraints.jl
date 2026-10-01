@@ -84,6 +84,68 @@ function test_custom_linearized_constraints_preserves_nonconvex_constraints()
 end
 
 
+function test_nonconvex_gradient_callbacks_accept_cache_argument()
+    nx = 1
+    nu = 1
+    N = 3
+    times = LinRange(0.0, 1.0, N)
+    x_ref = zeros(nx, N)
+    u_ref = zeros(nu, N - 1)
+
+    function eom!(dx, x, pu, t)
+        dx[1] = pu.u[1]
+        return
+    end
+
+    function eom_aug!(dx_aug, x_aug, pu, t)
+        dx_aug[1] = pu.u[1]
+        dx_aug[2] = 0.0
+        dx_aug[3] = 1.0
+        return
+    end
+
+    g_cache_seen = Ref(false)
+    h_cache_seen = Ref(false)
+    objective(x, u) = sum(u)
+    g_noncvx(cache, x, u) = [x[1, end] - 0.5]
+    h_noncvx(cache, x, u) = [x[1, 2] - 0.25]
+    function ∇g_noncvx(cache, x, u)
+        g_cache_seen[] = cache isa SCPLib.MultipleShootingCache
+        return [0.0 0.0 1.0 0.0 0.0]
+    end
+    function ∇h_noncvx(cache, x, u)
+        h_cache_seen[] = cache isa SCPLib.MultipleShootingCache
+        return [0.0 1.0 0.0 0.0 0.0]
+    end
+
+    prob = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        objective,
+        times,
+        x_ref,
+        u_ref;
+        eom_aug! = eom_aug!,
+        ng = 1,
+        g_noncvx = g_noncvx,
+        ∇g_noncvx = ∇g_noncvx,
+        nh = 1,
+        h_noncvx = h_noncvx,
+        ∇h_noncvx = ∇h_noncvx,
+    )
+
+    _, g_ref, h_ref = SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+
+    @test g_cache_seen[]
+    @test h_cache_seen[]
+    @test g_ref == [-0.5]
+    @test h_ref == [0.0]
+    @test prob.lincache.∇g == [0.0 0.0 1.0 0.0 0.0]
+    @test prob.lincache.∇h == [0.0 1.0 0.0 0.0 0.0]
+end
+
+
 # -------------------- setup problem -------------------- #
 struct ControlParams_custom_linearized_constraints
     μ::Float64
@@ -255,4 +317,5 @@ end
 
 
 test_custom_linearized_constraints_preserves_nonconvex_constraints()
+test_nonconvex_gradient_callbacks_accept_cache_argument()
 test_scvxstar_custom_linearized_constraints(;verbosity = verbosity)
