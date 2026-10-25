@@ -29,6 +29,20 @@ function set_dynamics_cache!(
 end
 
 
+"""
+Set linearized dynamics for a mixed continuous/impulsive problem.
+"""
+function set_dynamics_cache!(
+    prob::MixedProblem,
+    x_ref::Union{Matrix,Adjoint},
+    u_ref::Union{Matrix,Adjoint},
+)
+    sols, g_dynamics_ref = get_trajectory_augmented(prob, x_ref, u_ref)
+    set_mixed_dynamics_cache!(prob.lincache, x_ref, u_ref, sols, prob)
+    return g_dynamics_ref
+end
+
+
 function set_dynamics_cache_forwardbackward!(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint})
     sols, g_dynamics_ref = get_trajectory_augmented_forwardbackward(prob, x_ref, u_ref)
     set_continuous_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
@@ -54,9 +68,26 @@ function set_linearized_constraints!(
             else
                 g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
             end
-            @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
-                prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
-            )
+            if prob isa MixedProblem
+                # Column k < N is a dense stack. Build it from VariableRefs so the
+                # arrival-node NaNs in model[:u] are never indexed.
+                dyn_cons = Any[]
+                for k in 1:prob.N-1
+                    uk = VariableRef[prob.model[:u][i, k] for i in 1:prob.nu]
+                    push!(dyn_cons, @constraint(prob.model,
+                        prob.model[:x][:,k+1] - (
+                            prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k]
+                            + prob.lincache.Φ_B[:,:,k]*uk
+                            + prob.lincache.Φ_c[:,k]
+                        ) == prob.model[:ξ_dyn][:,k]
+                    ))
+                end
+                prob.model[:constraint_dynamics] = dyn_cons
+            else
+                @constraint(prob.model, constraint_dynamics[k in 1:prob.N-1],
+                    prob.model[:x][:,k+1] - (prob.lincache.Φ_A[:,:,k]*prob.model[:x][:,k] + prob.lincache.Φ_B[:,:,k]*prob.model[:u][:,k] + prob.lincache.Φ_c[:,k]) == prob.model[:ξ_dyn][:,k]
+                )
+            end
         elseif prob.shooting_method == :forwardbackward
             if isnothing(prob.set_dynamics_cache!)
                 g_dynamics_ref = set_dynamics_cache_forwardbackward!(prob, x_ref, u_ref)         # default implementation
@@ -73,7 +104,7 @@ function set_linearized_constraints!(
 
     # define stacked flattened variables difference
     if prob.ng > 0 || prob.nh > 0
-        Δz = stack_flatten_variables(prob, prob.model[:x] - x_ref, prob.model[:u] - u_ref)
+        Δz = flattened_delta(prob, x_ref, u_ref)
     end
 
     # set nonconvex equality constraints

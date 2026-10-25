@@ -71,7 +71,7 @@ mutable struct FixedTRWSCPSolution <: SCPSolution
     function FixedTRWSCPSolution(prob::OptimalControlProblem, Nu::Int)
         status = :Solving
         x = zeros(prob.nx, prob.N)
-        u = zeros(prob.nu, Nu)
+        u = initial_control_matrix(prob, Nu)
 
         info = Dict(
             :J0 => Float64[],
@@ -198,7 +198,7 @@ function solve!(
         end
 
         _x = value.(prob.model[:x])
-        _u = value.(prob.model[:u])
+        _u = control_values(prob)
         _ξ_dyn = value.(prob.model[:ξ_dyn])
         _ξ = prob.ng > 0 ? value.(prob.model[:ξ]) : nothing
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing

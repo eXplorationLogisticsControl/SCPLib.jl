@@ -115,7 +115,7 @@ mutable struct SCvxSolution <: SCPSolution
     function SCvxSolution(prob::OptimalControlProblem, Nu::Int)
         status = :Solving
         x = zeros(prob.nx, prob.N)
-        u = zeros(prob.nu, Nu)
+        u = initial_control_matrix(prob, Nu)
         
         info = Dict(
             :J0 => Float64[],
@@ -169,6 +169,7 @@ function solve!(
     if algo.use_trustregion_control
         @assert prob.nu == size(algo.tr_u.Δ,1) "Number of control variables mismatch between problem and algorithm"
     end
+    mask_unused_control_trust_region!(algo, prob)
     tcpu_start = time()
 
     # initialize algorithm hyperparameters
@@ -257,7 +258,7 @@ function solve!(
         end
 
         _x = value.(prob.model[:x])
-        _u = value.(prob.model[:u])
+        _u = control_values(prob)
         _ξ_dyn = value.(prob.model[:ξ_dyn])
         _ξ = prob.ng > 0 ? value.(prob.model[:ξ]) : nothing
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing

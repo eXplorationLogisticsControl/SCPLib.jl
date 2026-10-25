@@ -55,7 +55,7 @@ function solve_convex_subproblem!(
         reshape(prob.model[:x] - x_ref, prod(size(prob.model[:x])));
     ]
     if algo.proximal_u
-        append!(Δvars, reshape(prob.model[:u] - u_ref, prod(size(prob.model[:u]))))
+        append_control_deltas!(Δvars, prob, u_ref)
     end
     ϵ_proximal = @variable(prob.model)
     @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
@@ -113,7 +113,7 @@ mutable struct ProxLinearSolution <: SCPSolution
     function ProxLinearSolution(prob::OptimalControlProblem, Nu::Int)
         status = :Solving
         x = zeros(prob.nx, prob.N)
-        u = zeros(prob.nu, Nu)
+        u = initial_control_matrix(prob, Nu)
         
         info = Dict(
             :J0 => Float64[],
@@ -247,7 +247,7 @@ function solve!(
         end
 
         _x = value.(prob.model[:x])
-        _u = value.(prob.model[:u])
+        _u = control_values(prob)
 
         # evaluate objective
         J0 = prob.objective(_x, _u)
