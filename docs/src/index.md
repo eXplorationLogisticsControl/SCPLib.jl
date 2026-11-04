@@ -104,3 +104,7 @@ algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)   # as an example, setting `w0` to a non
 # 4. solve problem
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 ```
+
+## Advanced usage
+
+By default, each SCP iteration linearizes dynamics as a dense STM product in JuMP. To replace that implementation, pass `set_linearized_constraints!` to `ContinuousProblem` or `ImpulsiveProblem`. See [User-defined linearized constraints](@ref) for the callback signature, JuMP naming requirements, and examples.

@@ -1,0 +1,84 @@
+
+==================== (a) FB Jacobian sign w.r.t. x_1 ====================
+analytic dg/dx1 = [0.8833911994813708 0.48044098970463156; -0.4565618461556966 0.883695666461109]
+FD       dg/dx1 = [-0.8833911994410304 -0.4804409896863593; 0.4565618461210841 -0.883695666455131]
+analytic dg/dxN = [0.9159509277663511 -0.4860049050959545; 0.33014991719003706 0.9165835148788488]
+FD       dg/dxN = [0.9159509278267031 -0.48600490526462536; 0.3301499171409761 0.9165835147401102]
+max |analytic-FD| on u block = 2.1124851867782013e-10
+true g(x1+d)      = [0.49297858827013447, 0.13584329511282212]
+model g0 + J*d    = [0.5010388793218915, 0.1090421293360867]
+correct g0 - Φ d  = [0.49297987512657737, 0.1358472795880169]
+
+==================== (b) FB: ξ_dyn decoupled from linearized dynamics ====================
+termination = OPTIMAL
+value(ξ_dyn) = [-0.30000000000000004, 0.5000000000000002]  ;  -λ/w = [-0.3; 0.5;;]
+penalty(ξ_dyn) in L = -1.7  (true linearized defect is forced to 0 => should be 0)
+
+==================== (c) FB with w0 = nothing ====================
+ERROR: BoundsError: attempt to access 2×2 Matrix{Float64} at index [1:2, 3]
+
+==================== (d) SCvx: model growth (slack vars/cones never deleted) ====================
+before: nvars=4
+after 6 iters: nvars=10
+   (AffExpr, MathOptInterface.EqualTo{Float64}, 1)
+   (AffExpr, MathOptInterface.LessThan{Float64}, 1)
+   (Vector{VariableRef}, MathOptInterface.NormOneCone, 6)
+   (Vector{AffExpr}, MathOptInterface.Zeros, 1)
+   (Vector{AffExpr}, MathOptInterface.Nonpositives, 4)
+
+==================== (e) ProxLinear: model growth and history misalignment ====================
+status=Feasible n_iter=50 length(J0)=50 last callback iter=50 nvars=104
+info[:J0][end]=-0.500000022737381  objective(sol.x)=-0.500000022737381
+   (AffExpr, MathOptInterface.EqualTo{Float64}, 1)
+   (AffExpr, MathOptInterface.GreaterThan{Float64}, 100)
+   (AffExpr, MathOptInterface.LessThan{Float64}, 51)
+   (Vector{AffExpr}, MathOptInterface.Zeros, 1)
+   (Vector{AffExpr}, MathOptInterface.SecondOrderCone, 50)
+
+==================== (f) ΔL<0 & ΔJ<0 => ρ≫1, step accepted and TR expanded ====================
+
+ Solving OCP with SCvx* Algorithm (`・ω・´)
+
+   Feasibility tolerance tol_feas :  1.00e-06
+   Optimality tolerance tol_opt   :  1.00e-04
+   Objective tolerance tol_J0     : -1.00e+16
+   Initial penalty weight w       :  1.00e+04
+   Use L1 penalty                 :  No
+   Warmstart primal               :  No
+   Warmstart dual                 :  No
+   Use trust-region on u          :  No
+
+Iter |     J0     |    ΔJ_i    |    ΔL_i    |     χ_i    |    ρ_i    |    r_i    |     w     |  acpt. |
+   1 |  9.996e-01 | -4.993e+03 | -9.998e-01 |  9.992e-01 |  4.99e+03 |  2.00e+00 |  1.00e+04 |  yes   |
+
+   Status                   : MaxIterReached
+   Iterations               : 1
+   Total CPU time           : 1.28 sec
+   Objective                : 9.9960e-01
+   Objective improvement ΔJ : -4.9930e+03 (tol: 1.0000e-04)
+   Max constraint violation : 9.9920e-01 (tol: 1.0000e-06)
+
+accept=Bool[1] ΔJ=[-4993.005597001335] Δ after=[6.0 6.0]
+
+==================== (g) warmstart_dual after re-linearization ====================
+ERROR: KeyError: key MathOptInterface.ConstraintIndex{MathOptInterface.VectorAffineFunction{Float64}, MathOptInterface.Nonpositives}(2) not found
+
+==================== (h) solve! called twice on same problem ====================
+ERROR: An object of name constraint_dynamics is already attached to this model. If this
+    is intended, consider using the anonymous construction syntax, for example,
+    `x = @variable(model, [1:N], ...)` where the name of the object does
+    not appear inside the macro.
+
+    Alternatively, use `unregist
+
+==================== (i) μ never decreases; complementarity at 'Optimal' point ====================
+status=Optimal x2=0.9999999997573727 h(x2)=-3.0000000004852545 final μ=[4.702500000032831] w=2.0
+μ history (unique) = [4.703]
+
+==================== (j) AD-generated eom_aug! with an implicit (autodiff) ODE solver ====================
+ERROR: First call to automatic differentiation for the Jacobian
+failed. This means that the user `f` function is not compatible
+with automatic differentiation. Methods to fix this include:
+
+1. Turn off automatic differentiation (e.g. Rosenbrock23() becomes
+   Rosenbrock23(autodiff = AutoFiniteDiff())). Mor
