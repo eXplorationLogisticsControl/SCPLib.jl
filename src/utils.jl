@@ -2,6 +2,20 @@
 
 
 """
+Solver verbosity for `OrdinaryDiffEq`.
+
+v6 accepted `verbose = false`. v7 requires a `DEVerbosity` object.
+"""
+function ode_verbose()
+    if isdefined(OrdinaryDiffEq, :DEVerbosity)
+        return OrdinaryDiffEq.DEVerbosity(OrdinaryDiffEq.SciMLLogging.None())
+    else
+        return false
+    end
+end
+
+
+"""
 Trajectory index for `EnsembleProblem` `prob_func`.
 
 OrdinaryDiffEq v6 / SciMLBase called `prob_func(prob, i, repeat)` with integer `i`.
@@ -14,13 +28,6 @@ ensemble_sim_id(ctx) = ctx.sim_id
 """Per-trajectory solutions from an ensemble (`sols.u`) or a plain vector."""
 ensemble_trajectories(sols::SciMLBase.AbstractEnsembleSolution) = sols.u
 ensemble_trajectories(sols::AbstractVector) = sols
-
-
-function vprintf(verbosity::Int, str::String)
-    if verbosity > 0
-        println(str)
-    end
-end
 
 
 function message_accept_step(accept::Bool)

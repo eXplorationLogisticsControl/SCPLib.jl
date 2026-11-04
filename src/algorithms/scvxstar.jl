@@ -239,7 +239,13 @@ end
 function tune_initial_penalty_weight!(algo::SCvxStar, prob::OptimalControlProblem, x_ref, u_ref, J_expected::Real = 1.0, K_w::Real = 10.0)
     # evaluate nonlinear constraints
     if isnothing(prob.fun_get_trajectory)
-        _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        if prob.shooting_method == :multiple
+            _, g_dynamics = get_trajectory(prob, x_ref, u_ref)
+        elseif prob.shooting_method == :forwardbackward
+            _, g_dynamics = get_trajectory_forwardbackward(prob, x_ref, u_ref)
+        else
+            @error "Invalid shooting method: $(prob.shooting_method)"
+        end
     else
         _, g_dynamics = prob.fun_get_trajectory(prob, x_ref, u_ref)
     end
@@ -280,7 +286,9 @@ Solve non-convex OCP with SCvx* algorithm
 - `warmstart_primal::Bool`: whether to warmstart primal variables
 - `warmstart_dual::Bool`: whether to warmstart dual variables
 - `tol_ΔL::Float64`: relative tolerance on the predicted reduction; `|ΔL| ≤ ε` with
-  `ε = min(tol_ΔL * max(1,|J_ref|), tol_opt)` is treated as zero (no model decrease)
+  `ε = min(tol_ΔL * max(1,|J_ref|), tol_opt)` is treated as zero (no model decrease); a
+  negative `tol_opt` leaves `ε` uncapped and disables the stationarity-based exits
+  (`:Optimal` from a null step, `:InfeasibleStationary`)
 - `max_null_steps::Int`: number of consecutive null steps at an infeasible reference after which
   `:InfeasibleStationary` is returned
 
@@ -299,8 +307,9 @@ Solve non-convex OCP with SCvx* algorithm
 - `:Optimal`: an accepted step that is not bounded by the trust-region has `|ΔJ| ≤ tol_opt` and
   `χ ≤ tol_feas`; or the reference is a feasible stationary point of the subproblem; or
   `J0 ≤ tol_J0` with `χ ≤ tol_feas`
-- `:TRCollapsed`: a step is rejected while the trust-region is at its lower bound; the last
-  accepted reference is returned
+- `:Stalled` / `:Feasible`: a step is rejected while the trust-region is already at its lower
+  bound, so the subproblem cannot change; the last accepted reference is returned, with status
+  `:Feasible` if it satisfies `χ ≤ tol_feas` and `:Stalled` otherwise
 - `:InfeasibleStationary`: `max_null_steps` consecutive null steps at a reference that violates
   the non-convex constraints (the multiplier and penalty updates cannot move it)
 - `:CPFailed`, `:Feasible`, `:MaxIterReached`: as before
@@ -344,7 +353,7 @@ function solve!(
 
     # check whether the initial guess satisfies the convex constraints (before any linearized or
     # trust-region constraints are added); if not, the first step is a restoration step
-    ref_feasible = reference_convex_feasible(prob, x_ref, u_ref; atol = tol_feas)
+    ref_feasible = reference_convex_feasible(prob, x_ref, u_ref; atol = max(tol_feas, sqrt(eps())))
     ref_is_initial_guess = true
     n_null = 0                  # number of consecutive null steps
 
@@ -512,7 +521,7 @@ function solve!(
         accept = step_kind == :restoration || (step_kind == :ratio && rho_i >= algo.rhos[1])
         tr_action = trust_region_action(algo, step_kind, rho_i)
         # rejected step while the trust-region cannot shrink any further
-        collapsed = !accept && tr_action == :shrink && trust_region_at_floor(algo)
+        collapsed = !accept && tr_action == :shrink && trust_region_at_lower_bound(algo)
 
         if verbosity > 0
             if mod(it, 20) == 0
@@ -548,7 +557,7 @@ function solve!(
         # convergence check: |ΔJ| is only a stationarity measure for an accepted step that is not
         # bounded by the trust-region; a null step certifies stationarity of the reference
         converged_ratio = step_kind == :ratio && accept && !tr_active && (abs(ΔJ) <= tol_opt) && (χ <= tol_feas)
-        converged_null  = step_kind == :stationary && (χ_ref <= tol_feas)
+        converged_null  = step_kind == :stationary && (tol_opt >= 0) && (χ_ref <= tol_feas)   # tol_opt < 0 disables convergence
         reached_J0      = (J0_rec <= tol_J0) && (χ_rec <= tol_feas)
         if converged_ratio || converged_null || reached_J0
             solution.status = :Optimal
@@ -594,7 +603,7 @@ function solve!(
                 end
             end
 
-        elseif step_kind == :stationary
+        elseif step_kind == :stationary && (χ_ref > tol_feas)
             # null step: the reference is a stationary point of the current subproblem but is
             # infeasible, so update the multipliers and penalty weight at the reference
             flag_reference = false
@@ -611,7 +620,7 @@ function solve!(
             # repeated null steps: the multiplier/penalty updates do not move the subproblem away
             # from the infeasible reference, i.e. it is an infeasible stationary point
             n_null += 1
-            if n_null >= max_null_steps
+            if n_null >= max_null_steps && tol_opt >= 0
                 solution.status = :InfeasibleStationary
                 if verbosity > 0
                     @warn("Exiting after $n_null consecutive null steps at an infeasible stationary point (χ = $(χ_ref))")
@@ -633,8 +642,9 @@ function solve!(
         # update trust-region
         flag_trust_region = update_trust_region!(algo, tr_action)
 
+        # a rejected step at the lower bound cannot change the subproblem: stop at the reference
         if collapsed
-            solution.status = :TRCollapsed
+            solution.status = χ_rec <= tol_feas ? :Feasible : :Stalled
             if verbosity > 0
                 @warn("Exiting as trust-region collapsed to its lower bound Δ_min = $(algo.Δ_bounds[1])")
             end

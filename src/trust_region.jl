@@ -96,13 +96,18 @@ function trust_region_action(algo::SCPAlgorithm, rho_i::Real)
 end
 
 
-"""Whether every trust-region radius (state, and control if used) is at its lower bound `Δ_bounds[1]`"""
-function trust_region_at_floor(algo::SCPAlgorithm)
-    at_floor = all(algo.tr.Δ .<= algo.Δ_bounds[1])
+"""
+    trust_region_at_lower_bound(algo::SCPAlgorithm)
+
+True when every trust-region radius (state, and control if used) is already at its lower bound
+`Δ_bounds[1]`, so a rejected step cannot shrink the subproblem any further.
+"""
+function trust_region_at_lower_bound(algo::SCPAlgorithm)
+    at_bound = all(algo.tr.Δ .<= algo.Δ_bounds[1])
     if algo.use_trustregion_control && !isnothing(algo.tr_u)
-        at_floor = at_floor && all(algo.tr_u.Δ .<= algo.Δ_bounds[1])
+        at_bound = at_bound && all(algo.tr_u.Δ .<= algo.Δ_bounds[1])
     end
-    return at_floor
+    return at_bound
 end
 
 
@@ -218,6 +223,7 @@ Returns `(rho, kind)`, where `rho = ΔJ/ΔL` (or `NaN` if `ΔL == 0`) and `kind`
 The threshold is `ε = min(tol_ΔL * max(1, |J_ref|), tol_abs)`: relative to the merit to
 account for solver accuracy, but never above `tol_abs` (the optimality tolerance), so that a
 constant offset in the objective cannot hide a decrease the stopping test would care about.
+A non-positive `tol_abs` (convergence test disabled) leaves `ε` uncapped.
 """
 function classify_step(
     ΔJ::Real, ΔL::Real, J_ref::Real,
@@ -225,7 +231,10 @@ function classify_step(
     tol_ΔL::Real = 1e-8,
     tol_abs::Real = Inf,
 )
-    ε = min(tol_ΔL * max(1.0, abs(J_ref)), tol_abs)
+    ε = tol_ΔL * max(1.0, abs(J_ref))
+    if tol_abs > 0          # a non-positive tol_abs (e.g. tol_opt = -1 to disable convergence) leaves ε uncapped
+        ε = min(ε, tol_abs)
+    end
     rho = ΔL == 0 ? NaN : ΔJ / ΔL
     if !ref_feasible || (ref_is_initial_guess && ΔL < -ε)
         return rho, :restoration

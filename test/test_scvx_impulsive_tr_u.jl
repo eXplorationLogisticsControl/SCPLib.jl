@@ -11,7 +11,7 @@ end
 
 
 # -------------------- setup parameters -------------------- #
-struct ControlParams_impulsive_tr_u
+struct ControlParams_scvx_impulsive_tr_u
     μ::Float64
 end
 
@@ -21,7 +21,7 @@ function test_scvx_impulsive_tr_u(;verbosity::Int = 0, get_plot::Bool = false)
     TU = 382981     # sec
     MU = 500.0      # kg
     VU = DU/TU      # km/s
-    params = ControlParams_impulsive_tr_u(μ)
+    params = ControlParams_scvx_impulsive_tr_u(μ)
 
     function eom!(drv, rv, pu, t)
         (; params, u) = pu

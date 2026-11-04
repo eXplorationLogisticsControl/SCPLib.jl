@@ -195,7 +195,9 @@ Solve non-convex OCP with SCvx algorithm
 # Keyword arguments
 - `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`
 - `tol_ΔL::Float64`: relative tolerance on the predicted reduction; `|ΔL| ≤ ε` with
-  `ε = min(tol_ΔL * max(1,|J_ref|), tol_opt)` is treated as zero (no model decrease)
+  `ε = min(tol_ΔL * max(1,|J_ref|), tol_opt)` is treated as zero (no model decrease); a
+  negative `tol_opt` leaves `ε` uncapped and disables the stationarity-based exits
+  (`:Optimal` from a null step, `:InfeasibleStationary`)
 
 # Step classification and termination
 Steps are classified as in `solve!(::SCvxStar, ...)` (restoration step from a convex-infeasible
@@ -205,8 +207,9 @@ initial guess, ratio test, null step, rejection). Termination statuses:
   `J0 ≤ tol_J0` with `χ ≤ tol_feas`
 - `:InfeasibleStationary`: the reference is a stationary point of the penalized problem
   (`ΔL ≈ 0`) but violates the non-convex constraints (Mao et al. 2018); increase `w`
-- `:TRCollapsed`: a step is rejected while the trust-region is at its lower bound; the last
-  accepted reference is returned
+- `:Stalled` / `:Feasible`: a step is rejected while the trust-region is already at its lower
+  bound, so the subproblem cannot change; the last accepted reference is returned, with status
+  `:Feasible` if it satisfies `χ ≤ tol_feas` and `:Stalled` otherwise
 - `:CPFailed`, `:Feasible`, `:MaxIterReached`
 """
 function solve!(
@@ -237,7 +240,7 @@ function solve!(
 
     # check whether the initial guess satisfies the convex constraints (before any linearized or
     # trust-region constraints are added); if not, the first step is a restoration step
-    ref_feasible = reference_convex_feasible(prob, x_ref, u_ref; atol = tol_feas)
+    ref_feasible = reference_convex_feasible(prob, x_ref, u_ref; atol = max(tol_feas, sqrt(eps())))
     ref_is_initial_guess = true
 
     # l1-penalty epigraph variables, created once
@@ -363,7 +366,7 @@ function solve!(
         accept = step_kind == :restoration || (step_kind == :ratio && rho_i >= algo.rhos[1])
         tr_action = trust_region_action(algo, step_kind, rho_i)
         # rejected step while the trust-region cannot shrink any further
-        collapsed = !accept && tr_action == :shrink && trust_region_at_floor(algo)
+        collapsed = !accept && tr_action == :shrink && trust_region_at_lower_bound(algo)
 
         if verbosity > 0
             if mod(it, 20) == 0
@@ -402,7 +405,7 @@ function solve!(
         # convergence check: |ΔJ| is only a stationarity measure for an accepted step that is not
         # bounded by the trust-region; a null step certifies stationarity of the reference
         converged_ratio = step_kind == :ratio && accept && !tr_active && (abs(ΔJ) <= tol_opt) && (χ <= tol_feas)
-        converged_null  = step_kind == :stationary && (χ_ref <= tol_feas)
+        converged_null  = step_kind == :stationary && (tol_opt >= 0) && (χ_ref <= tol_feas)   # tol_opt < 0 disables convergence
         reached_J0      = (J0_rec <= tol_J0) && (χ_rec <= tol_feas)
         if converged_ratio || converged_null || reached_J0
             solution.status = :Optimal
@@ -412,7 +415,7 @@ function solve!(
 
         # stationary point of the exact penalty function that is infeasible: with a fixed
         # penalty weight no further progress is possible (Mao et al. 2018)
-        if step_kind == :stationary
+        if step_kind == :stationary && (tol_opt >= 0) && (χ_ref > tol_feas)
             solution.status = :InfeasibleStationary
             if verbosity > 0
                 @warn("Exiting at an infeasible stationary point of the penalized problem (χ = $(χ_ref)); consider increasing w")
@@ -443,14 +446,17 @@ function solve!(
         # update trust-region
         flag_trust_region = update_trust_region!(algo, tr_action)
 
+        # a rejected step at the lower bound cannot change the subproblem: stop at the reference
         if collapsed
-            solution.status = :TRCollapsed
+            solution.status = χ_rec <= tol_feas ? :Feasible : :Stalled
             if verbosity > 0
                 @warn("Exiting as trust-region collapsed to its lower bound Δ_min = $(algo.Δ_bounds[1])")
             end
             push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
+
+        push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
 
         if verbosity >= 2
             # extra information when verbosity >= 2
@@ -469,7 +475,6 @@ function solve!(
                 solution.status = :MaxIterReached
             end
         end
-        push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
     end
     tcpu_end = time()
     solution.info[:cpu_times][:time_total] = tcpu_end - tcpu_start

@@ -6,7 +6,7 @@ Tests for the trust-region globalization of SCvx* / SCvx / ProxLinear
 - M4: SCvx / ProxLinear slack variables and cones are created once
 - M9: control trust region can be enabled without passing `nu`
 - M10: stopping test requires an accepted step that is not bounded by the trust region;
-       `:TRCollapsed` / `:InfeasibleStationary` statuses
+       stall exit at the trust-region lower bound returns the reference; `:InfeasibleStationary`
 """
 
 using Clarabel
@@ -84,6 +84,8 @@ function test_classify_step()
     @test SCPLib.classify_step(-3.0, 1e-9, 1.0, true, false, true; tol_ΔL = tol)[2] == :unresolved
     # the threshold is capped by tol_abs, so a constant objective offset cannot hide a decrease
     @test SCPLib.classify_step(5e-3, 5e-3, 1e6, true, false, false; tol_ΔL = tol, tol_abs = 1e-4)[2] == :ratio
+    # a non-positive tol_abs (tol_opt = -1 disables convergence) must not make ε negative
+    @test SCPLib.classify_step(0.0, -1e-30, 0.0, true, true, false; tol_ΔL = tol, tol_abs = -1.0)[2] == :stationary
     @test SCPLib.classify_step(5e-3, 5e-3, 1e6, true, false, false; tol_ΔL = tol)[2] == :stationary
     # ΔL < 0 from a convex-feasible reference with the TR inactive: the solver cannot improve on
     # the reference (solver noise), so the reference is stationary
@@ -107,7 +109,7 @@ function test_restoration_step()
 end
 
 
-function test_tr_collapse()
+function test_tr_collapse()   # stall exit at the trust-region lower bound
     for make_algo in (
         () -> SCPLib.SCvx(1, 2; w = 1e3, Δ_bounds = (1e-4, 10.0)),
         () -> SCPLib.SCvxStar(1, 2; w0 = 1e2, l1_penalty = true, Δ_bounds = (1e-4, 10.0)),
@@ -115,7 +117,7 @@ function test_tr_collapse()
         prob, x_ref, u_ref = _glob_lin_problem(set_dynamics_cache! = _glob_wrong_sign_cache!)
         algo = make_algo()
         sol = SCPLib.solve!(algo, prob, x_ref, u_ref; verbosity = verbosity, maxiter = 100)
-        @test sol.status == :TRCollapsed
+        @test sol.status == :Feasible                # stall exit; the reference (zeros) has χ = 0
         @test sol.n_iter < 100
         @test !any(sol.info[:accept])
         @test all(algo.tr.Δ .== 1e-4)
