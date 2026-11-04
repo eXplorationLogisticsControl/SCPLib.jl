@@ -426,7 +426,8 @@ function solve!(
             _, g_dynamics = prob.fun_get_trajectory(prob, _x, _u)
         end
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
-        h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
+        h_raw = prob.nh > 0 ? prob.h_noncvx(prob.lincache, _x, _u) : nothing   # raw h, for the μ update
+        h_noncvx = prob.nh > 0 ? max.(h_raw, 0) : nothing                     # h⁺, for J and χ
 
         # check improvement
         J_ref = prob.objective(x_ref, u_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
@@ -499,7 +500,8 @@ function solve!(
                     algo.λ = algo.λ + algo.w * g_noncvx
                 end
                 if prob.nh > 0
-                    algo.μ = algo.μ + algo.w * h_noncvx
+                    # inequality multiplier update uses raw h so μ can decrease to 0
+                    algo.μ = max.(0.0, algo.μ .+ algo.w .* h_raw)
                 end
                 algo.w = min(algo.beta * algo.w, algo.w_max)
 

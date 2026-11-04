@@ -90,10 +90,15 @@ function set_linearized_constraints!(
     # set nonconvex inequality constraints
     if prob.nh > 0
         set_h_noncvx_cache!(prob.lincache, prob.∇h_noncvx, x_ref, u_ref)
-        h_ref = max.(prob.h_noncvx(prob.lincache, x_ref, u_ref), 0)
+        # The model uses the raw h(z̄): h(z̄) + ∇h Δz <= ζ with ζ >= 0, so that
+        # ζ = max(0, h(z̄) + ∇h Δz) is the convex model of h⁺. Clipping h(z̄) here
+        # would turn inactive constraints into one-sided barriers. The returned
+        # h_ref is clipped, as callers only use it in the merit function (h⁺).
+        h_raw = prob.h_noncvx(prob.lincache, x_ref, u_ref)
         @constraint(prob.model, constraint_h_noncvx[i in 1:prob.nh],
-            h_ref[i] + prob.lincache.∇h[i,:]' * Δz <= prob.model[:ζ][i]
+            h_raw[i] + prob.lincache.∇h[i,:]' * Δz <= prob.model[:ζ][i]
         )
+        h_ref = max.(h_raw, 0)
     else
         h_ref = nothing
     end

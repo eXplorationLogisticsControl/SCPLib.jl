@@ -145,7 +145,10 @@ function test_scvxstar_h_noncvx(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
-    @test solution.info[:J0][end] ≈ 89.5490390172954 atol=1e-5
+    @test maximum(h_noncvx(nothing, solution.x, solution.u)) <= 1e-6
+    # changed from 89.5490390172954 after linearizing h with raw h(z̄) instead of max(h(z̄),0):
+    # the old barrier kept a ~0.05 m margin from obstacle 1; the constraint is now active
+    @test solution.info[:J0][end] ≈ 89.35655843225972 atol=1e-5
 end
 
 
