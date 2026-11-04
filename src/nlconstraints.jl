@@ -64,9 +64,12 @@ function set_linearized_constraints!(
                 g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
             end
 
+            # the linearized match-point defect is relaxed by the virtual control ξ_dyn, which is
+            # penalized in the merit function: this avoids artificial infeasibility and makes the
+            # reference feasible for its own subproblem, so that L(z̄) = J(z̄)
             Δz = vcat(prob.model[:x] - x_ref..., prob.model[:u] - u_ref...)
             @constraint(prob.model, constraint_dynamics,
-                g_dynamics_ref + prob.lincache.∇g_dyn * Δz == zeros(prob.nx)
+                g_dynamics_ref + prob.lincache.∇g_dyn * Δz == prob.model[:ξ_dyn][:,1]
             )
         end
     end

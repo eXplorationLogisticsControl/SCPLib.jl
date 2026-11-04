@@ -38,3 +38,7 @@ end
     include("test_scvx_dynamics_ad.jl")
     include("test_scvx_impulsive_tr_u.jl")
 end
+
+@testset "Globalization" begin
+    include("test_scp_globalization.jl")
+end
