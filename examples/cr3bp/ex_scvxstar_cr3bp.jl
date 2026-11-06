@@ -157,7 +157,7 @@ end
 
 # solve problem
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref; 
-    maxiter = 100, callback = callback)
+    maxiter = 200, callback = callback)
 
 # propagate solution
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
