@@ -95,9 +95,12 @@ function set_linearized_constraints!(
                 g_dynamics_ref = prob.set_dynamics_cache!(prob, x_ref, u_ref)    # user-defined implementation
             end
 
+            # the linearized match-point defect is relaxed by the virtual control ξ_dyn, which is
+            # penalized in the merit function: this avoids artificial infeasibility and makes the
+            # reference feasible for its own subproblem, so that L(z̄) = J(z̄)
             Δz = vcat(prob.model[:x] - x_ref..., prob.model[:u] - u_ref...)
             @constraint(prob.model, constraint_dynamics,
-                g_dynamics_ref + prob.lincache.∇g_dyn * Δz == zeros(prob.nx)
+                g_dynamics_ref + prob.lincache.∇g_dyn * Δz == prob.model[:ξ_dyn][:,1]
             )
         end
     end
@@ -121,10 +124,15 @@ function set_linearized_constraints!(
     # set nonconvex inequality constraints
     if prob.nh > 0
         set_h_noncvx_cache!(prob.lincache, prob.∇h_noncvx, x_ref, u_ref)
-        h_ref = max.(prob.h_noncvx(prob.lincache, x_ref, u_ref), 0)
+        # The model uses the raw h(z̄): h(z̄) + ∇h Δz <= ζ with ζ >= 0, so that
+        # ζ = max(0, h(z̄) + ∇h Δz) is the convex model of h⁺. Clipping h(z̄) here
+        # would turn inactive constraints into one-sided barriers. The returned
+        # h_ref is clipped, as callers only use it in the merit function (h⁺).
+        h_raw = prob.h_noncvx(prob.lincache, x_ref, u_ref)
         @constraint(prob.model, constraint_h_noncvx[i in 1:prob.nh],
-            h_ref[i] + prob.lincache.∇h[i,:]' * Δz <= prob.model[:ζ][i]
+            h_raw[i] + prob.lincache.∇h[i,:]' * Δz <= prob.model[:ζ][i]
         )
+        h_ref = max.(h_raw, 0)
     else
         h_ref = nothing
     end

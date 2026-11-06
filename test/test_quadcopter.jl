@@ -35,7 +35,10 @@ function test_quadcopter(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
-    @test solution.info[:J0][end] ≈ 89.54904 atol=1e-3
+    # 89.54904 before the C1 fix (PR #82): clipping h(z̄) in the linearization made the obstacle
+    # constraints one-sided barriers, keeping the path 0.05 away from them; with the fix they are
+    # active at the optimum (h ≈ 0) and the cost is lower
+    @test solution.info[:J0][end] ≈ 89.35656 atol=1e-3
 
     # obstacles are avoided
     h_opt = prob.h_noncvx(prob.lincache, solution.x, solution.u)

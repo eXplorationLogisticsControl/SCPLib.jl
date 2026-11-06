@@ -23,6 +23,7 @@ end
     include("test_scvxstar_dynamics_userdefined_oop.jl")
     include("test_scvxstar_dynamics_ad.jl")
     include("test_scvxstar_h_noncvx.jl")
+    include("test_scvxstar_inequality_linearization.jl")
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
     include("test_scvxstar_impulsive_tr_u.jl")
@@ -65,4 +66,8 @@ end
 
 @testset "Problem sets" begin
     include("test_quadcopter.jl")
+end
+
+@testset "Globalization" begin
+    include("test_scp_globalization.jl")
 end

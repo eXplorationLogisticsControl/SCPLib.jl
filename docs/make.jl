@@ -28,6 +28,9 @@ makedocs(
           "Basic OCP" => "ocp_basic_cr3bp.md",
           "Non-convex path constraints" => "ocp_ncvx.md",
         ],
+        "Advanced" => Any[
+          "User-defined linearized constraints" => "advanced/set_linearized_constraints.md",
+        ],
         "Examples" => Any[
           "Brachistochrone" => "examples/example_brachistochrone.md",
           "Hypersensitive" => "examples/example_hypersensitive.md",

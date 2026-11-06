@@ -249,7 +249,7 @@ function test_scvxstar_custom_linearized_constraints(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
-    @test solution.info[:J0][end] ≈ 4.894728467119614 atol=1e-8
+    @test solution.info[:J0][end] ≈ 4.894669576189742 atol=1e-8
     return solution
 end
 
