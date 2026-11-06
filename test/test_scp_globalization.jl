@@ -88,8 +88,24 @@ function test_classify_step()
     @test SCPLib.classify_step(0.0, -1e-30, 0.0, true, true, false; tol_ΔL = tol, tol_abs = -1.0)[2] == :stationary
     @test SCPLib.classify_step(5e-3, 5e-3, 1e6, true, false, false; tol_ΔL = tol)[2] == :stationary
     # ΔL < 0 from a convex-feasible reference with the TR inactive: the solver cannot improve on
-    # the reference (solver noise), so the reference is stationary
-    @test SCPLib.classify_step(-1e-5, -1e-5, 0.2, true, false, false; tol_ΔL = tol)[2] == :stationary
+    # the reference (solver noise), so the reference is stationary. The noise can exceed tol_opt:
+    # test_scvx_impulsive_tr_u ends on ΔL ≈ -3e-5 with tol_opt = 1e-6 (w = 1e3), and the biased
+    # impulsive test on ΔL ≈ -3e-5 with tol_opt = 1e-4 (w ≈ 2.7e12), both with J ≈ 0.2
+    @test SCPLib.classify_step(-1e-4, -3e-5, 0.2, true, false, false; tol_ΔL = tol, tol_abs = 1e-6)[2] == :stationary
+    @test SCPLib.classify_step(-1e-4, -3e-5, 0.2, true, false, false; tol_ΔL = tol, tol_abs = 1e-4)[2] == :stationary
+    # ... but a candidate much worse than the reference is a failed solve / inconsistent model and
+    # must not certify stationarity, whatever the optimality tolerance
+    @test SCPLib.classify_step(-10.0, -10.0, 0.2, true, false, false; tol_ΔL = tol, tol_abs = 1e-4)[2] == :reject
+    @test SCPLib.classify_step(-1e-2, -1e-2, 1.0, true, false, false; tol_ΔL = tol, tol_abs = 1e-6)[2] == :reject
+    @test SCPLib.classify_step(-1e-2, -1e-2, 1.0, true, false, false; tol_ΔL = tol)[2] == :reject
+    # the bound is relative to the merit (like the solver accuracy) ...
+    @test SCPLib.classify_step(-1e-2, -1e-2, 1e2, true, false, false; tol_ΔL = tol)[2] == :stationary
+    # ... and tunable: tol_ΔL_null = 0 leaves only ε and the optimality tolerance
+    @test SCPLib.classify_step(-3e-5, -3e-5, 0.2, true, false, false; tol_ΔL = tol, tol_ΔL_null = 0.0)[2] == :reject
+    @test SCPLib.classify_step(-3e-5, -3e-5, 0.2, true, false, false; tol_ΔL = tol, tol_ΔL_null = 0.0, tol_abs = 1e-4)[2] == :stationary
+    @test SCPLib.classify_step(-1e-9, -1e-9, 0.2, true, false, false; tol_ΔL = tol, tol_ΔL_null = 0.0)[2] == :stationary
+    # with the TR active the negative side stays at ε (reject → shrink)
+    @test SCPLib.classify_step(-1e-4, -3e-5, 0.2, true, false, true; tol_ΔL = tol, tol_abs = 1e-4)[2] == :reject
 end
 
 
@@ -123,6 +139,29 @@ function test_tr_collapse()   # stall exit at the trust-region lower bound
         @test all(algo.tr.Δ .== 1e-4)
         @test sol.x == zeros(1, 2)                  # the reference, not a rejected candidate
         @test sol.u == zeros(1, 1)
+    end
+end
+
+
+function test_rejected_step_at_maxiter()
+    # every step is rejected (wrong-sign model) and maxiter is reached before the TR collapses:
+    # the solution must be the reference (zeros, χ = 0), not the last rejected candidate
+    for make_algo in (
+        () -> SCPLib.SCvx(1, 2; w = 1e3, Δ_bounds = (1e-4, 10.0)),
+        () -> SCPLib.SCvxStar(1, 2; w0 = 1e2, l1_penalty = true, Δ_bounds = (1e-4, 10.0)),
+    )
+        prob, x_ref, u_ref = _glob_lin_problem(set_dynamics_cache! = _glob_wrong_sign_cache!)
+        algo = make_algo()
+        sol = SCPLib.solve!(algo, prob, x_ref, u_ref; verbosity = verbosity, maxiter = 3)
+        @test sol.n_iter == 3
+        @test !any(sol.info[:accept])
+        @test all(algo.tr.Δ .> 1e-4)                 # stopped by maxiter, not by the TR collapse
+        @test sol.status == :Feasible                # judged on the reference, which has χ = 0
+        @test sol.x == zeros(1, 2)
+        @test sol.u == zeros(1, 1)
+        @test all(sol.info[:J0] .== 0.0)             # info describes the reference, not the candidates
+        @test all(sol.info[:ΔJ] .== 0.0)
+        @test all(sol.info[:χ] .== 0.0)
     end
 end
 
@@ -253,6 +292,7 @@ end
     @testset "classify_step" begin test_classify_step() end
     @testset "restoration step (M2)" begin test_restoration_step() end
     @testset "TR collapse (M10)" begin test_tr_collapse() end
+    @testset "rejected step at maxiter" begin test_rejected_step_at_maxiter() end
     @testset "stationary reference (M2/M10)" begin test_stationary_start() end
     @testset "no false convergence at tiny Δ (M10)" begin test_no_false_convergence_tiny_tr() end
     @testset "objective offset invariance" begin test_objective_offset() end

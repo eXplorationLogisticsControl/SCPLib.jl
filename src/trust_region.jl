@@ -199,7 +199,7 @@ end
 
 """
     classify_step(ΔJ, ΔL, J_ref, ref_feasible, ref_is_initial_guess, tr_active;
-                  tol_ΔL = 1e-8, tol_abs = Inf)
+                  tol_ΔL = 1e-8, tol_abs = Inf, tol_ΔL_null = 1e-3)
 
 Classify a trust-region step from the actual (`ΔJ`) and predicted (`ΔL`) merit reductions.
 Returns `(rho, kind)`, where `rho = ΔJ/ΔL` (or `NaN` if `ΔL == 0`) and `kind` is one of:
@@ -209,16 +209,22 @@ Returns `(rho, kind)`, where `rho = ΔJ/ΔL` (or `NaN` if `ΔL == 0`) and `kind`
   convex-feasible `z̄` and a consistent model, `L(z̄) = J(z̄)` and `ΔL ≥ 0`). The ratio is
   meaningless; the step is accepted without a ratio test.
 - `:ratio`: `ΔL > ε`; the regular ratio test applies to `rho`.
-- `:stationary`: `ΔL ≤ ε` and the trust-region is inactive at the candidate (null step). The
-  reference is feasible for its own subproblem with `L(z̄) = J(z̄)`, so the subproblem cannot
-  improve on it by more than `ε` (a negative `ΔL` only means the solver returned a point worse
-  than `z̄`, i.e. `z̄` is optimal to within the solver accuracy); since the trust-region is
-  inactive, `z̄` is a stationary point of the penalized problem.
+- `:stationary`: `-ε_null ≤ ΔL ≤ ε` and the trust-region is inactive at the candidate (null
+  step). The reference is feasible for its own subproblem with `L(z̄) = J(z̄)`, so the subproblem
+  cannot improve on it by more than `ε` (a slightly negative `ΔL` only means the solver returned
+  a point marginally worse than `z̄`, i.e. `z̄` is optimal to within the solver accuracy); since
+  the trust-region is inactive, `z̄` is a stationary point of the penalized problem.
+  The negative side is bounded by `ε_null = max(ε, tol_ΔL_null * max(1, |J_ref|), tol_abs)`
+  (`tol_abs` only if it is a positive finite number). The solver noise in `ΔL` can exceed `ε`
+  and the optimality tolerance: `z̄` satisfies the convex constraints only to the solver accuracy,
+  and the penalty weight amplifies the correction the subproblem has to make (ΔL ≈ -3e-5 with
+  J ≈ 0.2 has been observed both at w = 1e3 and at w ≈ 3e12). A candidate worse than `z̄` by more
+  than `ε_null` is not noise but a failed solve or an inconsistent model.
 - `:unresolved`: `|ΔL| ≤ ε` while the step is bounded by the trust-region: the predicted decrease
   is below resolution because the trust-region is too small to tell. The reference is kept and
   the trust-region is expanded (shrinking would only make `ΔL` smaller).
-- `:reject`: `ΔL < -ε` while the step is bounded by the trust-region (inconsistent model or
-  solver inaccuracy); the trust-region is shrunk.
+- `:reject`: `ΔL < -ε` while the step is bounded by the trust-region, or `ΔL < -ε_null` while it
+  is not (inconsistent model or failed subproblem solve); the trust-region is shrunk.
 
 The threshold is `ε = min(tol_ΔL * max(1, |J_ref|), tol_abs)`: relative to the merit to
 account for solver accuracy, but never above `tol_abs` (the optimality tolerance), so that a
@@ -230,6 +236,7 @@ function classify_step(
     ref_feasible::Bool, ref_is_initial_guess::Bool, tr_active::Bool;
     tol_ΔL::Real = 1e-8,
     tol_abs::Real = Inf,
+    tol_ΔL_null::Real = 1e-3,
 )
     ε = tol_ΔL * max(1.0, abs(J_ref))
     if tol_abs > 0          # a non-positive tol_abs (e.g. tol_opt = -1 to disable convergence) leaves ε uncapped
@@ -241,7 +248,14 @@ function classify_step(
     elseif ΔL > ε
         return rho, :ratio
     elseif !tr_active
-        return rho, :stationary
+        # a slightly negative ΔL only means the solver returned a point marginally worse than z̄;
+        # a candidate much worse than z̄ is not solver noise but a failed subproblem solve or an
+        # inconsistent model, so it cannot certify stationarity
+        ε_null = max(ε, tol_ΔL_null * max(1.0, abs(J_ref)))
+        if 0 < tol_abs < Inf
+            ε_null = max(ε_null, tol_abs)
+        end
+        return rho, (ΔL >= -ε_null ? :stationary : :reject)
     elseif ΔL >= -ε
         return rho, :unresolved
     else
