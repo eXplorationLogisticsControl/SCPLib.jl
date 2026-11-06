@@ -289,6 +289,10 @@ Solve non-convex OCP with SCvx* algorithm
   `ε = min(tol_ΔL * max(1,|J_ref|), tol_opt)` is treated as zero (no model decrease); a
   negative `tol_opt` leaves `ε` uncapped and disables the stationarity-based exits
   (`:Optimal` from a null step, `:InfeasibleStationary`)
+- `tol_ΔL_null::Float64`: relative bound on how negative `ΔL` may be in a null step;
+  with the trust-region inactive, `ΔL < -ε_null`, `ε_null = max(ε, tol_ΔL_null * max(1,|J_ref|), tol_opt)`,
+  is treated as a failed subproblem solve / inconsistent model and rejected instead of
+  certifying the reference as stationary
 - `max_null_steps::Int`: number of consecutive null steps at an infeasible reference after which
   `:InfeasibleStationary` is returned
 
@@ -296,12 +300,17 @@ Solve non-convex OCP with SCvx* algorithm
 - If the initial guess violates the convex constraints of the model, the first step is a
   restoration step: it is accepted without a ratio test and the trust-region is kept.
 - If `ΔL > ε`, the usual ratio test `ρ = ΔJ/ΔL` is applied.
-- If `ΔL ≤ ε` and the trust-region is inactive, the reference is a stationary point of the
-  subproblem (null step): it is returned as `:Optimal` if feasible, otherwise the multipliers and
-  penalty weight are updated at the reference.
+- If `-ε_null ≤ ΔL ≤ ε` and the trust-region is inactive, the reference is a stationary point of
+  the subproblem (null step): it is returned as `:Optimal` if feasible, otherwise the multipliers
+  and penalty weight are updated at the reference. A candidate much worse than the reference
+  (`ΔL < -ε_null`, see `tol_ΔL_null`) is rejected instead.
 - If `|ΔL| ≤ ε` with the trust-region active, the predicted decrease is unresolved at this
   trust-region size: the reference is kept and the trust-region expands.
 - If `ΔL < -ε` with the trust-region active, the step is rejected and the trust-region shrinks.
+
+The returned `solution` (and `solution.info`, and the callback arguments) always describes the
+current iterate: the candidate of an accepted step, otherwise the reference. A rejected candidate
+is never returned (except when it already satisfies `J0 ≤ tol_J0` and `χ ≤ tol_feas`).
 
 # Termination status
 - `:Optimal`: an accepted step that is not bounded by the trust-region has `|ΔJ| ≤ tol_opt` and
@@ -331,6 +340,7 @@ function solve!(
     warmstart_primal::Bool = false,
     warmstart_dual::Bool = false,
     tol_ΔL::Float64 = 1e-8,
+    tol_ΔL_null::Float64 = 1e-3,
     max_null_steps::Int = 10,
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
@@ -514,7 +524,7 @@ function solve!(
         # classify step
         tr_active = trust_region_active(algo, _x, _u, x_ref, u_ref)
         rho_i, step_kind = classify_step(ΔJ, ΔL, J_ref, ref_feasible, ref_is_initial_guess, tr_active;
-                                         tol_ΔL = tol_ΔL, tol_abs = tol_opt)
+                                         tol_ΔL = tol_ΔL, tol_abs = tol_opt, tol_ΔL_null = tol_ΔL_null)
         if step_kind == :unresolved && trust_region_at_ceiling(algo)
             step_kind = :stationary     # no resolvable decrease even at the largest trust-region
         end
@@ -532,12 +542,15 @@ function solve!(
                     message_step(step_kind, accept))
         end
 
-        # iterate on record: the candidate, or the reference itself for a null step or when the
-        # trust-region has collapsed (the reference is then what is returned)
-        if step_kind == :stationary || collapsed
-            x_rec, u_rec, J0_rec, ΔJ_rec, χ_rec = x_ref, u_ref, J0_ref, 0.0, χ_ref
-        else
+        # iterate on record (held by `solution`, stored in `info`, passed to the callback): the
+        # candidate if it becomes the new reference (accepted step) or already meets the objective
+        # target `tol_J0` while feasible; otherwise the reference, which remains the current iterate
+        # (rejected, unresolved and null steps, trust-region collapse), so a rejected candidate is
+        # never returned, e.g. when `maxiter` is reached on a rejected step
+        if accept || ((J0 <= tol_J0) && (χ <= tol_feas))
             x_rec, u_rec, J0_rec, ΔJ_rec, χ_rec = _x, _u, J0, ΔJ, χ
+        else
+            x_rec, u_rec, J0_rec, ΔJ_rec, χ_rec = x_ref, u_ref, J0_ref, 0.0, χ_ref
         end
 
         # update current solution
