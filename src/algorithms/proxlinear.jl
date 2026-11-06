@@ -44,27 +44,22 @@ function Base.show(io::IO, algo::ProxLinear)
 end
 
 
-"""Solve convex subproblem for Prox-linear algorithm"""
-function solve_convex_subproblem!(
-    algo::ProxLinear, prob::OptimalControlProblem,
-    x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint},
-)
+"""
+    add_proxlinear_slacks!(algo::ProxLinear, prob::OptimalControlProblem)
 
-    # prepare slack for proximal term
-    Δvars = [
-        reshape(prob.model[:x] - x_ref, prod(size(prob.model[:x])));
-    ]
-    if algo.proximal_u
-        append!(Δvars, reshape(prob.model[:u] - u_ref, prod(size(prob.model[:u]))))
-    end
-    ϵ_proximal = @variable(prob.model)
-    @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
-
+Create the slack variables of the prox-linear subproblem: the l1 epigraph of the dynamics
+defects `ϵ_noncvx_dyn ≥ |ξ_dyn|`, the l1 epigraph of the non-convex equality constraints
+`ϵ_noncvx_g ≥ ‖ξ‖₁`, and the proximal-term epigraph variable `ϵ_proximal`.
+The first two do not depend on the reference, so they are created once per solve and reused;
+the second-order cone constraint defining `ϵ_proximal ≥ ‖Z - Z_ref‖₂` is replaced at each iteration.
+"""
+function add_proxlinear_slacks!(algo::ProxLinear, prob::OptimalControlProblem)
     # L1 penalty on dynamics constraints
-    ϵ_noncvx_dyn = @variable(prob.model, [1:prob.nx,1:prob.N-1])
+    ξ_dyn = prob.model[:ξ_dyn]
+    ϵ_noncvx_dyn = @variable(prob.model, [1:size(ξ_dyn,1), 1:size(ξ_dyn,2)])
     @constraint(prob.model, ϵ_noncvx_dyn .>= 0.0)
-    @constraint(prob.model, [k in 1:prob.N-1], prob.model[:ξ_dyn][:,k] .<=  ϵ_noncvx_dyn[:,k])
-    @constraint(prob.model, [k in 1:prob.N-1], prob.model[:ξ_dyn][:,k] .>= -ϵ_noncvx_dyn[:,k])
+    @constraint(prob.model, ξ_dyn .<=  ϵ_noncvx_dyn)
+    @constraint(prob.model, ξ_dyn .>= -ϵ_noncvx_dyn)
 
     # L1 penalty on non-convex equality constraints
     if prob.ng > 0
@@ -78,7 +73,43 @@ function solve_convex_subproblem!(
     else
         ϵ_noncvx_g = 0.0
     end
-    
+
+    return Dict{Symbol,Any}(
+        :ϵ_proximal => @variable(prob.model),
+        :ϵ_noncvx_dyn => ϵ_noncvx_dyn,
+        :ϵ_noncvx_g => ϵ_noncvx_g,
+        :constraint_proximal => nothing,
+    )
+end
+
+
+"""
+Solve convex subproblem for Prox-linear algorithm
+
+`slacks` are the subproblem slack variables from `add_proxlinear_slacks!`; when calling this
+function repeatedly on the same problem, create them once and pass them in.
+"""
+function solve_convex_subproblem!(
+    algo::ProxLinear, prob::OptimalControlProblem,
+    x_ref::Union{Matrix,Adjoint}, u_ref::Union{Matrix,Adjoint},
+    slacks::Dict = add_proxlinear_slacks!(algo, prob),
+)
+    ϵ_proximal = slacks[:ϵ_proximal]
+    ϵ_noncvx_dyn = slacks[:ϵ_noncvx_dyn]
+    ϵ_noncvx_g = slacks[:ϵ_noncvx_g]
+
+    # proximal term epigraph: ϵ_proximal ≥ ‖Z - Z_ref‖₂ (depends on the reference, so replace it)
+    if !isnothing(slacks[:constraint_proximal]) && is_valid(prob.model, slacks[:constraint_proximal])
+        delete(prob.model, slacks[:constraint_proximal])
+    end
+    Δvars = [
+        reshape(prob.model[:x] - x_ref, prod(size(prob.model[:x])));
+    ]
+    if algo.proximal_u
+        append!(Δvars, reshape(prob.model[:u] - u_ref, prod(size(prob.model[:u]))))
+    end
+    slacks[:constraint_proximal] = @constraint(prob.model, [ϵ_proximal, Δvars...] in SecondOrderCone())
+
     # max(0, h(x,u)) penalty on non-convex inequality constraints
     if prob.nh > 0
         slack_h_eval = prob.model[:ζ]
@@ -213,6 +244,9 @@ function solve!(
     filter!(e->e≠:constraint_trust_region_x_lb, prob.model_nl_references)
     filter!(e->e≠:constraint_trust_region_x_ub, prob.model_nl_references)
 
+    # subproblem slack variables, created once
+    slacks = add_proxlinear_slacks!(algo, prob)
+
     for it in 1:maxiter
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference
@@ -231,7 +265,7 @@ function solve!(
 
         # solve convex subproblem
         tstart_cp = time()
-        _ϵ_noncvx_g, _ϵ_noncvx_h, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref)
+        _ϵ_noncvx_g, _ϵ_noncvx_h, _ϵ_proximal = solve_convex_subproblem!(algo, prob, x_ref, u_ref, slacks)
         push!(solution.info[:cpu_times][:time_subproblem], time() - tstart_cp)
 
         # check termination status

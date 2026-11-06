@@ -5,6 +5,24 @@
 SCvx algorithm
 
 # Arguments
+- `nx::Int`: number of states
+- `N::Int`: number of time steps
+- `Δ0`: initial (state) trust-region size
+- `w::Float64`: exact (l1) penalty weight
+- `rhos::Tuple{Real,Real,Real}`: trust-region acceptance thresholds
+- `alphas::Tuple{Real,Real}`: trust-region size update factors
+- `Δ_bounds::Tuple{Float64,Float64}`: trust-region size bounds
+- `nu::Union{Nothing,Int}`: number of controls (optional; only used to build the control trust-region
+  at construction, otherwise it is built from the problem at the first solve)
+- `Δ0_u`: initial control trust-region size (used if `use_trustregion_control = true`)
+- `use_trustregion_control::Bool`: whether to also impose a trust-region on the controls `u`
+
+!!! note "Trust-region on the controls"
+    By default (`use_trustregion_control = false`) the trust-region only bounds the states `x`.
+    The convergence theory of SCvx (Mao et al. 2018) assumes a trust-region on all decision
+    variables, which is what makes the linearization error (and hence the ratio test) vanish as
+    Δ → 0. When the dynamics or the non-convex constraints are nonlinear in `u`, set
+    `use_trustregion_control = true`.
 """
 mutable struct SCvx <: TrustRegionAlgorithm
     # storage
@@ -17,6 +35,7 @@ mutable struct SCvx <: TrustRegionAlgorithm
     alphas::Tuple{Real,Real}
     Δ_bounds::Tuple{Float64,Float64}
     use_trustregion_control::Bool
+    Δ0_u::Union{Float64,Vector{Float64},Matrix{Float64}}
 
     function SCvx(
         nx::Int,
@@ -31,12 +50,10 @@ mutable struct SCvx <: TrustRegionAlgorithm
         use_trustregion_control::Bool = false,
     )
         tr = TrustRegions(nx, N, Δ0)
-        if use_trustregion_control && isnothing(nu)
-            @error "Number of control variables `nu` is not provided to SCvxStar"
-        end
+        # if `nu` is not provided, the control trust-region is built at the first solve
         tr_u = use_trustregion_control && !isnothing(nu) ? TrustRegions(nu, N, Δ0_u) : nothing
-        
-        new(tr, tr_u, w, rhos, alphas, Δ_bounds, use_trustregion_control)
+
+        new(tr, tr_u, w, rhos, alphas, Δ_bounds, use_trustregion_control, Δ0_u)
     end
 end
 
@@ -65,34 +82,61 @@ function penalty(algo::SCvx, prob::OptimalControlProblem, ξ_dyn, ξ, ζ)
 end
 
 
-function penalty(algo::SCvx, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1)
-    P = algo.w * sum(slacks_L1[:slack_gdyn])
-    @constraint(prob.model, [slacks_L1[:slack_gdyn]; vec(ξ_dyn)] in MOI.NormOneCone(1 + prod(size(ξ_dyn))))
-    if prob.ng > 0
-        P += algo.w * sum(slacks_L1[:slack_gnoncvx])
-        @constraint(prob.model, [slacks_L1[:slack_gnoncvx]; ξ] in MOI.NormOneCone(1 + length(ξ)))
-    end
-    if prob.nh > 0
-        # this penalization works because ζ is defined to be non-negative
-        P += algo.w * sum(slacks_L1[:slack_hnoncvx])
-        @constraint(prob.model, [slacks_L1[:slack_hnoncvx]; ζ] in MOI.NormOneCone(1 + length(ζ)))
-    end
-    return P
-end
+"""
+    add_l1_slacks!(algo::SCvx, prob::OptimalControlProblem)
 
-
-"""Solve convex subproblem for SCvx algorithm"""
-function solve_convex_subproblem!(algo::SCvx, prob::OptimalControlProblem)
-    # set objective with penalty
-    _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
-    _ζ = prob.nh > 0 ? prob.model[:ζ] : nothing
-
-    # append slack variable for l1 penalty term
+Create the epigraph variables `t ≥ ‖ξ_dyn‖₁`, `t ≥ ‖ξ‖₁`, `t ≥ ‖ζ‖₁` of the exact penalty.
+These do not depend on the reference, so they are created once per solve and reused at every
+iteration (only the objective is rebuilt).
+"""
+function add_l1_slacks!(algo::SCvx, prob::OptimalControlProblem)
     slacks_L1 = Dict(
         :slack_gdyn => @variable(prob.model),
         :slack_gnoncvx => prob.ng > 0 ? @variable(prob.model) : nothing,
         :slack_hnoncvx => prob.nh > 0 ? @variable(prob.model) : nothing,
     )
+    ξ_dyn = prob.model[:ξ_dyn]
+    @constraint(prob.model, [slacks_L1[:slack_gdyn]; vec(ξ_dyn)] in MOI.NormOneCone(1 + length(ξ_dyn)))
+    if prob.ng > 0
+        ξ = prob.model[:ξ]
+        @constraint(prob.model, [slacks_L1[:slack_gnoncvx]; ξ] in MOI.NormOneCone(1 + length(ξ)))
+    end
+    if prob.nh > 0
+        # this penalization works because ζ is defined to be non-negative
+        ζ = prob.model[:ζ]
+        @constraint(prob.model, [slacks_L1[:slack_hnoncvx]; ζ] in MOI.NormOneCone(1 + length(ζ)))
+    end
+    return slacks_L1
+end
+
+
+"""
+SCvx exact penalty function for the JuMP model, in terms of the epigraph variables created by
+`add_l1_slacks!`
+"""
+function penalty(algo::SCvx, prob::OptimalControlProblem, ξ_dyn::Matrix{VariableRef}, ξ, ζ, slacks_L1)
+    P = algo.w * slacks_L1[:slack_gdyn]
+    if prob.ng > 0
+        P += algo.w * slacks_L1[:slack_gnoncvx]
+    end
+    if prob.nh > 0
+        P += algo.w * slacks_L1[:slack_hnoncvx]
+    end
+    return P
+end
+
+
+"""
+Solve convex subproblem for SCvx algorithm
+
+`slacks_L1` are the l1-penalty epigraph variables from `add_l1_slacks!`; when calling this
+function repeatedly on the same problem, create them once and pass them in.
+"""
+function solve_convex_subproblem!(algo::SCvx, prob::OptimalControlProblem,
+                                  slacks_L1::Dict = add_l1_slacks!(algo, prob))
+    # set objective with penalty
+    _ξ = prob.ng > 0 ? prob.model[:ξ] : nothing
+    _ζ = prob.nh > 0 ? prob.model[:ζ] : nothing
 
     J = prob.objective(prob.model[:x], prob.model[:u])
     P = penalty(algo, prob, prob.model[:ξ_dyn], _ξ, _ζ, slacks_L1)
@@ -150,6 +194,23 @@ Solve non-convex OCP with SCvx algorithm
 
 # Keyword arguments
 - `callback::Union{Nothing,Function}`: called each iteration as `callback(algo, solution, iteration, J0, χ)`
+- `tol_ΔL::Float64`: relative tolerance on the predicted reduction; `|ΔL| ≤ ε` with
+  `ε = min(tol_ΔL * max(1,|J_ref|), tol_opt)` is treated as zero (no model decrease); a
+  negative `tol_opt` leaves `ε` uncapped and disables the stationarity-based exits
+  (`:Optimal` from a null step, `:InfeasibleStationary`)
+
+# Step classification and termination
+Steps are classified as in `solve!(::SCvxStar, ...)` (restoration step from a convex-infeasible
+initial guess, ratio test, null step, rejection). Termination statuses:
+- `:Optimal`: an accepted step that is not bounded by the trust-region has `|ΔJ| ≤ tol_opt` and
+  `χ ≤ tol_feas`; or the reference is a feasible stationary point of the subproblem; or
+  `J0 ≤ tol_J0` with `χ ≤ tol_feas`
+- `:InfeasibleStationary`: the reference is a stationary point of the penalized problem
+  (`ΔL ≈ 0`) but violates the non-convex constraints (Mao et al. 2018); increase `w`
+- `:Stalled` / `:Feasible`: a step is rejected while the trust-region is already at its lower
+  bound, so the subproblem cannot change; the last accepted reference is returned, with status
+  `:Feasible` if it satisfies `χ ≤ tol_feas` and `:Stalled` otherwise
+- `:CPFailed`, `:Feasible`, `:MaxIterReached`
 """
 function solve!(
     algo::SCvx,
@@ -165,14 +226,27 @@ function solve!(
     callback::Union{Nothing,Function} = nothing,
     warmstart_primal::Bool = false,
     warmstart_dual::Bool = false,
+    tol_ΔL::Float64 = 1e-8,
 )
+    ensure_trust_region_control!(algo, prob)
+    clamp_trust_region!(algo)
     if algo.use_trustregion_control
         @assert prob.nu == size(algo.tr_u.Δ,1) "Number of control variables mismatch between problem and algorithm"
+    elseif verbosity > 0
+        @warn("SCvx trust-region only bounds the states x; set `use_trustregion_control = true` " *
+              "when the dynamics or constraints are nonlinear in u (see `?SCvx`)", maxlog = 1)
     end
     tcpu_start = time()
 
+    # check whether the initial guess satisfies the convex constraints (before any linearized or
+    # trust-region constraints are added); if not, the first step is a restoration step
+    ref_feasible = reference_convex_feasible(prob, x_ref, u_ref; atol = max(tol_feas, sqrt(eps())))
+    ref_is_initial_guess = true
+
+    # l1-penalty epigraph variables, created once
+    slacks_L1 = add_l1_slacks!(algo, prob)
+
     # initialize algorithm hyperparameters
-    rho_i = (algo.rhos[2] + algo.rhos[3]) / 2
     flag_reference    = true    # at initial iteraiton, we need to update reference
     flag_trust_region = true    # (redundant since `flag_reference = true`)
     δ_i = 1e16
@@ -208,7 +282,9 @@ function solve!(
 
     # append trust-region constraints references for nonlinear program
     if algo.use_trustregion_control
-        append!(prob.model_nl_references, [:constraint_trust_region_u_lb, :constraint_trust_region_u_ub])
+        for ref in (:constraint_trust_region_u_lb, :constraint_trust_region_u_ub)
+            ref in prob.model_nl_references || push!(prob.model_nl_references, ref)
+        end
     end
 
 
@@ -241,7 +317,7 @@ function solve!(
 
         # solve convex subproblem
         tstart_cp = time()
-        solve_convex_subproblem!(algo, prob)
+        solve_convex_subproblem!(algo, prob, slacks_L1)
         push!(solution.info[:cpu_times][:time_subproblem], time() - tstart_cp)
 
         # check termination status
@@ -267,23 +343,30 @@ function solve!(
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 
-        # check improvement
-        J_ref = prob.objective(x_ref, u_ref) + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
+        # merit of the reference, actual and predicted merit of the candidate
+        J0_ref = prob.objective(x_ref, u_ref)
+        J_ref = J0_ref + penalty(algo, prob, g_dyn_ref, g_ref, h_ref)
         J0 = prob.objective(_x, _u)
         J = J0 + penalty(algo, prob, g_dynamics, g_noncvx, h_noncvx)
         L = J0 + penalty(algo, prob, _ξ_dyn, _ξ, _ζ)
         ΔJ = J_ref - J            # actual cost reduction, eqn (13a)
         ΔL = J_ref - L            # predicted cost reduction, eqn (13b)
-        rho_i = abs(ΔL) > 1e-12 ? ΔJ / ΔL : 1.0
 
-        # check nonlinear convergence
-        χ = norm(g_dynamics,Inf)
-        if prob.ng > 0
-            χ = max(χ, norm(g_noncvx,Inf))
+        # constraint violation of the candidate and of the reference
+        χ = constraint_violation(prob, g_dynamics, g_noncvx, h_noncvx)
+        χ_ref = constraint_violation(prob, g_dyn_ref, g_ref, h_ref)
+
+        # classify step
+        tr_active = trust_region_active(algo, _x, _u, x_ref, u_ref)
+        rho_i, step_kind = classify_step(ΔJ, ΔL, J_ref, ref_feasible, ref_is_initial_guess, tr_active;
+                                         tol_ΔL = tol_ΔL, tol_abs = tol_opt)
+        if step_kind == :unresolved && trust_region_at_ceiling(algo)
+            step_kind = :stationary     # no resolvable decrease even at the largest trust-region
         end
-        if prob.nh > 0
-            χ = max(χ, norm(h_noncvx,Inf))
-        end
+        accept = step_kind == :restoration || (step_kind == :ratio && rho_i >= algo.rhos[1])
+        tr_action = trust_region_action(algo, step_kind, rho_i)
+        # rejected step while the trust-region cannot shrink any further
+        collapsed = !accept && tr_action == :shrink && trust_region_at_lower_bound(algo)
 
         if verbosity > 0
             if mod(it, 20) == 0
@@ -291,35 +374,61 @@ function solve!(
             end
             @printf(" %3.0f | % 1.3e | % 1.3e | % 1.3e | % 1.3e | % 1.2e | % 1.2e | % 1.2e |  %s   |\n",
                     it, J0, ΔJ, ΔL, χ, rho_i, algo.tr.Δ[1,1], algo.w,
-                    message_accept_step(rho_i >= algo.rhos[1]))
+                    message_step(step_kind, accept))
+        end
+
+        # iterate on record: the candidate, or the reference itself for a null step or when the
+        # trust-region has collapsed (the reference is then what is returned)
+        if step_kind == :stationary || collapsed
+            x_rec, u_rec, J0_rec, ΔJ_rec, χ_rec = x_ref, u_ref, J0_ref, 0.0, χ_ref
+        else
+            x_rec, u_rec, J0_rec, ΔJ_rec, χ_rec = _x, _u, J0, ΔJ, χ
         end
 
         # update current solution
-        solution.x[:,:] = _x
-        solution.u[:,:] = _u
+        solution.x[:,:] = x_rec
+        solution.u[:,:] = u_rec
 
         if store_iterates
-            push!(solution.info[:J0], J0)
-            push!(solution.info[:ΔJ], ΔJ)
-            push!(solution.info[:χ], χ)
+            push!(solution.info[:J0], J0_rec)
+            push!(solution.info[:ΔJ], ΔJ_rec)
+            push!(solution.info[:χ], χ_rec)
             push!(solution.info[:Δ], algo.tr.Δ)
-            push!(solution.info[:accept], rho_i >= algo.rhos[1])
+            push!(solution.info[:accept], accept)
             solution.n_iter += 1
         end
 
         if !isnothing(callback)
-            callback(algo, solution, it, J0, χ)
+            callback(algo, solution, it, J0_rec, χ_rec)
         end
 
-        if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
+        # convergence check: |ΔJ| is only a stationarity measure for an accepted step that is not
+        # bounded by the trust-region; a null step certifies stationarity of the reference
+        converged_ratio = step_kind == :ratio && accept && !tr_active && (abs(ΔJ) <= tol_opt) && (χ <= tol_feas)
+        converged_null  = step_kind == :stationary && (tol_opt >= 0) && (χ_ref <= tol_feas)   # tol_opt < 0 disables convergence
+        reached_J0      = (J0_rec <= tol_J0) && (χ_rec <= tol_feas)
+        if converged_ratio || converged_null || reached_J0
             solution.status = :Optimal
             push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
-               
+
+        # stationary point of the exact penalty function that is infeasible: with a fixed
+        # penalty weight no further progress is possible (Mao et al. 2018)
+        if step_kind == :stationary && (tol_opt >= 0) && (χ_ref > tol_feas)
+            solution.status = :InfeasibleStationary
+            if verbosity > 0
+                @warn("Exiting at an infeasible stationary point of the penalized problem (χ = $(χ_ref)); consider increasing w")
+            end
+            push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
+            break
+        end
+
         # check step acceptance
-        if rho_i >= algo.rhos[1]
+        if accept
             flag_reference = true
+            ref_is_initial_guess = false
+            ref_feasible = true         # subproblem solutions satisfy the convex constraints
             x_ref[:,:] = _x
             u_ref[:,:] = _u
 
@@ -334,15 +443,18 @@ function solve!(
             flag_reference = false
         end
 
-        # a rejected step at the lower bound cannot change the subproblem
-        if rho_i < algo.rhos[1] && trust_region_at_lower_bound(algo)
-            solution.status = χ <= tol_feas ? :Feasible : :Stalled
+        # update trust-region
+        flag_trust_region = update_trust_region!(algo, tr_action)
+
+        # a rejected step at the lower bound cannot change the subproblem: stop at the reference
+        if collapsed
+            solution.status = χ_rec <= tol_feas ? :Feasible : :Stalled
+            if verbosity > 0
+                @warn("Exiting as trust-region collapsed to its lower bound Δ_min = $(algo.Δ_bounds[1])")
+            end
             push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break
         end
-
-        # update trust-region 
-        flag_trust_region = update_trust_region!(algo, rho_i)
 
         push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
 
@@ -357,7 +469,7 @@ function solve!(
         
         # handle termination status when maximum number of iterations is reached
         if it == maxiter && solution.status == :Solving
-            if χ <= tol_feas
+            if χ_rec <= tol_feas
                 solution.status = :Feasible
             else
                 solution.status = :MaxIterReached

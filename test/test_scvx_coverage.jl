@@ -62,7 +62,7 @@ end
 
 
 function test_scvx_trustregion_control_without_nu()
-    algo = @test_logs (:error,) match_mode=:any SCPLib.SCvx(1, 3; use_trustregion_control = true)
+    algo = SCPLib.SCvx(1, 3; use_trustregion_control = true)   # tr_u is built lazily in solve! (M9)
     @test isnothing(algo.tr_u)
 end
 
@@ -131,6 +131,9 @@ end
 
 function test_scvx_stalled_at_trust_region_lower_bound()
     prob, x_ref, u_ref = make_scvx_coverage_problem(Clarabel.Optimizer)
+    # start away from the optimum so steps carry a real predicted decrease (ΔL > 0) and are
+    # rejected by the ratio test; at the optimum they would be null steps, which keep the TR
+    u_ref .= 1.0
     # floor high enough that rejected steps run out of room to shrink;
     # rhos reject every step, and tol_feas < 0 keeps the exit off :Feasible
     algo = SCPLib.SCvx(1, 3; w = 1e3, Δ0 = 1.0,

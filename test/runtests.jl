@@ -63,3 +63,7 @@ end
 @testset "Problem sets" begin
     include("test_quadcopter.jl")
 end
+
+@testset "Globalization" begin
+    include("test_scp_globalization.jl")
+end

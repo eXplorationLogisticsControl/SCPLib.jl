@@ -4,7 +4,9 @@ Repo state reviewed: `main` @ 9ee12ec (plus uncommitted docs changes). No repo f
 
 > **Independent check (2026-11-03):** C1, C2, M1, M2, M3 and M8 were re-checked against the source. C1 was reproduced by re-running `r01_hclip.jl`: SCvx* with the auto-tuned weight, ProxLinear and SCvx all return `:Optimal` at x₂ ≈ 0 (true optimum 1.0). SCvx* with `w0 = 10` does reach 1.0 after 21 iterations, so the SCvx* failure also depends on M5. Line references for `linearization.jl` were corrected (C2 → line 88, impulsive Φ_B → line 44). The remaining findings have not been independently checked.
 
-> **Fix status (2026-11-03):** C1 and M1 are fixed on branch `debug/scvxstar-inequality-linearization` (commit `1cc087c`). Tests are in `test/test_scvxstar_inequality_linearization.jl`, and the full suite passes (81/81). See the **Resolution** notes under C1 and M1. All other findings are still open.
+> **Fix status (2026-11-03):** C1 and M1 are fixed on branch `debug/scvxstar-inequality-linearization` (commit `1cc087c`). Tests are in `test/test_scvxstar_inequality_linearization.jl`, and the full suite passes (81/81). See the **Resolution** notes under C1 and M1.
+>
+> **Fix status (2026-11-03, second pass):** M2, M4 and M10 are fixed, M9 is mitigated (opt-in fixed and documented, default unchanged by decision), and M3 is fixed too, because the corrected ratio test needs it (see the M2 note). Tests are in `test/test_scp_globalization.jl`, and the full suite passes (158/158). An adversarial review of this pass found 2 high-severity defects in the first design, which were fixed (see "Adversarial review" under M10). Four regression constants were re-baselined; each one is justified in the **Resolution** notes. All other findings are still open.
 
 Repro scripts (run from the repo root with `julia --project=. <script>`):
 
@@ -23,15 +25,15 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
 | C1 | Critical | FIXED | nlconstraints.jl:93 | Inequalities are linearized as `max(h(z̄),0) + ∇h Δz ≤ ζ`, not `h(z̄) + ∇h Δz ≤ ζ`. Inactive constraints become one-sided barriers, which causes false "Optimal" (SCvx*, SCvx, ProxLinear). |
 | C2 | Critical (latent) | CONFIRMED | linearization.jl:88 | Forward-backward ∂g/∂x₁ has the wrong sign. The test hides it with a sign-flipped FD and `maximum(err)` without `abs`. |
 | M1 | Major (Critical with C1) | FIXED | scvxstar.jl:429,502 | μ is updated with clipped h⁺, so μ never decreases. Complementarity is violated (Oguri uses μ ← max(0, μ + w h)). |
-| M2 | Major | CONFIRMED | scvxstar.jl:438; scvx.jl:277; fixedtrw.jl:218 | ρ = ΔJ/ΔL with ΔL<0 and ΔJ<0 gives ρ ≫ 1, so a merit-increasing step is accepted and the TR expands. ΔL≈0 forces ρ=1. |
-| M3 | Major | CONFIRMED | nlconstraints.jl:67-70 | Forward-backward: the linearized match-point is a hard equality and ξ_dyn is a free, decoupled variable. Predicted penalty = −‖λ‖²/(2w), which corrupts ρ. Artificial infeasibility is possible. |
-| M4 | Major | CONFIRMED | scvx.jl:91-95,70-78; proxlinear.jl:60-91 | SCvx and ProxLinear add new slack variables and cones every iteration and never delete them. The model grows linearly. ProxLinear also builds the ϵ_g slacks twice. |
+| M2 | Major | FIXED | scvxstar.jl:438; scvx.jl:277; fixedtrw.jl:218 | ρ = ΔJ/ΔL with ΔL<0 and ΔJ<0 gives ρ ≫ 1, so a merit-increasing step is accepted and the TR expands. ΔL≈0 forces ρ=1. |
+| M3 | Major | FIXED | nlconstraints.jl:67-70 | Forward-backward: the linearized match-point is a hard equality and ξ_dyn is a free, decoupled variable. Predicted penalty = −‖λ‖²/(2w), which corrupts ρ. Artificial infeasibility is possible. |
+| M4 | Major | FIXED | scvx.jl:91-95,70-78; proxlinear.jl:60-91 | SCvx and ProxLinear add new slack variables and cones every iteration and never delete them. The model grows linearly. ProxLinear also builds the ϵ_g slacks twice. |
 | M5 | Major | CONFIRMED (value) | scvxstar.jl:242-243, 52 | The auto-tuned w is about 10/χ₀, so w = 1e9 for a feasible guess. w_max = 1e16 by default, which makes the QP terribly conditioned. Contributes to C1 false convergence. |
 | M6 | Major | CONFIRMED | utils.jl:76-83; scvxstar.jl:391,492 | `warmstart_dual=true` crashes with KeyError because it sets dual starts on constraints deleted at re-linearization. |
 | M7 | Major | CONFIRMED (FB) / LIKELY | scvx.jl:266; proxlinear.jl:268; fixedtrw.jl:207; scvxstar.jl:227 | SCvx, ProxLinear and FixedTRW ignore `fun_get_trajectory` and `shooting_method`. The `tune_initial_penalty_weight!` call crashes for forward-backward. The merit is inconsistent with the custom J_ref. |
 | M8 | Major | LIKELY | scvxstar.jl:459; scvx.jl:298; fixedtrw.jl:238 | The returned solution is the last candidate even when it was rejected, so the status describes a rejected point. CPFailed at iteration 1 returns zeros. |
-| M9 | Major/Design | LIKELY | trust_region.jl:46-56; scvxstar.jl:72-76 | Default TR covers only x, not u, tf-dilation or slacks. The TR-convergence argument (ρ→1 as Δ→0) does not hold, so the algorithm can stall or accept with an inaccurate model. |
-| M10 | Major/Design | SUSPECT | scvxstar.jl:472; scvx.jl:314 | The stopping test uses absolute \|ΔJ\| on the candidate, even when rejected or with tiny Δ. It can declare "Optimal" at non-stationary points. |
+| M9 | Major/Design | MITIGATED | trust_region.jl:46-56; scvxstar.jl:72-76 | Default TR covers only x, not u, tf-dilation or slacks. The TR-convergence argument (ρ→1 as Δ→0) does not hold, so the algorithm can stall or accept with an inaccurate model. |
+| M10 | Major/Design | FIXED | scvxstar.jl:472; scvx.jl:314 | The stopping test uses absolute \|ΔJ\| on the candidate, even when rejected or with tiny Δ. It can declare "Optimal" at non-stationary points. |
 | M11 | Major/Design | LIKELY | impulsive_problem.jl:64,77; linearization.jl:41-43 | The impulsive jump is `x + dfdu(x,u,t)·u`, and Φ_B = Φ_A·dfdu. This is only correct for jumps that are linear in u and independent of x. |
 | M12 | Major/Design | LIKELY | nlconstraints.jl:47-48 vs docs/src/advanced/set_linearized_constraints.md | The docs tell the callback to emit `:constraint_g_noncvx`/`:constraint_h_noncvx`, but the library now emits them too, causing a JuMP name collision. The callback's g_ref/h_ref are ignored. Anonymous callback constraints are never deleted, so stale linearizations accumulate. |
 | m1 | Minor | LIKELY | proxlinear.jl:295-306 | ProxLinear breaks before storing history: the final iterate is missing from info, n_iter and the callback, and the exit print shows the previous iterate. |
@@ -134,6 +136,20 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
 - **Fix:**
   - If ΔL ≤ ε·max(1,|J_ref|): stop if χ ≤ tol, otherwise reject and shrink.
   - Treat a convex-infeasible initial reference explicitly: always accept the first step without a ratio test, or project the guess first.
+- **Resolution (FIXED):** a new `classify_step` in `trust_region.jl` (used by SCvx* and SCvx) replaces the ρ line. With ε = min(`tol_ΔL`·max(1,|J_ref|), `tol_opt`), where `tol_ΔL = 1e-8` is a new `solve!` kwarg (the cap keeps a constant objective offset from hiding a decrease):
+  - **`:restoration`.** The initial guess violates the user's convex constraints. This is checked once, before any linearized or TR constraints exist, with `JuMP.primal_feasibility_report(...; skip_missing=true)`. A `ΔL < −ε` before any accepted step is also taken as a certificate of this. The step is accepted without a ratio test, Δ is kept, and δ_i is not initialised from its ΔJ. Repro (f) now gives `rst`, Δ stays at 2.0 (it was 6.0), and `test_scvxstar_callback.jl` still passes.
+  - **`:ratio`.** ΔL > ε uses the usual ρ thresholds.
+  - **`:stationary` (null step).** ΔL ≤ ε (of either sign) with the TR inactive at z*. The argument: z̄ is feasible for its own subproblem with L(z̄) = J(z̄), so the subproblem cannot beat it by more than ε. A negative ΔL only means the solver returned something worse than z̄, so z̄ is optimal within solver accuracy. With the TR inactive, z̄ is then stationary for the penalized problem. In that case:
+    - if χ(z̄) ≤ tol_feas, return `:Optimal` with z̄;
+    - otherwise SCvx* applies the AL update at z̄ (λ, μ = max(0, μ + w h(z̄)), w ← βw) and keeps the reference and the TR. After `max_null_steps = 10` consecutive null steps it returns `:InfeasibleStationary`;
+    - SCvx (fixed w) returns the new status `:InfeasibleStationary` (Mao 2018).
+  - **`:unresolved`.** |ΔL| ≤ ε with the TR active: the predicted decrease cannot be resolved at this Δ. The reference is kept and the TR **expands**, because shrinking would only make ΔL smaller. At Δ_max this is treated as a null step. ΔL ≈ 0 no longer gives ρ = 1.
+  - **`:reject`.** ΔL < −ε with the TR active: the TR shrinks.
+  - FixedTRW accepts every step by design. Its displayed ρ is `NaN` when ΔL ≈ 0.
+  - **The fix exposed two latent issues that the old acceptance path had masked:**
+    - *Forward-backward (`test_scvxstar_forwardbackward.jl`).* It converged only because a ΔL = −0.045 step was scored ρ = 5.95 and accepted. Both x nodes are fixed by the BCs, so the default x-TR constrains nothing (M9). The hard match-point equality (M3) also makes z̄ infeasible for its own subproblem, so L(z̄) ≠ J(z̄). Fixing either one alone gives `:TRCollapsed` (M3 only) or `:CPFailed` (u-TR only). With the M3 fix plus `use_trustregion_control = true` in that test, it reaches `:Optimal` in 23 iterations with ρ ≈ 1 at the end. J0 goes from 1.5812496921 to 1.5812497959 (re-baselined), with χ = 6e-8.
+    - *Biased impulsive (`test_scvxstar_impulsive_u_bias.jl`, case with bias).* The old run stopped at iteration 42 on a *rejected* step (ρ = −0.03, M10). The new run reaches w ≈ 2.7e12, where ΔL ≈ −1e-5 is solver noise (M5). The null-step rule above terminates it `:Optimal` with χ ≈ 1e-12. Before ΔL ≤ ε (either sign) with an inactive TR was treated as a null step, it ended `:TRCollapsed`.
+  - `test_scvx_impulsive_tr_u.jl`: the old run accepted a ΔL < 0 step with ρ = 152 at iteration 39. The new run ends with a feasible null step (χ = 3.9e-10) at a slightly lower objective. J0 goes from 0.2146711336 to 0.2146596098 (re-baselined).
 
 ### M3: Forward-backward: hard match constraint plus a decoupled ξ_dyn
 
@@ -147,6 +163,7 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - Once λ_dyn ≠ 0 (after the first multiplier update), ΔL is overstated by ‖λ‖²/(2w) every iteration, so ρ is biased low, causing spurious rejections and TR collapse.
   - The hard equality also makes the subproblem infeasible when Δ is small or the bounds are tight.
 - **Fix:** `g_ref + ∇g_dyn Δz == ξ_dyn[:,1]`.
+- **Resolution (FIXED, together with M2):** applied as proposed in `nlconstraints.jl`. Without it, the corrected ratio test (M2) cannot converge on forward-backward problems (see the M2 note). Forward-backward also needs `use_trustregion_control = true` when both x nodes are fixed, because the x-TR is then vacuous. `test_scvxstar_forwardbackward.jl` now sets it. C2 (wrong sign of ∂g/∂x₁) is still open; it is masked in the test because x₁ is fixed.
 
 ### M4: Model growth in SCvx and ProxLinear
 
@@ -162,6 +179,13 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - Solve time grows with the iteration count.
   - The stale epigraph variables are free and unbounded above, so the optimal face is unbounded. Interior-point solvers then see poorer conditioning, ALMOST_OPTIMAL or SLOW_PROGRESS.
 - **Fix:** create the slacks once (as SCvxStar does for l1) and register and delete the cone constraints with the other references.
+- **Resolution (FIXED):**
+  - **SCvx:** `add_l1_slacks!` creates the three epigraph variables and their NormOneCone constraints once per `solve!`. They do not depend on the reference. `penalty(::SCvx, …, slacks_L1)` now only builds the expression.
+  - **ProxLinear:** `add_proxlinear_slacks!` creates `ϵ_noncvx_dyn` (sized from `ξ_dyn`, so forward-backward no longer indexes N−1 columns), a single NormOneCone `ϵ_noncvx_g` (the dead vector duplicate is removed) and the `ϵ_proximal` variable once. The reference-dependent SOC prox constraint is deleted and re-added each iteration.
+  - Both `solve_convex_subproblem!` methods take the slacks as an optional last argument, so standalone calls still work.
+  - **Repros:** (d) has 1 NormOneCone and 5 variables after 6 iterations (was 6 cones and 10 variables); (e) has 1 SOC and 6 variables after 50 iterations (was 50 SOC and 104 variables).
+  - **Tests:** the variable and constraint counts are constant across iterations.
+  - The SCvx* `l1_penalty` cones are still deleted and re-created every iteration. That is bounded, not growth.
 
 ### M5: Penalty weight defaults (auto-tune and w_max)
 
@@ -214,6 +238,12 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - Alternatively, a large unbounded jump in u (or tf) is accepted thanks to M2.
   - Slack variables are naturally excluded (fine), but tf must be included.
 - **Fix:** enable the u-TR by default (at least for components that enter nonlinearly), or document that convergence guarantees need it.
+- **Resolution (MITIGATED; by decision, the default stays `false` so existing scripts keep their iterates):**
+  - The `SCvxStar`/`SCvx` docstrings now document `use_trustregion_control`/`Δ0_u` and explain why the convergence theory needs them.
+  - `solve!` emits a one-time `@warn` (verbosity > 0) when the u-TR is off.
+  - `use_trustregion_control = true` without `nu` used to log `@error` and then crash in `solve!`. It now builds `tr_u` lazily from `prob.nu` (`ensure_trust_region_control!`), also when `set_trust_region_constraints!` is called directly.
+  - u-TR reference names are no longer appended twice.
+  - Forward-backward with both x nodes fixed effectively needs the u-TR (see M2/M3).
 
 ### M10: The stopping test can fire at non-stationary points
 
@@ -229,6 +259,26 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - Require the step to be accepted.
   - Use ΔL, or a relative tolerance |ΔJ| ≤ ε(1+|J|).
   - Refuse to declare optimality while Δ is at Δ_min; return `:TRCollapsed` instead.
+- **Resolution (FIXED; `tol_opt` stays absolute by decision):**
+  - The SCvx*/SCvx test runs after step classification. `:Optimal` requires one of:
+    - an accepted ratio step that is **not bounded by the TR** (no component with |z*−z̄| ≥ max((1−1e-3)Δ − 1e-8, Δ/2)), with |ΔJ| ≤ tol_opt and χ ≤ tol_feas;
+    - a feasible null step (see M2), which returns z̄;
+    - the unchanged `J0 ≤ tol_J0` target.
+  - The TR-inactive condition is stronger than "Δ not at Δ_min". It removes the tiny-Δ false stop down to the solver's accuracy: with `Δ0 = 1e-6` the old code returned `:Optimal` at x₂ ≈ 1e-6, and the new code reaches 1. Below Δ ≈ 1e-8, Clarabel's accuracy makes the TR-activity test noise. The initial Δ is therefore clamped into `Δ_bounds` (SCvx has Δ_min = 1e-6). SCvx*'s default Δ_min = 1e-10 sits below that accuracy, but the `:unresolved` → expand rule recovers it (Δ0 = 1e-9 reaches x₂ = 1 in 21 iterations).
+  - A rejected step while every Δ (and Δ_u) is already at Δ_min returns the last accepted reference. This was first a new status `:TRCollapsed`. When merging main, which had added the same exit as `:Stalled` / `:Feasible` (`trust_region_at_lower_bound`, PR #79), it was renamed to main's statuses: `:Feasible` if the reference has χ ≤ tol_feas, otherwise `:Stalled`. Older mentions of `:TRCollapsed` below refer to this exit.
+  - Also found during the merge: main's coverage tests use `tol_opt = -1` / `tol_feas = -1` to disable convergence. Those values made the capped ΔL threshold ε and the reference-feasibility tolerance negative, which turned every first step into a restoration step. Now ε is capped only when `tol_opt > 0`, `reference_convex_feasible` uses `atol = max(tol_feas, √eps)`, and `tol_opt < 0` also disables the null-step `:Optimal` and `:InfeasibleStationary` exits. The SCvx* null-step multiplier update runs only when χ_ref > tol_feas. Main's two stall tests start from `u_ref = 1`: their original reference was already optimal, so steps there are now null steps and do not shrink the TR.
+  - FixedTRW's stop also requires the TR to be inactive.
+  - For null steps, the recorded iterate (`solution.x`, `info[:J0]`, `info[:χ]`) is the reference, and `info[:ΔJ]` = 0.
+  - **Regression:** `test_scvxstar_dynamics_userdefined.jl` and `test_scvxstar_custom_linearized_constraints.jl` (auto-tuned w) used to stop at iteration 43 on a TR-bounded step (Δ = 1.2e-3). They now stop at iteration 81 with χ = 7e-11. J0 goes from 4.8947284671 to 4.8946695762 (re-baselined); the AD and out-of-place variants of the same problem reach 4.894668. The cost is more iterations on problems where repeated rejections keep the TR small.
+  - **Adversarial review** (independent agent, with repro scripts):
+    - **H1 (fixed):** ε scaled with |J_ref|, so with objective `1e6 − x₂` it exceeded `tol_opt`. A real decrease of 5e-3 was then a "null step", giving a false `:Optimal` at x₂ = 0.995. Fixed by capping ε at `tol_opt`.
+    - **H2 (fixed):** the first design shrank the TR when ΔL ≈ 0 with the TR active. Once Δ·slope < ε, nothing could recover, so it ended `:TRCollapsed` at x₂ = 0 for objective offsets of 1e4/1e6 with Δ0 = 1e-5/1e-3. Fixed by the `:unresolved` → expand rule. Both cases are regression-tested ("objective offset invariance").
+    - **Infeasible stationary point, SCvx\* (fixed):** repeated null steps doubled w until Clarabel failed (`:CPFailed` at w = 1.4e12). It now exits `:InfeasibleStationary` after `max_null_steps`.
+    - **Bookkeeping (fixed):** on `:TRCollapsed`, `info`/the callback described the rejected candidate. Now the reference is recorded, as for null steps. Dead `rho_i` initialisation removed; the "certifies" wording in the docstring softened.
+    - **Forward-backward with default settings (warning only):** fails (`:TRCollapsed`) without `use_trustregion_control = true`; see M2/M3. `solve!` now prints a specific warning, not maxlog-limited. Auto-enabling it was not done, because that would contradict the default-off decision for M9.
+    - **Examples now hit maxiter (not changed):** `ex_scvxstar_cr3bp.jl` and `ex_scvxstar_custom_linearized_constraints.jl` went from `:Optimal` in 68 iterations to `:Feasible` at maxiter = 100. Every accepted step is TR-bounded, in an accept/reject/reject cycle while w doubles, so stationarity is not certified. The final point is better (χ 3e-10 vs 6e-7, J0 2.408563 vs 2.408602). Options: raise `maxiter` there, or add a scale-aware measure for TR-bounded steps (e.g. ΔL/‖Δz‖∞).
+    - **Deferred:** a rejected step whose candidate lies strictly inside the TR is re-solved identically until Δ < ‖Δz‖∞ (up to about 29 wasted solves). Shrinking straight to Δ ← min(Δ, ‖z*−z̄‖∞)/α₁ would fix it, but it changes every iteration path and therefore every regression baseline, so it is left for a separate change.
+  - **Open:** M8 is still open, so on `:MaxIterReached`/`:Feasible` the returned point can still be a rejected candidate.
 
 ### M11: The impulsive jump model is only correct for jumps linear in u and independent of x
 

@@ -255,7 +255,8 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     # solve
     tol_opt = 1e-6
     tol_feas = 1e-6
-    algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, shooting_method = :forwardbackward)
+    # both state nodes are fixed by the boundary conditions, so a trust-region on u is needed
+    algo = SCPLib.SCvxStar(nx, N; w0 = 1e2, shooting_method = :forwardbackward, use_trustregion_control = true)
 
     # solve problem
     u_ref = zeros(nu, N-1)
@@ -265,7 +266,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
     sols_opt, g_dynamics_opt = SCPLib.get_trajectory_augmented_forwardbackward(prob, solution.x, solution.u)
     @test maximum(abs.(g_dynamics_opt)) <= 1e-6
     @test solution.status == :Optimal
-    @test solution.info[:J0][end] ≈ 1.5812496920535764 atol=1e-8
+    @test solution.info[:J0][end] ≈ 1.58124979586062 atol=1e-8
 end
 
 
