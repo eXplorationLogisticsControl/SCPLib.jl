@@ -159,7 +159,7 @@ mutable struct SCvxSolution <: SCPSolution
     function SCvxSolution(prob::OptimalControlProblem, Nu::Int)
         status = :Solving
         x = zeros(prob.nx, prob.N)
-        u = zeros(prob.nu, Nu)
+        u = initial_control_matrix(prob, Nu)
         
         info = Dict(
             :J0 => Float64[],
@@ -242,6 +242,7 @@ function solve!(
         @warn("SCvx trust-region only bounds the states x; set `use_trustregion_control = true` " *
               "when the dynamics or constraints are nonlinear in u (see `?SCvx`)", maxlog = 1)
     end
+    mask_unused_control_trust_region!(algo, prob)
     tcpu_start = time()
 
     # check whether the initial guess satisfies the convex constraints (before any linearized or
@@ -339,7 +340,7 @@ function solve!(
         end
 
         _x = value.(prob.model[:x])
-        _u = value.(prob.model[:u])
+        _u = control_values(prob)
         _ξ_dyn = value.(prob.model[:ξ_dyn])
         _ξ = prob.ng > 0 ? value.(prob.model[:ξ]) : nothing
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing

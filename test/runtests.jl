@@ -60,6 +60,10 @@ end
     include("test_impulsive_problem_coverage.jl")
 end
 
+@testset "Mixed problem" begin
+    include("test_mixed_problem.jl")
+end
+
 @testset "Problem sets" begin
     include("test_quadcopter.jl")
 end
