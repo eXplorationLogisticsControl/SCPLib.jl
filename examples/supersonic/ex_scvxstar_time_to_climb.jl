@@ -394,12 +394,12 @@ algo = SCPLib.SCvxStar(
     nu = nu,
     Δ0_u = [0.05, 0.3],
     use_trustregion_control = true,
-    Δ_bounds = (1e-8, 2.0),
+    Δ_bounds = (1e-10, 2.0),
 )
 
 solution = SCPLib.solve!(
     algo, prob, x_ref, u_ref;
-    maxiter = 200,
+    maxiter = 500,
     tol_feas = 1e-6,
     tol_opt = 1e-4,
 )
@@ -457,7 +457,7 @@ scatterlines!(ax_χ, eachindex(solution.info[:accept]), solution.info[:χ]; colo
 ax_w = Axis(fig[2, 3]; xlabel = "Iteration", ylabel = "w", yscale = log10)
 scatterlines!(ax_w, eachindex(solution.info[:accept]), solution.info[:w]; color = colors_accept, marker = :circle, markersize = 7)
 
-ax_J = Axis(fig[1, 4]; xlabel = "Iteration", ylabel = "ΔJ", yscale = log10)
+ax_J = Axis(fig[1, 4]; xlabel = "Iteration", ylabel = "ΔJ")
 scatterlines!(ax_J, eachindex(solution.info[:accept]), abs.(solution.info[:ΔJ]); color = colors_accept, marker = :circle, markersize = 7)
 
 ax_Δ = Axis(fig[2, 4]; xlabel = "Iteration", ylabel = "trust region radius", yscale = log10)
