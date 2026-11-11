@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Brachistochrone · SCPLib.jl</title><meta name="title" content="Brachistochrone · SCPLib.jl"/><meta property="og:title" content="Brachistochrone · SCPLib.jl"/><meta property="twitter:title" content="Brachistochrone · SCPLib.jl"/><meta name="description" content="Documentation for SCPLib.jl."/><meta property="og:description" content="Documentation for SCPLib.jl."/><meta property="twitter:description" content="Documentation for SCPLib.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../index.html"><img src="../assets/logo.png" alt="SCPLib.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">SCPLib.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../ocp_basic_cr3bp.html">Basic OCP</a></li><li><a class="tocitem" href="../ocp_ncvx.html">Non-convex path constraints</a></li></ul></li><li><span class="tocitem">Advanced</span><ul><li><a class="tocitem" href="../advanced/set_linearized_constraints.html">User-defined linearized constraints</a></li><li><a class="tocitem" href="../advanced/impulsive_control_variable_time.html">Impulsive control with variable time</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li class="is-active"><a class="tocitem" href="example_brachistochrone.html">Brachistochrone</a></li><li><a class="tocitem" href="example_hypersensitive.html">Hypersensitive</a></li><li><a class="tocitem" href="example_supersonic.html">Supersonic time-to-climb</a></li><li><a class="tocitem" href="example_spaceshuttle.html">Space shuttle reentry</a></li><li><a class="tocitem" href="example_dionysus.html">Dionysus problem</a></li></ul></li><li><span class="tocitem">API</span><ul><li><a class="tocitem" href="../api_algorithms.html">API: Algorithms</a></li><li><a class="tocitem" href="../api_problems.html">API: Problems &amp; Dynamics</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="example_brachistochrone.html">Brachistochrone</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="example_brachistochrone.html">Brachistochrone</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/eXplorationLogisticsControl/SCPLib.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/eXplorationLogisticsControl/SCPLib.jl/blob/https://github.com/eXplorationLogisticsControl/SCPLib.jl/blob/{commit}{path}/docs/src/examples/example_brachistochrone.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Brachistochrone"><a class="docs-heading-anchor" href="#Brachistochrone">Brachistochrone</a><a id="Brachistochrone-1"></a><a class="docs-heading-anchor-permalink" href="#Brachistochrone" title="Permalink"></a></h1><p>Brachistochrone problem: finding the fastest descent path.</p><p>This classic calculus of variations problem finds the curve of fastest descent between two points under gravity. The solution demonstrates time-optimal trajectory generation with:</p><ul><li>2D position dynamics</li><li>Speed dynamics under gravitational acceleration</li><li>Angle control subject to bounds</li><li>Minimal time objective</li></ul><p>The state is <span>$[x, y, v]$</span> and the control is the angle <span>$\theta$</span> from the downward vertical. Final time is free on a uniform grid: normalized time runs over <span>$[0, 1]$</span>, and a dilation <span>$s = t_f$</span> scales the dynamics. The propagated trajectory is compared with the analytical cycloid.</p><p><strong>File:</strong> <code>examples/brachistochrone/ex_scvxstar_brachistochrone.jl</code></p><pre><code class="language-julia hljs">&quot;&quot;&quot;Brachistochrone minimum-time problem with SCvx*
+
+Classic fastest-descent curve from the OpenSCvx brachistochrone example:
+https://openscvx.github.io/OpenSCvx/latest/Examples/abstract/brachistochrone/
+
+The final time is free. Normalized time τ ∈ [0, 1] and a uniform dilation
+control s = tf give dx/dτ = s f(x, θ).
+&quot;&quot;&quot;
+
+using Clarabel
+using ForwardDiff
+using CairoMakie
+using JuMP
+using LinearAlgebra
+using OrdinaryDiffEq
+
+include(joinpath(@__DIR__, &quot;../../src/SCPLib.jl&quot;))
+
+
+# -------------------- setup problem -------------------- #
+struct BrachistochroneParams
+    g::Float64
+end
+
+g = 9.81
+params = BrachistochroneParams(g)
+
+function eom!(dx, x, pu, t)
+    (; params, u) = pu
+    θ = u[1]
+    s = u[2]
+    v = x[3]
+    dx[1] =  s * v * sin(θ)
+    dx[2] = -s * v * cos(θ)
+    dx[3] =  s * params.g * cos(θ)
+    return
+end
+
+# boundary conditions and bounds (OpenSCvx brachistochrone)
+x_initial = [0.0, 10.0, 0.0]
+xy_final = [10.0, 5.0]
+pos_min = 0.0
+pos_max = 10.0
+v_min = 0.0
+v_max = 10.0
+theta_min = 0.0
+theta_max = 100.5 * π / 180
+tf_min = 1e-2          # open lower bound; s = 0 makes the dilation singular
+tf_max = 2.0
+tf_guess = 2.0
+
+# analytical cycloid: X = r (φ - sin φ), Y = r (1 - cos φ), Y measured downward
+# (φf - sin φf) / (1 - cos φf) = Xf / Yf,  T = φf * sqrt(r / g),  θ = φ / 2
+function cycloid_parameters(Xf, Yf, g)
+    ratio = Xf / Yf
+    φ = 2.5
+    for _ in 1:30
+        f = φ - sin(φ) - ratio * (1 - cos(φ))
+        df = 1 - cos(φ) - ratio * sin(φ)
+        φ -= f / df
+    end
+    r = Yf / (1 - cos(φ))
+    T = φ * sqrt(r / g)
+    return φ, r, T
+end
+
+Xf = xy_final[1] - x_initial[1]
+Yf = x_initial[2] - xy_final[2]
+φf, r_cyc, T_cyc = cycloid_parameters(Xf, Yf, g)
+
+# -------------------- define objective -------------------- #
+function objective(x, u)
+    return u[2, 1]     # uniform dilation; s = tf
+end
+
+# -------------------- create problem -------------------- #
+N = 41
+nx = 3                              # [x, y, v]
+nu = 2                              # [θ, s]
+times = LinRange(0.0, 1.0, N)
+
+v_final_guess = sqrt(2 * g * Yf)
+x_final_guess = [xy_final; v_final_guess]
+x_ref = zeros(nx, N)
+for (i, α) in enumerate(LinRange(0.0, 1.0, N))
+    x_ref[:, i] = (1 - α) * x_initial + α * x_final_guess
+end
+θ_guess = collect(LinRange(5 * π / 180, theta_max, N - 1))
+u_ref = [θ_guess&#39;; tf_guess * ones(1, N - 1)]
+
+prob = SCPLib.ContinuousProblem(
+    Clarabel.Optimizer,
+    eom!,
+    params,
+    objective,
+    times,
+    x_ref,
+    u_ref;
+    ode_method = Tsit5(),
+)
+set_silent(prob.model)
+
+# boundary conditions; final speed is free inside its box
+@constraint(prob.model, constraint_initial, prob.model[:x][:, 1] == x_initial)
+@constraint(prob.model, constraint_final_xy, prob.model[:x][1:2, end] == xy_final)
+
+# convex path constraints
+@constraint(prob.model, constraint_position_lb[i in 1:2, k in 1:N],
+    prob.model[:x][i, k] &gt;= pos_min)
+@constraint(prob.model, constraint_position_ub[i in 1:2, k in 1:N],
+    prob.model[:x][i, k] &lt;= pos_max)
+@constraint(prob.model, constraint_speed_lb[k in 1:N],
+    prob.model[:x][3, k] &gt;= v_min)
+@constraint(prob.model, constraint_speed_ub[k in 1:N],
+    prob.model[:x][3, k] &lt;= v_max)
+@constraint(prob.model, constraint_theta_lb[k in 1:N-1],
+    prob.model[:u][1, k] &gt;= theta_min)
+@constraint(prob.model, constraint_theta_ub[k in 1:N-1],
+    prob.model[:u][1, k] &lt;= theta_max)
+
+# uniform free final time
+@constraint(prob.model, constraint_tf_lb[k in 1:N-1], prob.model[:u][2, k] &gt;= tf_min)
+@constraint(prob.model, constraint_tf_ub[k in 1:N-1], prob.model[:u][2, k] &lt;= tf_max)
+@constraint(prob.model, constraint_tf_uniform[k in 1:N-2],
+    prob.model[:u][2, k] == prob.model[:u][2, k+1])
+
+
+# -------------------- instantiate algorithm -------------------- #
+# Trust region on (θ, s): those controls enter the dynamics nonlinearly,
+# and unbounded control steps stall the linear model at tf = tf_max.
+algo = SCPLib.SCvxStar(
+    nx, N;
+    w0 = 1e2,
+    Δ0 = 1.0,
+    nu = nu,
+    Δ0_u = 0.5,
+    use_trustregion_control = true,
+)
+
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 200, tol_feas = 1e-8, tol_opt = 1e-4)
+
+# propagate solution
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+tf = solution.u[2, 1]
+
+# -------------------- plot -------------------- #
+fig = Figure(size=(1200, 800))
+
+φs = LinRange(0.0, φf, 400)
+x_cyc = x_initial[1] .+ r_cyc .* (φs .- sin.(φs))
+y_cyc = x_initial[2] .- r_cyc .* (1 .- cos.(φs))
+
+ax_xy = Axis(fig[1, 1]; xlabel = &quot;x&quot;, ylabel = &quot;y&quot;, title = &quot;Trajectory&quot;, autolimitaspect = 1)
+lines!(ax_xy, x_cyc, y_cyc, color = :black, linestyle = :dash, linewidth = 2, label = &quot;cycloid&quot;)
+for (i, _sol) in enumerate(sols_opt)
+    lines!(ax_xy, Array(_sol)[1, :], Array(_sol)[2, :], color = :tomato; label = i == 1 ? &quot;SCvx* (ZOH)&quot; : nothing)
+end
+scatter!(ax_xy, [x_initial[1]], [x_initial[2]], color = :blue, label = &quot;start&quot;)
+scatter!(ax_xy, [xy_final[1]], [xy_final[2]], color = :green, label = &quot;goal&quot;)
+axislegend(ax_xy, position = :rt)
+
+ax_θ = Axis(fig[2, 1]; xlabel = &quot;Time&quot;, ylabel = &quot;θ, rad&quot;, title = &quot;Angle from vertical&quot;)
+t_nodes = prob.times .* tf
+t_dense = LinRange(0.0, T_cyc, 400)
+stairs!(ax_θ, t_nodes[1:end-1], solution.u[1, :], step = :pre, color = :tomato, linewidth = 2, label = &quot;SCvx*&quot;)
+lines!(ax_θ, t_dense, t_dense ./ (2 * sqrt(r_cyc / g)), color = :black, linestyle = :dash, linewidth = 2, label = &quot;φ/2&quot;)
+hlines!(ax_θ, [theta_min, theta_max], color = :gray, linestyle = :dot)
+axislegend(ax_θ, position = :lt)
+
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:length(solution.info[:accept])]
+ax_χ = Axis(fig[1, 2]; xlabel = &quot;Iteration&quot;, ylabel = &quot;χ&quot;, yscale = log10)
+scatterlines!(ax_χ, 1:length(solution.info[:accept]), solution.info[:χ], color = colors_accept, marker = :circle, markersize = 7)
+
+ax_w = Axis(fig[2, 2]; xlabel = &quot;Iteration&quot;, ylabel = &quot;w&quot;, yscale = log10)
+scatterlines!(ax_w, 1:length(solution.info[:accept]), solution.info[:w], color = colors_accept, marker = :circle, markersize = 7)
+
+ax_J = Axis(fig[1, 3]; xlabel = &quot;Iteration&quot;, ylabel = &quot;ΔJ&quot;, yscale = log10)
+scatterlines!(ax_J, 1:length(solution.info[:accept]), abs.(solution.info[:ΔJ]), color = colors_accept, marker = :circle, markersize = 7)
+
+ax_Δ = Axis(fig[2, 3]; xlabel = &quot;Iteration&quot;, ylabel = &quot;trust region radius&quot;, yscale = log10)
+scatterlines!(ax_Δ, 1:length(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]], color = colors_accept, marker = :circle, markersize = 7)
+
+mkpath(joinpath(@__DIR__, &quot;plots&quot;))
+save(joinpath(@__DIR__, &quot;plots/brachistochrone_traj_scvxstar.png&quot;), fig; px_per_unit = 3)
+display(fig)
+println(&quot;Cycloid time T = $(T_cyc) s, optimized time tf = $(tf) s&quot;)
+println(&quot;|tf - T| = $(abs(tf - T_cyc)) s&quot;)
+println(&quot;Terminal cycloid angle φf/2 = $(rad2deg(φf / 2)) deg (bound $(rad2deg(theta_max)) deg)&quot;)
+println(&quot;Dynamics defect ‖g‖∞ = $(norm(g_dynamics_opt, Inf))&quot;)
+println(&quot;Done!&quot;)</code></pre><p><img src="../assets/brachistochrone_traj_scvxstar.png" alt="SCvx* brachistochrone trajectory compared with the cycloid"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../advanced/impulsive_control_variable_time.html">« Impulsive control with variable time</a><a class="docs-footer-nextpage" href="example_hypersensitive.html">Hypersensitive »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Monday 9 November 2026 22:59">Monday 9 November 2026</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

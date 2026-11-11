@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Hypersensitive · SCPLib.jl</title><meta name="title" content="Hypersensitive · SCPLib.jl"/><meta property="og:title" content="Hypersensitive · SCPLib.jl"/><meta property="twitter:title" content="Hypersensitive · SCPLib.jl"/><meta name="description" content="Documentation for SCPLib.jl."/><meta property="og:description" content="Documentation for SCPLib.jl."/><meta property="twitter:description" content="Documentation for SCPLib.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../index.html"><img src="../assets/logo.png" alt="SCPLib.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">SCPLib.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../ocp_basic_cr3bp.html">Basic OCP</a></li><li><a class="tocitem" href="../ocp_ncvx.html">Non-convex path constraints</a></li></ul></li><li><span class="tocitem">Advanced</span><ul><li><a class="tocitem" href="../advanced/set_linearized_constraints.html">User-defined linearized constraints</a></li><li><a class="tocitem" href="../advanced/impulsive_control_variable_time.html">Impulsive control with variable time</a></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="example_brachistochrone.html">Brachistochrone</a></li><li class="is-active"><a class="tocitem" href="example_hypersensitive.html">Hypersensitive</a><ul class="internal"><li><a class="tocitem" href="#Problem"><span>Problem</span></a></li><li><a class="tocitem" href="#Transcription"><span>Transcription</span></a></li><li><a class="tocitem" href="#Initial-guess"><span>Initial guess</span></a></li><li><a class="tocitem" href="#Solve"><span>Solve</span></a></li></ul></li><li><a class="tocitem" href="example_supersonic.html">Supersonic time-to-climb</a></li><li><a class="tocitem" href="example_spaceshuttle.html">Space shuttle reentry</a></li><li><a class="tocitem" href="example_dionysus.html">Dionysus problem</a></li></ul></li><li><span class="tocitem">API</span><ul><li><a class="tocitem" href="../api_algorithms.html">API: Algorithms</a></li><li><a class="tocitem" href="../api_problems.html">API: Problems &amp; Dynamics</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Examples</a></li><li class="is-active"><a href="example_hypersensitive.html">Hypersensitive</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="example_hypersensitive.html">Hypersensitive</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/eXplorationLogisticsControl/SCPLib.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/eXplorationLogisticsControl/SCPLib.jl/blob/https://github.com/eXplorationLogisticsControl/SCPLib.jl/blob/{commit}{path}/docs/src/examples/example_hypersensitive.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Hypersensitive"><a class="docs-heading-anchor" href="#Hypersensitive">Hypersensitive</a><a id="Hypersensitive-1"></a><a class="docs-heading-anchor-permalink" href="#Hypersensitive" title="Permalink"></a></h1><p>Hypersensitive control from the <a href="http://www.ee.ic.ac.uk/ICLOCS/ExampleHypersensitive.html">ICLOCS2 example</a>, originally Rao and Mease, <em>Optim. Control Appl. Meth.</em> 21(1), 2000.</p><h2 id="Problem"><a class="docs-heading-anchor" href="#Problem">Problem</a><a id="Problem-1"></a><a class="docs-heading-anchor-permalink" href="#Problem" title="Permalink"></a></h2><p>$</p><p>\begin{aligned} \underset{x(\cdot),\,u(\cdot)}{\operatorname{minimize}} \quad &amp; \frac12 \int<em>0^{t</em>f} \bigl(x(t)^2 + u(t)^2\bigr)\, dt \
+\text{subject to} \quad &amp; \dot x = -x^3 + u, \
+&amp; x(0) = 1, \quad x(t<em>f) = 1.5, \
+&amp; t</em>f = 10000. \end{aligned} $</p><p>The state and the control are unbounded. On this horizon the solution is two boundary layers joined by <span>$x \approx 0$</span>. Each layer rides a zero-energy manifold of the Hamiltonian system, <span>$\lambda = -x^3 \pm x\sqrt{x^4+1}$</span>, with <span>$u = -\lambda$</span>. The plus sign is the initial layer and the minus sign is the terminal layer:</p><p>$</p><p>\begin{aligned} x<em>{\mathrm{init}}(t) &amp;= \bigl(\sinh(2t + \operatorname{asinh} 1)\bigr)^{-1/2}, \
+x</em>{\mathrm{term}}(t) &amp;= \bigl(\sinh\bigl(2(t_f - t) + \operatorname{asinh}(1/1.5^2)\bigr)\bigr)^{-1/2}. \end{aligned} $</p><p>The initial control starts at <span>$1 - \sqrt{2} \approx -0.414$</span> and the terminal control ends near <span>$7.07$</span>. Integrating <span>$\tfrac12(x^2+u^2)$</span> along the two manifolds gives a cost of about <span>$3.362$</span>.</p><h2 id="Transcription"><a class="docs-heading-anchor" href="#Transcription">Transcription</a><a id="Transcription-1"></a><a class="docs-heading-anchor-permalink" href="#Transcription" title="Permalink"></a></h2><p>SCPLib integrates in normalized time <span>$\tau \in [0, 1]$</span>. The state is <span>$[x, J, \theta]$</span> with <span>$\theta = t / t_f$</span>, and the controls are <span>$u$</span> and a dilation <span>$s = (dt/d\tau) / t_f$</span>:</p><p>$</p><p>\begin{aligned} \frac{dx}{d\tau} &amp;= s\, t<em>f\,(-x^3 + u), \
+\frac{dJ}{d\tau} &amp;= s\, t</em>f\, \tfrac12\bigl(x^2 + u^2\bigr), \
+\frac{d\theta}{d\tau} &amp;= s. \end{aligned} $</p><p>The objective is <span>$J(1)$</span>. Time is fixed by <span>$\theta(0) = 0$</span> and <span>$\theta(1) = 1$</span>. The dilation stays in <span>$[10^{-8},\, 30]$</span>, which is wide enough for the coast intervals below. <span>$x$</span> and <span>$u$</span> stay free, as in ICLOCS.</p><h2 id="Initial-guess"><a class="docs-heading-anchor" href="#Initial-guess">Initial guess</a><a id="Initial-guess-1"></a><a class="docs-heading-anchor-permalink" href="#Initial-guess" title="Permalink"></a></h2><p>The terminal control climbs from about <span>$3$</span> to <span>$7$</span> in the last tenth of a second, so the mesh packs nodes into both layers and coasts where the state is zero. With a normalized coordinate <span>$s \in [0, 1]$</span> on a segment <span>$[t_a, t_b]$</span>,</p><p>$</p><p>\begin{aligned} t<em>{\mathrm{start}}(s) &amp;= t</em>a + (t<em>b - t</em>a)\sin^2!\bigl(\pi s / 2\bigr), \
+t<em>{\mathrm{end}}(s) &amp;= t</em>a + (t<em>b - t</em>a)\cos^2!\bigl(\pi(1-s)/2\bigr). \end{aligned} $</p><p>The first map clusters at <span>$t_a$</span> and the second at <span>$t_b$</span>. The nodes are <span>$41$</span> points of <span>$t_{\mathrm{start}}$</span> on <span>$[0, 15]$</span>, eight uniformly spaced points on <span>$(15,\, 9985)$</span>, and <span>$61$</span> points of <span>$t_{\mathrm{end}}$</span> on <span>$[9985,\, 10000]$</span>. Normalized time is uniform, <span>$\theta_k = t_k / t_f$</span>, and the dilation guess is the slope of that mesh,</p><p>$</p><p>s<em>k = \frac{\theta</em>{k+1} - \theta<em>k}{\tau</em>{k+1} - \tau_k}. $</p><p>State nodes sit on the boundary layer, <span>$x_k = x_{\mathrm{init}}(t_k) + x_{\mathrm{term}}(t_k)$</span>, with <span>$J_1 = 0$</span>. On each interval the control is the constant <span>$u$</span> that carries <span>$x_k$</span> to <span>$x_{k+1}$</span> under <span>$\dot x = -x^3 + u$</span>. Newton starts from</p><p>$</p><p>u = \frac{x<em>{k+1} - x</em>k}{\Delta t} + \Bigl(\frac{x<em>k + x</em>{k+1}}{2}\Bigr)^3 $</p><p>and <span>$J$</span> accumulates <span>$\tfrac12\int(x^2+u^2)\,dt$</span> of that same transfer.</p><h2 id="Solve"><a class="docs-heading-anchor" href="#Solve">Solve</a><a id="Solve-1"></a><a class="docs-heading-anchor-permalink" href="#Solve" title="Permalink"></a></h2><p>SCvx* linearizes the zero-order-hold dynamics about this reference and solves the convex subproblem with Clarabel. Trust-region radii on <span>$\theta$</span> and <span>$s$</span> scale with the local mesh width (<span>$\Delta\theta$</span> is a quarter of the neighboring spacing, <span>$\Delta s = 0.02\, s_k$</span>), with <span>$\Delta x = 0.05$</span>, <span>$\Delta J = 0.2$</span>, and <span>$\Delta u = 0.2$</span>. The radii stay at those sizes (<span>$\alpha_2 = 1$</span>), so the terminal nodes, spaced by about <span>$0.01\,\mathrm{s}$</span>, remain inside the spike.</p><p>The solve is optimal after <span>$74$</span> iterations. The discrete cost is <span>$3.378$</span>, and the dynamics defect is about <span>$7\times 10^{-7}$</span>.</p><p><strong>File:</strong> <code>examples/hypersensitive/ex_scvxstar_hypersensitive.jl</code></p><pre><code class="language-julia hljs">&quot;&quot;&quot;Hypersensitive optimal control with SCvx*
+
+ICLOCS2 hypersensitive problem (Rao and Mease, Optim. Control Appl. Meth. 21, 2000):
+http://www.ee.ic.ac.uk/ICLOCS/ExampleHypersensitive.html
+
+Minimize ½∫(x² + u²) dt subject to ẋ = -x³ + u, with x(0) = 1, x(t_f) = 1.5,
+and t_f = 10000 fixed. The state and the control are unbounded.
+
+The state here is ``[x, J, θ]`` with ``θ = t / t_f`` and the controls are ``u``
+and a dilation ``s = (dt/dτ) / t_f``. Normalized time runs over ``τ ∈ [0, 1]``,
+so every trust-region variable stays O(1). The initial mesh clusters nodes
+in both boundary layers.
+
+On this horizon the solution is two non-overlapping boundary layers joined by
+x ≈ 0. Each layer rides a zero-energy manifold of the Hamiltonian system,
+λ = -x³ ± x√(x⁴ + 1), with the sign selecting the initial or terminal layer.
+&quot;&quot;&quot;
+
+using Clarabel
+using ForwardDiff
+using CairoMakie
+using JuMP
+using LinearAlgebra
+using OrdinaryDiffEq
+
+include(joinpath(@__DIR__, &quot;../../src/SCPLib.jl&quot;))
+
+
+# -------------------- problem data (ICLOCS2) -------------------- #
+struct HypersensitiveParams
+    tf::Float64
+end
+
+const tf = 10000.0
+const x0 = 1.0
+const xf = 1.5
+
+params = HypersensitiveParams(tf)
+
+# Transcription bounds. ICLOCS leaves x and u free. s stays positive so that
+# time increases; the upper bound sits above the coast intervals of the mesh.
+const s_min = 1e-8
+const s_max = 30.0
+const θ_min, θ_max = 0.0, 1.0
+
+
+function eom!(dx, x, pu, t)
+    (; params, u) = pu
+    s = u[2]
+    dx[1] = s * params.tf * (-x[1]^3 + u[1])
+    dx[2] = s * params.tf * 0.5 * (x[1]^2 + u[1]^2)
+    dx[3] = s
+    return
+end
+
+
+# Zero-energy boundary layers. φ &gt; 40 underflows the state to zero.
+function x_init(t)
+    φ = 2 * t + asinh(1 / x0^2)
+    φ &gt; 40 &amp;&amp; return 0.0
+    return 1 / sqrt(sinh(φ))
+end
+
+function x_term(t)
+    φ = 2 * (tf - t) + asinh(1 / xf^2)
+    φ &gt; 40 &amp;&amp; return 0.0
+    return 1 / sqrt(sinh(φ))
+end
+
+function u_of_x(x, terminal::Bool)
+    x == 0 &amp;&amp; return 0.0
+    root = sqrt(x^4 + 1)
+    return terminal ? x^3 + x * root : x^3 - x * root
+end
+
+function x_layer(t)
+    return x_init(t) + x_term(t)
+end
+
+function u_layer(t)
+    return u_of_x(x_init(t), false) + u_of_x(x_term(t), true)
+end
+
+# ∫ λ dx on the initial manifold, and ∫ -λ dx on the terminal manifold.
+function cost_init_to(x)
+    x == 0 &amp;&amp; return 0.0
+    return -x^4 / 4 + (x^2 * sqrt(x^4 + 1) + asinh(x^2)) / 4
+end
+
+function cost_term_to(x)
+    x == 0 &amp;&amp; return 0.0
+    return x^4 / 4 + (x^2 * sqrt(x^4 + 1) + asinh(x^2)) / 4
+end
+
+function J_layer(t)
+    return (cost_init_to(x0) - cost_init_to(x_init(t))) + cost_term_to(x_term(t))
+end
+
+const J_analytical = cost_init_to(x0) + cost_term_to(xf)
+
+
+function objective(x, u)
+    return x[2, end]
+end
+
+
+# -------------------- layer-adapted mesh -------------------- #
+# The terminal control climbs from about 3 to 7 in the last tenth of a second.
+# A cosine grid on [0, t_f] does not put a node there. Cluster at t = 0 and at
+# t = t_f, and leave a coarse coast in between, where the state is zero.
+function cluster_start(t_a, t_b, n)
+    s = collect(LinRange(0.0, 1.0, n))
+    return t_a .+ (t_b - t_a) .* sin.(0.5 * π .* s).^2
+end
+
+function cluster_end(t_a, t_b, n)
+    s = collect(LinRange(0.0, 1.0, n))
+    return t_a .+ (t_b - t_a) .* cos.(0.5 * π .* (1 .- s)).^2
+end
+
+t_init = cluster_start(0.0, 15.0, 41)
+t_mid = collect(LinRange(15.0, tf - 15.0, 10))[2:end-1]
+t_term = cluster_end(tf - 15.0, tf, 61)
+t_phys = [t_init; t_mid; t_term]
+
+const N = length(t_phys)
+const nx = 3                              # [x, J, θ]
+const nu = 2                              # [u, s]
+const times = collect(LinRange(0.0, 1.0, N))
+
+θ_ref = t_phys ./ tf
+Δτ = times[2] - times[1]
+s_ref = diff(θ_ref) ./ Δτ
+
+# Constant control on each interval that carries the boundary-layer state
+# from one node to the next. ẋ = -x³ + u, so the hold is the root of that
+# transfer, not a sample of u(t).
+function transfer_xu(x_left, u, Δt)
+    function f!(dz, z, p, t)
+        x = z[1]
+        dz[1] = -x^3 + u
+        dz[2] = 0.5 * (x^2 + u^2)
+    end
+    sol = solve(
+        ODEProblem(f!, [x_left, 0.0], (0.0, Δt)),
+        Tsit5();
+        reltol = 1e-11,
+        abstol = 1e-11,
+    )
+    return sol.u[end][1], sol.u[end][2]
+end
+
+function match_control(x_left, x_right, Δt, u_guess)
+    if max(abs(x_left), abs(x_right)) &lt; 1e-12
+        return 0.0, 0.0
+    end
+    u = u_guess
+    x_end, ΔJ = transfer_xu(x_left, u, Δt)
+    for _ in 1:12
+        residual = x_end - x_right
+        abs(residual) &lt; 1e-10 &amp;&amp; return u, ΔJ
+        ε = 1e-6 * max(1.0, abs(u))
+        x_end_ε, _ = transfer_xu(x_left, u + ε, Δt)
+        slope = (x_end_ε - x_end) / ε
+        abs(slope) &lt; 1e-14 &amp;&amp; break
+        u -= residual / slope
+        x_end, ΔJ = transfer_xu(x_left, u, Δt)
+    end
+    return u, ΔJ
+end
+
+t_ref = θ_ref .* tf
+x_ref = zeros(nx, N)
+u_ref = zeros(nu, N - 1)
+x_ref[1, 1] = x_layer(t_ref[1])
+x_ref[2, 1] = 0.0
+x_ref[3, 1] = θ_ref[1]
+for k in 1:N-1
+    Δt = t_ref[k+1] - t_ref[k]
+    x_left = x_ref[1, k]
+    x_right = x_layer(t_ref[k+1])
+    u_guess = (x_right - x_left) / Δt + (0.5 * (x_left + x_right))^3
+    u_k, ΔJ = match_control(x_left, x_right, Δt, u_guess)
+    u_ref[1, k] = u_k
+    u_ref[2, k] = s_ref[k]
+    x_ref[1, k+1] = x_right
+    x_ref[2, k+1] = x_ref[2, k] + ΔJ
+    x_ref[3, k+1] = θ_ref[k+1]
+end
+
+
+# -------------------- create problem -------------------- #
+prob = SCPLib.ContinuousProblem(
+    Clarabel.Optimizer,
+    eom!,
+    params,
+    objective,
+    times,
+    x_ref,
+    u_ref;
+    ode_method = Tsit5(),
+)
+set_silent(prob.model)
+
+@constraint(prob.model, constraint_initial, prob.model[:x][:, 1] == [x0, 0.0, 0.0])
+@constraint(prob.model, constraint_final_x, prob.model[:x][1, end] == xf)
+@constraint(prob.model, constraint_final_θ, prob.model[:x][3, end] == 1.0)
+
+@constraint(prob.model, constraint_θ_lb[k in 1:N], prob.model[:x][3, k] &gt;= θ_min)
+@constraint(prob.model, constraint_θ_ub[k in 1:N], prob.model[:x][3, k] &lt;= θ_max)
+@constraint(prob.model, constraint_s_lb[k in 1:N-1], prob.model[:u][2, k] &gt;= s_min)
+@constraint(prob.model, constraint_s_ub[k in 1:N-1], prob.model[:u][2, k] &lt;= s_max)
+
+
+# -------------------- solve -------------------- #
+# Absolute steps in θ and s would move the terminal nodes, spaced by ~0.01 s,
+# out of the spike. Scale those radii to the local mesh width, and do not let
+# them grow: a cap large enough for u is already fatal for s.
+Δ0 = zeros(nx, N)
+Δ0[1, :] .= 0.05
+Δ0[2, :] .= 0.2
+for k in 1:N
+    dθ = k == 1 ? θ_ref[2] - θ_ref[1] :
+         k == N ? θ_ref[N] - θ_ref[N-1] :
+         0.5 * (θ_ref[k+1] - θ_ref[k-1])
+    Δ0[3, k] = 0.25 * dθ
+end
+Δ0_u = zeros(nu, N)
+Δ0_u[1, :] .= 0.2
+for k in 1:N-1
+    Δ0_u[2, k] = 0.02 * s_ref[k]
+end
+Δ0_u[2, N] = Δ0_u[2, N-1]
+
+algo = SCPLib.SCvxStar(
+    nx, N;
+    w0 = 1e2,
+    Δ0 = Δ0,
+    nu = nu,
+    Δ0_u = Δ0_u,
+    use_trustregion_control = true,
+    Δ_bounds = (1e-14, 1.0),
+    alphas = (2.0, 1.0),
+)
+
+solution = SCPLib.solve!(
+    algo, prob, x_ref, u_ref;
+    maxiter = 200,
+    tol_feas = 1e-6,
+    tol_opt = 1e-4,
+)
+
+sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+
+
+# -------------------- plot -------------------- #
+const layer_window = 10.0
+
+function collect_state(sols)
+    ts = Float64[]
+    xs = Float64[]
+    Js = Float64[]
+    for sol in sols
+        X = Array(sol)
+        append!(ts, X[3, :] .* tf)
+        append!(xs, X[1, :])
+        append!(Js, X[2, :])
+    end
+    return ts, xs, Js
+end
+
+t_prop, x_prop, J_prop = collect_state(sols_opt)
+t_nodes = solution.x[3, :] .* tf
+t_dense = [collect(LinRange(0.0, layer_window, 400)); collect(LinRange(tf - layer_window, tf, 400))]
+x_dense = x_layer.(t_dense)
+u_dense = u_layer.(t_dense)
+
+function zoh_stair(nodes, values)
+    return nodes, [values; values[end]]
+end
+
+fig = Figure(size = (1500, 1200))
+
+function plot_x!(ax, tlim; title)
+    lines!(ax, t_dense, x_dense; color = :black, linestyle = :dash, linewidth = 2, label = &quot;boundary layer&quot;)
+    lines!(ax, t_prop, x_prop; color = :steelblue, linewidth = 2, label = &quot;SCvx*&quot;)
+    scatter!(ax, t_nodes, solution.x[1, :]; color = :tomato, markersize = 5, label = &quot;nodes&quot;)
+    xlims!(ax, tlim)
+    ax.title = title
+    ax.xlabel = &quot;Time [s]&quot;
+    ax.ylabel = &quot;x&quot;
+end
+
+function plot_u!(ax, tlim; title)
+    lines!(ax, t_dense, u_dense; color = :black, linestyle = :dash, linewidth = 2, label = &quot;boundary layer&quot;)
+    t_u, u_stair = zoh_stair(t_nodes, solution.u[1, :])
+    stairs!(ax, t_u, u_stair; step = :post, color = :steelblue, linewidth = 2, label = &quot;SCvx* (ZOH)&quot;)
+    xlims!(ax, tlim)
+    ax.title = title
+    ax.xlabel = &quot;Time [s]&quot;
+    ax.ylabel = &quot;u&quot;
+end
+
+ax_x = Axis(fig[1, 1])
+plot_x!(ax_x, (0.0, tf); title = &quot;State&quot;)
+axislegend(ax_x, position = :rt)
+
+ax_x0 = Axis(fig[1, 2])
+plot_x!(ax_x0, (0.0, layer_window); title = &quot;Initial layer&quot;)
+
+ax_xf = Axis(fig[1, 3])
+plot_x!(ax_xf, (tf - layer_window, tf); title = &quot;Terminal layer&quot;)
+
+ax_u = Axis(fig[2, 1])
+plot_u!(ax_u, (0.0, tf); title = &quot;Control&quot;)
+
+ax_u0 = Axis(fig[2, 2])
+plot_u!(ax_u0, (0.0, layer_window); title = &quot;Initial layer&quot;)
+axislegend(ax_u0, position = :rt)
+
+ax_uf = Axis(fig[2, 3])
+plot_u!(ax_uf, (tf - layer_window, tf); title = &quot;Terminal layer&quot;)
+axislegend(ax_uf, position = :lt)
+
+ax_s = Axis(fig[3, 1]; xlabel = &quot;τ&quot;, ylabel = &quot;s&quot;, title = &quot;Time dilation&quot;)
+τ_s, s_stair = zoh_stair(times, solution.u[2, :])
+τ_g, s_guess = zoh_stair(times, s_ref)
+stairs!(ax_s, τ_g, s_guess; step = :post, color = :black, linestyle = :dash, linewidth = 2, label = &quot;initial mesh&quot;)
+stairs!(ax_s, τ_s, s_stair; step = :post, color = :steelblue, linewidth = 2, label = &quot;SCvx*&quot;)
+axislegend(ax_s, position = :rt)
+
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in eachindex(solution.info[:accept])]
+ax_χ = Axis(fig[3, 2]; xlabel = &quot;Iteration&quot;, ylabel = &quot;χ&quot;, yscale = log10)
+scatterlines!(ax_χ, eachindex(solution.info[:accept]), solution.info[:χ]; color = colors_accept, marker = :circle, markersize = 7)
+
+ax_w = Axis(fig[3, 3]; xlabel = &quot;Iteration&quot;, ylabel = &quot;w&quot;, yscale = log10)
+scatterlines!(ax_w, eachindex(solution.info[:accept]), solution.info[:w]; color = colors_accept, marker = :circle, markersize = 7)
+
+ax_ΔJ = Axis(fig[4, 1]; xlabel = &quot;Iteration&quot;, ylabel = &quot;ΔJ&quot;, yscale = log10)
+scatterlines!(ax_ΔJ, eachindex(solution.info[:accept]), abs.(solution.info[:ΔJ]); color = colors_accept, marker = :circle, markersize = 7)
+
+ax_Δ = Axis(fig[4, 2]; xlabel = &quot;Iteration&quot;, ylabel = &quot;trust region radius&quot;, yscale = log10)
+scatterlines!(ax_Δ, eachindex(solution.info[:accept]), [minimum(val) for val in solution.info[:Δ]]; color = colors_accept, marker = :circle, markersize = 7)
+
+ax_J = Axis(fig[4, 3]; xlabel = &quot;Time [s]&quot;, ylabel = &quot;J&quot;, title = &quot;Accumulated cost&quot;)
+t_J = LinRange(0.0, tf, 4000)
+lines!(ax_J, t_J, J_layer.(t_J); color = :black, linestyle = :dash, linewidth = 2, label = &quot;boundary layer&quot;)
+lines!(ax_J, t_prop, J_prop; color = :steelblue, linewidth = 2, label = &quot;SCvx*&quot;)
+scatter!(ax_J, t_nodes, solution.x[2, :]; color = :tomato, markersize = 4, label = &quot;nodes&quot;)
+axislegend(ax_J, position = :lt)
+
+mkpath(joinpath(@__DIR__, &quot;plots&quot;))
+save(joinpath(@__DIR__, &quot;plots/hypersensitive_scvxstar.png&quot;), fig; px_per_unit = 3)
+display(fig)
+
+J_opt = solution.x[2, end]
+println(&quot;Status: $(solution.status) after $(solution.n_iter) iterations&quot;)
+println(&quot;Cost J = $(J_opt), boundary-layer J = $(J_analytical), |J - J*| = $(abs(J_opt - J_analytical))&quot;)
+println(&quot;Terminal state [x, J, θ] = $(solution.x[:, end])&quot;)
+println(&quot;Dynamics defect ‖g‖∞ = $(norm(g_dynamics_opt, Inf))&quot;)
+println(&quot;Dilation s ∈ [$(minimum(solution.u[2, :])), $(maximum(solution.u[2, :]))]&quot;)
+println(&quot;First interval Δt = $(t_nodes[2] - t_nodes[1]) s, last interval Δt = $(t_nodes[end] - t_nodes[end-1]) s&quot;)
+println(&quot;Done!&quot;)</code></pre><p><img src="../assets/hypersensitive_scvxstar.png" alt="Hypersensitive problem with SCvx*: state and control over the full horizon and both boundary layers, time dilation, and convergence"/></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="example_brachistochrone.html">« Brachistochrone</a><a class="docs-footer-nextpage" href="example_supersonic.html">Supersonic time-to-climb »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Monday 9 November 2026 22:59">Monday 9 November 2026</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>

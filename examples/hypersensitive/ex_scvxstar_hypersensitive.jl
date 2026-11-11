@@ -239,15 +239,20 @@ algo = SCPLib.SCvxStar(
     nu = nu,
     Δ0_u = Δ0_u,
     use_trustregion_control = true,
-    Δ_bounds = (1e-14, 1.0),
-    alphas = (2.0, 1.0),
+    Δ_bounds = (1e-8, 1.0),
+    alphas = (2.0, 2.0),
 )
 
+# The s radii stay small by design, so the trust-region is active at every
+# iteration (its multipliers on s do not vanish) and the default stationarity
+# test cannot fire. Stop on a small accepted step instead; this is not a
+# stationarity certificate (`solution.info[:converged_by] == :small_step`).
 solution = SCPLib.solve!(
     algo, prob, x_ref, u_ref;
     maxiter = 200,
     tol_feas = 1e-6,
     tol_opt = 1e-4,
+    small_step_convergence = true,
 )
 
 sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
@@ -336,7 +341,7 @@ scatterlines!(ax_χ, eachindex(solution.info[:accept]), solution.info[:χ]; colo
 ax_w = Axis(fig[3, 3]; xlabel = "Iteration", ylabel = "w", yscale = log10)
 scatterlines!(ax_w, eachindex(solution.info[:accept]), solution.info[:w]; color = colors_accept, marker = :circle, markersize = 7)
 
-ax_ΔJ = Axis(fig[4, 1]; xlabel = "Iteration", ylabel = "ΔJ", yscale = log10)
+ax_ΔJ = Axis(fig[4, 1]; xlabel = "Iteration", ylabel = "ΔJ")
 scatterlines!(ax_ΔJ, eachindex(solution.info[:accept]), abs.(solution.info[:ΔJ]); color = colors_accept, marker = :circle, markersize = 7)
 
 ax_Δ = Axis(fig[4, 2]; xlabel = "Iteration", ylabel = "trust region radius", yscale = log10)

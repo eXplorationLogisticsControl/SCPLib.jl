@@ -7,6 +7,8 @@ Tests for the trust-region globalization of SCvx* / SCvx / ProxLinear
 - M9: control trust region can be enabled without passing `nu`
 - M10: stopping test requires an accepted step that is not bounded by the trust region;
        stall exit at the trust-region lower bound returns the reference; `:InfeasibleStationary`
+- dual test on the trust region (`trust_region_dual_bound`, `trust_region_limiting`) and the
+  opt-in `small_step_convergence` for a trust region that stays active
 """
 
 using Clarabel
@@ -288,6 +290,87 @@ function test_trust_region_control_without_nu()
 end
 
 
+"""Build the linearized subproblem at (x_ref, u_ref) and solve it once; returns the candidate."""
+function _glob_solve_subproblem!(algo, prob, x_ref, u_ref)
+    SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+    SCPLib.set_trust_region_constraints!(algo, prob, x_ref, u_ref)
+    SCPLib.solve_convex_subproblem!(algo, prob, nothing)
+    return value.(prob.model[:x]), SCPLib.control_values(prob)
+end
+
+
+function test_trust_region_dual_bound()
+    # min -x₂ with x₂ = u: the state TR (Δ = 0.05) binds with multiplier 1, so the model could
+    # decrease by 1 ⋅ (Δ_max - Δ) = 9.95 more at the largest TR (Δ_max = 10)
+    prob, x_ref, u_ref = _glob_lin_problem()
+    algo = SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 0.05, Δ_bounds = (1e-10, 10.0))
+    x, u = _glob_solve_subproblem!(algo, prob, x_ref, u_ref)
+    @test x[1, 2] ≈ 0.05 atol = 1e-6
+    @test SCPLib.trust_region_dual_bound(algo, prob) ≈ 9.95 atol = 1e-5
+    @test SCPLib.trust_region_limiting(algo, prob, x, u, x_ref, u_ref; tol_dual = 1e-4)
+    @test SCPLib.trust_region_limiting(algo, prob, x, u, x_ref, u_ref; tol_dual = -1.0)
+
+    # the control TR binds instead (state TR loose): its multiplier enters the bound
+    prob, x_ref, u_ref = _glob_lin_problem()
+    algo = SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 1.0, Δ_bounds = (1e-10, 10.0),
+                           use_trustregion_control = true, nu = 1, Δ0_u = 0.05)
+    x, u = _glob_solve_subproblem!(algo, prob, x_ref, u_ref)
+    @test u[1, 1] ≈ 0.05 atol = 1e-6
+    @test SCPLib.trust_region_dual_bound(algo, prob) ≈ 9.95 atol = 1e-5
+
+    # min -x₂ s.t. x₂ ≤ 1 from x₂ = 0.95 with Δ = 0.05002: the convex constraint stops the step
+    # 2e-5 inside the TR, within the tolerance band of the geometric test, so the step counts as on
+    # the boundary; the TR multipliers are negligible (x₂ ≤ 1 carries the multiplier), and the dual
+    # test does not count the TR as limiting
+    prob, x_ref, u_ref = _glob_lin_problem(x_ref = [0.0 0.95], u_ref = fill(0.95, 1, 1))
+    algo = SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 0.05002, Δ_bounds = (1e-10, 0.1))
+    x, u = _glob_solve_subproblem!(algo, prob, x_ref, u_ref)
+    @test x[1, 2] ≈ 1.0 atol = 1e-6
+    @test SCPLib.trust_region_active(algo, x, u, x_ref, u_ref)
+    @test SCPLib.trust_region_dual_bound(algo, prob) < 1e-5
+    @test !SCPLib.trust_region_limiting(algo, prob, x, u, x_ref, u_ref; tol_dual = 1e-4)
+    @test SCPLib.trust_region_limiting(algo, prob, x, u, x_ref, u_ref; tol_dual = -1.0)   # geometric only
+
+    # without duals (model not solved) the geometric test decides
+    prob, x_ref, u_ref = _glob_lin_problem()
+    algo = SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 0.05)
+    @test isnothing(SCPLib.trust_region_dual_bound(algo, prob))
+    @test SCPLib.trust_region_limiting(algo, prob, [0.0 0.05], zeros(1, 1), x_ref, u_ref; tol_dual = 1e-4)
+end
+
+
+function test_small_step_convergence()
+    # a frozen tiny TR (no expansion): each step moves x₂ by Δ0 = 1e-5 and is bounded by the TR,
+    # so the default stopping test never fires (x₂ = 1 is the optimum)
+    for make_algo in (() -> SCPLib.SCvxStar(1, 2; w0 = 10.0, Δ0 = 1e-5, alphas = (2.0, 1.0)),
+                      () -> SCPLib.SCvx(1, 2; w = 1e3, Δ0 = 1e-5, alphas = (2.0, 1.0)))
+        prob, x_ref, u_ref = _glob_lin_problem()
+        sol = SCPLib.solve!(make_algo(), prob, x_ref, u_ref; verbosity = verbosity, maxiter = 5, tol_opt = 1e-4)
+        @test sol.status == :Feasible
+        @test !haskey(sol.info, :converged_by)
+        @test sol.x[1, 2] ≈ 5e-5 atol = 1e-8
+
+        # opt-in small-step test: :Optimal on the first step, which is NOT the optimum, which is
+        # why the test is opt-in and reported separately
+        prob, x_ref, u_ref = _glob_lin_problem()
+        sol = SCPLib.solve!(make_algo(), prob, x_ref, u_ref; verbosity = verbosity, maxiter = 5, tol_opt = 1e-4,
+                            small_step_convergence = true)
+        @test sol.status == :Optimal
+        @test sol.info[:converged_by] == :small_step
+        @test sol.n_iter == 1
+        @test sol.x[1, 2] ≈ 1e-5 atol = 1e-8
+    end
+
+    # the regular tests are reported as such
+    prob, x_ref, u_ref = _glob_lin_problem()
+    sol = SCPLib.solve!(SCPLib.SCvxStar(1, 2; w0 = 10.0), prob, x_ref, u_ref; verbosity = verbosity, maxiter = 100,
+                        small_step_convergence = true)
+    @test sol.status == :Optimal
+    @test sol.info[:converged_by] in (:ratio, :null)
+    @test sol.x[1, 2] ≈ 1.0 atol = 1e-6
+end
+
+
 @testset "SCP globalization" begin
     @testset "classify_step" begin test_classify_step() end
     @testset "restoration step (M2)" begin test_restoration_step() end
@@ -298,4 +381,6 @@ end
     @testset "objective offset invariance" begin test_objective_offset() end
     @testset "model size constant (M4)" begin test_model_size_constant() end
     @testset "u trust region without nu (M9)" begin test_trust_region_control_without_nu() end
+    @testset "trust-region dual test" begin test_trust_region_dual_bound() end
+    @testset "small-step convergence (opt-in)" begin test_small_step_convergence() end
 end

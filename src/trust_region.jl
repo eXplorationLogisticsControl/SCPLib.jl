@@ -41,10 +41,39 @@ end
 
 
 """
+Scale trust-region radii. `NaN` entries are copied through and are not used as radii.
+Mixed problems mark the unused continuous column `N` this way.
+"""
+function scale_trust_radii(Δ::AbstractMatrix, factor::Real, bound::Real, shrink::Bool)
+    out = similar(Δ)
+    for i in eachindex(Δ)
+        v = Δ[i]
+        if isnan(v)
+            out[i] = v
+        elseif shrink
+            out[i] = max(v / factor, bound)
+        else
+            out[i] = min(v * factor, bound)
+        end
+    end
+    return out
+end
+
+
+"""Whether every non-`NaN` radius is at or below `Δ_min` (`NaN` radii are unused slots)"""
+radii_at_lower_bound(Δ::AbstractMatrix, Δ_min::Real) = all(v -> isnan(v) || v <= Δ_min, Δ)
+
+
+"""Whether every non-`NaN` radius is at or above `Δ_max` (`NaN` radii are unused slots)"""
+radii_at_upper_bound(Δ::AbstractMatrix, Δ_max::Real) = all(v -> isnan(v) || v >= Δ_max, Δ)
+
+
+"""
     update_trust_region!(algo::SCPAlgorithm, action::Symbol)
 
 Apply a trust-region update `action ∈ (:shrink, :expand, :keep)` to `algo.tr` (and to
 `algo.tr_u` when the control trust-region is used), clamped to `algo.Δ_bounds`.
+`NaN` radii are left unchanged.
 Returns `true` if the trust-region size actually changed.
 """
 function update_trust_region!(algo::SCPAlgorithm, action::Symbol)
@@ -53,19 +82,20 @@ function update_trust_region!(algo::SCPAlgorithm, action::Symbol)
 
     function _update(Δ)
         if action == :shrink
-            return max.(Δ / algo.alphas[1], algo.Δ_bounds[1])
+            return scale_trust_radii(Δ, algo.alphas[1], algo.Δ_bounds[1], true)
         else
-            return min.(Δ * algo.alphas[2], algo.Δ_bounds[2])
+            return scale_trust_radii(Δ, algo.alphas[2], algo.Δ_bounds[2], false)
         end
     end
 
+    # `isequal` so that `NaN` slots (mixed problems) do not count as a change
     Δ_new = _update(algo.tr.Δ)
-    changed = Δ_new != algo.tr.Δ
+    changed = !isequal(Δ_new, algo.tr.Δ)
     algo.tr.Δ = Δ_new
 
     if algo.use_trustregion_control && !isnothing(algo.tr_u)
         Δu_new = _update(algo.tr_u.Δ)
-        changed = changed || (Δu_new != algo.tr_u.Δ)
+        changed = changed || !isequal(Δu_new, algo.tr_u.Δ)
         algo.tr_u.Δ = Δu_new
     end
     return changed
@@ -76,7 +106,7 @@ end
     update_trust_region!(algo::SCPAlgorithm, rho_i::Float64)
 
 Update trust-region size Δ from the ratio `rho_i`: shrink if `rho_i < rhos[2]`, expand if
-`rho_i >= rhos[3]`, keep otherwise.
+`rho_i >= rhos[3]`, keep otherwise. `NaN` radii are left unchanged.
 Returns `true` if the trust-region size actually changed.
 """
 function update_trust_region!(algo::SCPAlgorithm, rho_i::Float64)
@@ -101,11 +131,12 @@ end
 
 True when every trust-region radius (state, and control if used) is already at its lower bound
 `Δ_bounds[1]`, so a rejected step cannot shrink the subproblem any further.
+`NaN` radii (unused slots of mixed problems) are ignored.
 """
 function trust_region_at_lower_bound(algo::SCPAlgorithm)
-    at_bound = all(algo.tr.Δ .<= algo.Δ_bounds[1])
+    at_bound = radii_at_lower_bound(algo.tr.Δ, algo.Δ_bounds[1])
     if algo.use_trustregion_control && !isnothing(algo.tr_u)
-        at_bound = at_bound && all(algo.tr_u.Δ .<= algo.Δ_bounds[1])
+        at_bound = at_bound && radii_at_lower_bound(algo.tr_u.Δ, algo.Δ_bounds[1])
     end
     return at_bound
 end
@@ -116,6 +147,7 @@ end
 
 Clamp the trust-region radii into `algo.Δ_bounds` (e.g. an initial `Δ0` below `Δ_min`, where the
 subproblem solution is below the solver accuracy and the trust-region tests are meaningless).
+`NaN` radii (unused slots of mixed problems) stay `NaN`.
 """
 function clamp_trust_region!(algo::SCPAlgorithm)
     algo.tr.Δ = clamp.(algo.tr.Δ, algo.Δ_bounds[1], algo.Δ_bounds[2])
@@ -166,6 +198,89 @@ function trust_region_active(algo::SCPAlgorithm, x, u, x_ref, u_ref; rtol::Real 
 end
 
 
+"""Duals of one trust-region constraint entry: a vector constraint, an array of scalar constraints, or a scalar constraint"""
+_trust_region_duals(c::AbstractArray) = [dual(ci) for ci in c]
+_trust_region_duals(c) = vcat(dual(c))
+
+
+"""
+Accumulate `Σ |ν_lb + ν_ub| ⋅ (Δ_max - Δ)` over a pair of trust-region constraint containers.
+Entry `k` covers rows `1:nrows` of column `k` of `Δ`; entry `(k, i)` (mixed problems) covers
+`Δ[i, k]`. `NaN` radii (unused slots) are skipped.
+"""
+function _trust_region_dual_bound(cons_lb, cons_ub, Δ::AbstractMatrix, Δ_max::Real)
+    bound = 0.0
+    for key in eachindex(cons_lb)       # `keys` is not supported by JuMP's SparseAxisArray (mixed problems)
+        idx = Tuple(key)
+        ν = abs.(_trust_region_duals(cons_lb[idx...])) .+ abs.(_trust_region_duals(cons_ub[idx...]))
+        if length(idx) == 1
+            radii = view(Δ, 1:length(ν), idx[1])
+        else
+            radii = [Δ[idx[2], idx[1]]]
+        end
+        for (νi, Δi) in zip(ν, radii)
+            isnan(Δi) && continue
+            bound += νi * max(Δ_max - Δi, 0.0)
+        end
+    end
+    return bound
+end
+
+
+"""
+    trust_region_dual_bound(algo, prob)
+
+Upper bound on how much more the convex model could decrease if every trust-region radius were
+raised to its ceiling `Δ_bounds[2]`, computed from the multipliers `ν` of the trust-region
+constraints of the subproblem that was just solved:
+
+    L*(current Δ) - L*(Δ_max)  ≤  Σ ν ⋅ (Δ_max - Δ)
+
+The bound follows from convexity: the optimal value of a convex program is a convex function of
+the right-hand sides of its constraints, and `-ν` is a subgradient of it. A bound below the
+optimality tolerance means the trust-region does not limit the step (to that tolerance) at any
+radius the algorithm may use, even when the step lies on its boundary.
+
+Returns `nothing` when the solver did not return duals or the constraints are not found.
+"""
+function trust_region_dual_bound(algo::SCPAlgorithm, prob::OptimalControlProblem)
+    model = prob.model
+    has_duals(model) || return nothing
+    haskey(model, :constraint_trust_region_x_lb) || return nothing
+    Δ_max = algo.Δ_bounds[2]
+    bound = _trust_region_dual_bound(model[:constraint_trust_region_x_lb], model[:constraint_trust_region_x_ub],
+                                     algo.tr.Δ, Δ_max)
+    if hasproperty(algo, :use_trustregion_control) && algo.use_trustregion_control && !isnothing(algo.tr_u)
+        haskey(model, :constraint_trust_region_u_lb) || return nothing
+        bound += _trust_region_dual_bound(model[:constraint_trust_region_u_lb], model[:constraint_trust_region_u_ub],
+                                          algo.tr_u.Δ, Δ_max)
+    end
+    return bound
+end
+
+
+"""
+    trust_region_limiting(algo, prob, x, u, x_ref, u_ref; tol_dual = -1.0)
+
+Whether the trust-region limits the subproblem step. The step must lie on the trust-region
+boundary (`trust_region_active`), and, when `tol_dual > 0` and the solver returned duals, the
+multipliers must also matter: `trust_region_dual_bound(algo, prob) > tol_dual`. A step on the
+boundary whose multipliers are negligible (degenerate or weakly active trust-region) is then
+treated like an unbounded step for the stationarity tests. `tol_dual ≤ 0` keeps the purely
+geometric test.
+
+Must be called before the model is modified, so that the duals of the last solve are available.
+"""
+function trust_region_limiting(algo::SCPAlgorithm, prob::OptimalControlProblem, x, u, x_ref, u_ref;
+                               tol_dual::Real = -1.0)
+    trust_region_active(algo, x, u, x_ref, u_ref) || return false
+    tol_dual > 0 || return true
+    bound = trust_region_dual_bound(algo, prob)
+    isnothing(bound) && return true
+    return bound > tol_dual
+end
+
+
 """
     reference_convex_feasible(prob, x_ref, u_ref; atol = 1e-6)
 
@@ -185,6 +300,8 @@ function reference_convex_feasible(prob::OptimalControlProblem, x_ref, u_ref; at
         point[x[I]] = x_ref[I]
     end
     for I in CartesianIndices(u)
+        # mixed problems hold a `NaN` constant (not a variable) in the unused continuous column `N`
+        u[I] isa VariableRef || continue
         point[u[I]] = u_ref[I]
     end
     try
@@ -264,11 +381,11 @@ function classify_step(
 end
 
 
-"""Whether every trust-region radius (state, and control if used) is at its upper bound `Δ_bounds[2]`"""
+"""Whether every trust-region radius (state, and control if used) is at its upper bound `Δ_bounds[2]`; `NaN` radii are ignored"""
 function trust_region_at_ceiling(algo::SCPAlgorithm)
-    at_ceiling = all(algo.tr.Δ .>= algo.Δ_bounds[2])
+    at_ceiling = radii_at_upper_bound(algo.tr.Δ, algo.Δ_bounds[2])
     if algo.use_trustregion_control && !isnothing(algo.tr_u)
-        at_ceiling = at_ceiling && all(algo.tr_u.Δ .>= algo.Δ_bounds[2])
+        at_ceiling = at_ceiling && radii_at_upper_bound(algo.tr_u.Δ, algo.Δ_bounds[2])
     end
     return at_ceiling
 end
@@ -316,10 +433,16 @@ function set_trust_region_constraints!(
           prob.model[:x][:,k] - x_ref[:,k]  <= algo.tr.Δ[:,k])
 
     if algo.use_trustregion_control
-        @constraint(prob.model, constraint_trust_region_u_lb[k in 1:size(u_ref,2)],
-            -(prob.model[:u][:,k] - u_ref[:,k]) <= algo.tr_u.Δ[:,k])
-        @constraint(prob.model, constraint_trust_region_u_ub[k in 1:size(u_ref,2)],
-            prob.model[:u][:,k] - u_ref[:,k]  <= algo.tr_u.Δ[:,k])
+        add_control_trust_region!(algo, prob, u_ref)
     end
+    return
+end
+
+
+function add_control_trust_region!(algo::SCPAlgorithm, prob::OptimalControlProblem, u_ref)
+    @constraint(prob.model, constraint_trust_region_u_lb[k in 1:size(u_ref,2)],
+        -(prob.model[:u][:,k] - u_ref[:,k]) <= algo.tr_u.Δ[:,k])
+    @constraint(prob.model, constraint_trust_region_u_ub[k in 1:size(u_ref,2)],
+        prob.model[:u][:,k] - u_ref[:,k]  <= algo.tr_u.Δ[:,k])
     return
 end

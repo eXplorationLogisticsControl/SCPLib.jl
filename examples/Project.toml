@@ -3,6 +3,7 @@ version = "0.1.0"
 authors = ["Yuri <yuri.shimane@gmail.com>"]
 
 [deps]
+AstrodynamicsCore = "5a6b0320-136f-4178-8c7c-d24a6d4b07af"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
 Clarabel = "61c947e1-3e6d-4ee4-985a-eec8c727bd6e"
@@ -17,3 +18,6 @@ OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 SparseDiffTools = "47a9eef4-7e08-11e9-0b38-333d64bd3804"
+
+[sources]
+AstrodynamicsCore = {path = "../../AstrodynamicsCore.jl"}
