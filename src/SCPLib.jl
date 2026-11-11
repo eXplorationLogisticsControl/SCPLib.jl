@@ -19,6 +19,7 @@ include("dynamics.jl")
 include("linearization.jl")
 include("continuous_problem.jl")
 include("impulsive_problem.jl")
+include("mixed_problem.jl")
 include("nlconstraints.jl")
 include("trust_region.jl")
 
@@ -35,6 +36,7 @@ export get_impulsive_augmented_eom
 
 export ContinuousProblem
 export ImpulsiveProblem
+export MixedProblem
 export get_trajectory, get_trajectory_augmented
 export stack_flatten_variables, unpack_flattened_variables
 

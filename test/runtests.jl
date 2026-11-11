@@ -8,6 +8,14 @@ include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 verbosity = 0
 get_plot = false
 
+@testset "Utils" begin
+    include("test_utils.jl")
+end
+
+@testset "Dynamics" begin
+    include("test_dynamics.jl")
+end
+
 @testset "SCvxStar" begin
     include("test_scvxstar_subproblem.jl")
     include("test_scvxstar_dynamics_userdefined.jl")
@@ -15,13 +23,16 @@ get_plot = false
     include("test_scvxstar_dynamics_userdefined_oop.jl")
     include("test_scvxstar_dynamics_ad.jl")
     include("test_scvxstar_h_noncvx.jl")
+    include("test_scvxstar_inequality_linearization.jl")
 
     include("test_scvxstar_impulsive_dynamics_only.jl")
+    include("test_scvxstar_impulsive_tr_u.jl")
     include("test_scvxstar_impulsive_custom_linearized_constraints.jl")
     include("test_scvxstar_custom_propagate_func.jl")
 
     include("test_scvxstar_forwardbackward.jl")
     include("test_scvxstar_callback.jl")
+    include("test_scvxstar_coverage.jl")
 end
 
 @testset "Biased control" begin
@@ -31,9 +42,32 @@ end
 
 @testset "ProxLinear" begin
     include("test_proxlinear_dynamics_only.jl")
+    include("test_proxlinear_coverage.jl")
+end
+
+@testset "FixedTRW" begin
+    include("test_fixedtrw_impulsive_dynamics_only.jl")
+    include("test_fixedtrw_coverage.jl")
 end
 
 @testset "SCvx" begin
     include("test_scvx_dynamics_ad.jl")
     include("test_scvx_impulsive_tr_u.jl")
+    include("test_scvx_coverage.jl")
+end
+
+@testset "Impulsive problem" begin
+    include("test_impulsive_problem_coverage.jl")
+end
+
+@testset "Mixed problem" begin
+    include("test_mixed_problem.jl")
+end
+
+@testset "Problem sets" begin
+    include("test_quadcopter.jl")
+end
+
+@testset "Globalization" begin
+    include("test_scp_globalization.jl")
 end

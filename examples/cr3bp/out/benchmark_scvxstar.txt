@@ -1,0 +1,17 @@
+SCvx* CR3BP benchmark
+Source: examples/cr3bp/ex_scvxstar_cr3bp.jl
+Julia: 1.12.6
+N = 60, nx = 6, nu = 4
+Warmup status: Feasible (100 iterations)
+Note: each timed sample rebuilds the JuMP problem in setup (not timed).
+
+BenchmarkTools.Trial: 5 samples with 1 evaluation per sample.
+ Range (min … max):  1.262 s …    1.535 s  ┊ GC (min … max):  7.76% … 23.23%
+ Time  (median):     1.281 s               ┊ GC (median):     7.64%
+ Time  (mean ± σ):   1.376 s ± 144.894 ms  ┊ GC (mean ± σ):  14.49% ±  8.46%
+
+  █   ▁                                                    █  
+  █▁▁▁█▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁▁█ ▁
+  1.26 s         Histogram: frequency by time         1.54 s <
+
+ Memory estimate: 2.05 GiB, allocs estimate: 23894765.

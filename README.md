@@ -1,13 +1,16 @@
 <p align="center">
-  <img src="docs/assets/logo.png" alt="SCPLib.jl Logo" width="55%"/>
+  <img src="docs/src/assets/logo.png" alt="SCPLib.jl Logo" width="55%"/>
 </p>
 
 <p align="center">
+  <a href="https://explorationlogisticscontrol.github.io/SCPLib.jl">
+    <img src="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/docs.yml/badge.svg" alt="docs workflow"/>
+  </a>
   <a href="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/test.yml">
     <img src="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/test.yml/badge.svg" alt="test workflow"/>
   </a>
-  <a href="https://explorationlogisticscontrol.github.io/SCPLib.jl">
-    <img src="https://github.com/eXplorationLogisticsControl/SCPLib.jl/actions/workflows/docs.yml/badge.svg" alt="docs workflow"/>
+  <a href="https://app.codecov.io/gh/eXplorationLogisticsControl/SCPLib.jl">
+    <img src="https://codecov.io/gh/eXplorationLogisticsControl/SCPLib.jl/branch/main/graph/badge.svg" alt="codecov"/>
   </a>
   <!-- <a href="https://yuricst.github.io/HighFidelityEphemerisModel.jl/">📚Read the docs📚</a> -->
 </p>
@@ -118,3 +121,31 @@ algo = SCPLib.SCvxStar(nx, N; w0 = 1e4)   # as an example, setting `w0` to a non
 # 4. solve problem
 solution = SCPLib.solve!(algo, prob, x_ref, u_ref; maxiter = 100)
 ```
+
+## Gallery
+
+**Supersonic minimum time to climb**: `examples/supersonic/ex_scvxstar_time_to_climb.jl`
+
+<p align="center">
+  <img src="examples/supersonic/plots/supersonic_time_to_climb_scvxstar.png" alt="Supersonic example" width="95%"/>
+</p>
+
+**CR3BP transfer**: `examples/cr3bp/ex_scvxstar_cr3bp_mass_freetf_ad.jl`
+
+<p align="center">
+  <img src="examples/cr3bp/plots/cr3bp_mass_freetf_scvxstar.png" alt="CR3BP example" width="95%"/>
+</p>
+
+**Dionysus transfer**: `examples_astrodynamics/example_dionysus.jl`
+
+<p align="center">
+  <img src="examples_astrodynamics/plots/advanced_dionysus.png" alt="Dionysus example" width="95%"/>
+</p>
+
+**Hypersensitive problem**: `examples/hypersensitive/ex_scvxstar_hypersensitive.jl`
+
+<p align="center">
+  <img src="examples/hypersensitive/plots/hypersensitive_scvxstar.png" alt="Hypersensitive example" width="95%"/>
+</p>
+
+

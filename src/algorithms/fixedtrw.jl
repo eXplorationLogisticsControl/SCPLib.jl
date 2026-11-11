@@ -71,7 +71,7 @@ mutable struct FixedTRWSCPSolution <: SCPSolution
     function FixedTRWSCPSolution(prob::OptimalControlProblem, Nu::Int)
         status = :Solving
         x = zeros(prob.nx, prob.N)
-        u = zeros(prob.nu, Nu)
+        u = initial_control_matrix(prob, Nu)
 
         info = Dict(
             :J0 => Float64[],
@@ -198,7 +198,7 @@ function solve!(
         end
 
         _x = value.(prob.model[:x])
-        _u = value.(prob.model[:u])
+        _u = control_values(prob)
         _ξ_dyn = value.(prob.model[:ξ_dyn])
         _ξ = prob.ng > 0 ? value.(prob.model[:ξ]) : nothing
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
@@ -215,16 +215,14 @@ function solve!(
         L = J0 + penalty(algo, prob, _ξ_dyn, _ξ, _ζ)
         ΔJ = J_ref - J            # actual cost reduction, eqn (13a)
         ΔL = J_ref - L            # predicted cost reduction, eqn (13b)
-        rho_i = abs(ΔL) > 1e-12 ? ΔJ / ΔL : 1.0
+        # ρ is only reported (every step is accepted); it is undefined when ΔL ≈ 0
+        rho_i = abs(ΔL) > 1e-8 * max(1.0, abs(J_ref)) ? ΔJ / ΔL : NaN
 
         # check nonlinear convergence
-        χ = norm(g_dynamics,Inf)
-        if prob.ng > 0
-            χ = max(χ, norm(g_noncvx,Inf))
-        end
-        if prob.nh > 0
-            χ = max(χ, norm(h_noncvx,Inf))
-        end
+        χ = constraint_violation(prob, g_dynamics, g_noncvx, h_noncvx)
+
+        # |ΔJ| is only a stationarity measure if the step is not bounded by the trust-region
+        tr_active = trust_region_active(algo, _x, _u, x_ref, u_ref)
 
         if verbosity > 0
             if mod(it, 20) == 0
@@ -251,7 +249,7 @@ function solve!(
         if !isnothing(callback)
             callback(algo, solution, it, J0, χ)
         end
-        if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas)) || ((J0 <= tol_J0) && (χ <= tol_feas))
+        if ((abs(ΔJ) <= tol_opt) && (χ <= tol_feas) && !tr_active) || ((J0 <= tol_J0) && (χ <= tol_feas))
             solution.status = :Optimal
             push!(solution.info[:cpu_times][:time_iter_total], time() - tcpu_start_iter)
             break

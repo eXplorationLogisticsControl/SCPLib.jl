@@ -2,6 +2,20 @@
 
 
 """
+Solver verbosity for `OrdinaryDiffEq`.
+
+v6 accepted `verbose = false`. v7 requires a `DEVerbosity` object.
+"""
+function ode_verbose()
+    if isdefined(OrdinaryDiffEq, :DEVerbosity)
+        return OrdinaryDiffEq.DEVerbosity(OrdinaryDiffEq.SciMLLogging.None())
+    else
+        return false
+    end
+end
+
+
+"""
 Trajectory index for `EnsembleProblem` `prob_func`.
 
 OrdinaryDiffEq v6 / SciMLBase called `prob_func(prob, i, repeat)` with integer `i`.
@@ -14,13 +28,6 @@ ensemble_sim_id(ctx) = ctx.sim_id
 """Per-trajectory solutions from an ensemble (`sols.u`) or a plain vector."""
 ensemble_trajectories(sols::SciMLBase.AbstractEnsembleSolution) = sols.u
 ensemble_trajectories(sols::AbstractVector) = sols
-
-
-function vprintf(verbosity::Int, str::String)
-    if verbosity > 0
-        println(str)
-    end
-end
 
 
 function message_accept_step(accept::Bool)
@@ -82,4 +89,30 @@ function set_optimal_start_values(variable_primal::Dict, constraint_solution::Di
         set_dual_start_value(ci, dual_start)
     end
     return
+end
+
+"""Three-character step-acceptance message for the iteration log"""
+function message_step(kind::Symbol, accept::Bool)
+    if kind == :restoration
+        return "rst"
+    elseif kind == :stationary
+        return "nul"
+    elseif kind == :unresolved
+        return "exp"
+    else
+        return message_accept_step(accept)
+    end
+end
+
+
+"""Maximum constraint violation χ from dynamics defects and (clipped) non-convex constraint values"""
+function constraint_violation(prob::OptimalControlProblem, g_dynamics, g_noncvx, h_noncvx)
+    χ = norm(g_dynamics, Inf)
+    if prob.ng > 0
+        χ = max(χ, norm(g_noncvx, Inf))
+    end
+    if prob.nh > 0
+        χ = max(χ, norm(h_noncvx, Inf))
+    end
+    return χ
 end

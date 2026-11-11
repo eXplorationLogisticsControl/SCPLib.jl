@@ -10,13 +10,13 @@ mutable struct MultipleShootingCache <: AbstractLinearizationCache
     ∇g::Array{Float64, 2}
     ∇h::Array{Float64, 2}
 
-    function MultipleShootingCache(nx::Int, nu::Int, N::Int, Nu::Int, ng::Int, nh::Int)
+    function MultipleShootingCache(nx::Int, nu::Int, N::Int, Nu::Int, ng::Int, nh::Int, n_u_flat::Int = nu * Nu)
         return new(
             zeros(nx, nx, N-1),
             zeros(nx, nu, N-1),
             zeros(nx, N-1),
-            zeros(ng, nx*N + nu*Nu),
-            zeros(nh, nx*N + nu*Nu),
+            zeros(ng, nx*N + n_u_flat),
+            zeros(nh, nx*N + n_u_flat),
         )
     end
 end
@@ -44,6 +44,30 @@ function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u
         lincache.Φ_B[:,:,k] = lincache.Φ_A[:,:,k] * dfdu(x_ref[:,k], u_ref[:,k], sol.t[1])
         lincache.Φ_c[:,k]   = xf_aug[1:nx] - lincache.Φ_A[:,:,k] * x_ref[:,k] - lincache.Φ_B[:,:,k] * u_ref[:,k]
     end
+end1n1
+  
+
+"""
+Set the mixed-control cache.
+
+`sols` integrate `Φ_A` and the continuous `Φ_B` only, after the impulsive jump.
+The impulsive block of `Φ_B` is `Φ_A * dfdu` and is not part of the augmented state.
+Segment `k` reads the stacked column `u_ref[:, k]` (`k = 1:N-1` only).
+"""
+function set_mixed_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u_ref, sols, prob)
+    nx = prob.nx
+    nuc = prob.nuc
+    for (k, sol) in enumerate(ensemble_trajectories(sols))
+        xf_aug = sol.u[end]
+        Φ_A = reshape(xf_aug[nx+1:nx*(nx+1)], nx, nx)
+        Φ_Bc = reshape(xf_aug[nx*(nx+1)+1:nx*(nx+1)+nx*nuc], nx, nuc)
+        u_i = u_ref[nuc+1:end, k]
+        Φ_Bi = Φ_A * prob.dfdu(x_ref[:, k], u_i, sol.t[1])
+        lincache.Φ_A[:, :, k] = Φ_A
+        lincache.Φ_B[:, :, k] = [Φ_Bc Φ_Bi]
+        lincache.Φ_c[:, k] = xf_aug[1:nx] - Φ_A * x_ref[:, k] - lincache.Φ_B[:, :, k] * u_ref[:, k]
+    end
+    return
 end
 
 

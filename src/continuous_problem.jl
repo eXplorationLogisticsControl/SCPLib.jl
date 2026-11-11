@@ -93,6 +93,7 @@ function get_trajectory(prob::ContinuousProblem, x_ref::Union{Matrix,Adjoint}, u
         trajectories = prob.N - 1,
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
+        verbose = ode_verbose(),
     )
     for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
@@ -134,6 +135,7 @@ function get_trajectory_augmented(prob::ContinuousProblem, x_ref::Union{Matrix,A
         trajectories = prob.N - 1,
         reltol = prob.ode_reltol,
         abstol = prob.ode_abstol,
+        verbose = ode_verbose(),
     )
     for (k,sol) in enumerate(ensemble_trajectories(sols))
         g_dynamics[:,k] = x_ref[:,k+1] - sol.u[end][1:prob.nx]
@@ -163,7 +165,7 @@ function get_trajectory_forwardbackward(prob::ContinuousProblem, x_ref::Union{Ma
             tspan = (prob.times[k], prob.times[k+1]),
             p = dynamics_input(prob.params, _u_k),
         )
-        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
+        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol, verbose = ode_verbose())
         xk_fwd = sols[k].u[end][1:prob.nx]
     end
     
@@ -176,7 +178,7 @@ function get_trajectory_forwardbackward(prob::ContinuousProblem, x_ref::Union{Ma
             tspan = (prob.times[k+1], prob.times[k]),
             p = dynamics_input(prob.params, _u_k),
         )
-        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
+        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol, verbose = ode_verbose())
         xk_bwd = sols[k].u[end][1:prob.nx]
     end
     g_dynamics = zeros(prob.nx,1)
@@ -210,7 +212,7 @@ function get_trajectory_augmented_forwardbackward(prob::ContinuousProblem, x_ref
             tspan = (prob.times[k], prob.times[k+1]),
             p = dynamics_input(prob.params, _u_k),
         )
-        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
+        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol, verbose = ode_verbose())
         xk_fwd = sols[k].u[end][1:prob.nx]
     end
     
@@ -223,7 +225,7 @@ function get_trajectory_augmented_forwardbackward(prob::ContinuousProblem, x_ref
             tspan = (prob.times[k+1], prob.times[k]),
             p = dynamics_input(prob.params, _u_k),
         )
-        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol)
+        sols[k] = solve(ode_problem, prob.ode_method; reltol = prob.ode_reltol, abstol = prob.ode_abstol, verbose = ode_verbose())
         xk_bwd = sols[k].u[end][1:prob.nx]
     end
     g_dynamics = zeros(prob.nx,1)
@@ -316,10 +318,8 @@ function ContinuousProblem(
     # initialize linearization cache
     if shooting_method == :multiple
         lincache = MultipleShootingCache(nx, nu, N, N-1, ng, nh)
-    elseif shooting_method == :forwardbackward
-        lincache = ForwardBackwardCache(nx, nu, N, N-1, ng, nh)
     else
-        @error "Invalid shooting method: $shooting_method"
+        lincache = ForwardBackwardCache(nx, nu, N, N-1, ng, nh)
     end
 
     # check if ∇g_noncvx is provided

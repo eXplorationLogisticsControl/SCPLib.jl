@@ -1,0 +1,28 @@
+name: examples
+
+on:
+  schedule:
+    # Weekly, Monday 00:00 UTC. Scheduled workflows run on the default branch.
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+# needed to allow julia-actions/cache to delete old caches that it has created
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "lts"
+      - uses: julia-actions/cache@v2
+      - name: Instantiate examples environment
+        run: julia --project=examples -e 'using Pkg; Pkg.instantiate()'
+      - name: Run examples
+        run: julia --project=examples examples/runexamples.jl
+        env:
+          SKIP_GUROBI: "true"

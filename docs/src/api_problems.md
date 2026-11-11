@@ -20,6 +20,19 @@ Pages   = [
 ]
 ```
 
+## Mixed problems
+
+Continuous controls on nodes `1:N-1` and impulsive controls on nodes `1:N`.
+See `MixedProblem`.
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
+  "mixed_problem.jl",
+]
+```
+
 ## Equations of motion
 
 ```@autodocs
