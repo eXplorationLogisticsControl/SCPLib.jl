@@ -295,6 +295,15 @@ Solve non-convex OCP with SCvx* algorithm
   certifying the reference as stationary
 - `max_null_steps::Int`: number of consecutive null steps at an infeasible reference after which
   `:InfeasibleStationary` is returned
+- `tol_tr_dual::Float64`: tolerance of the dual test on the trust-region (default `tol_opt`). A step
+  on the trust-region boundary still counts as not bounded by it when the trust-region multipliers
+  bound the extra model decrease available up to `Δ_bounds[2]` by `tol_tr_dual`
+  (see `trust_region_dual_bound`); `tol_tr_dual ≤ 0` keeps the purely geometric test
+- `small_step_convergence::Bool`: also return `:Optimal` on an accepted step that is bounded by the
+  trust-region when `|ΔJ| ≤ tol_opt`, `ΔL ≤ tol_opt` and `χ ≤ tol_feas`. This is a small-step
+  test, not a stationarity certificate: it also passes when the trust-region has shrunk. Use it
+  when the trust-region is deliberately kept small (e.g. a frozen radius on a time-dilation
+  control), so it stays active; `solution.info[:converged_by]` is then `:small_step`
 
 # Step classification
 - If the initial guess violates the convex constraints of the model, the first step is a
@@ -313,9 +322,11 @@ current iterate: the candidate of an accepted step, otherwise the reference. A r
 is never returned (except when it already satisfies `J0 ≤ tol_J0` and `χ ≤ tol_feas`).
 
 # Termination status
-- `:Optimal`: an accepted step that is not bounded by the trust-region has `|ΔJ| ≤ tol_opt` and
-  `χ ≤ tol_feas`; or the reference is a feasible stationary point of the subproblem; or
-  `J0 ≤ tol_J0` with `χ ≤ tol_feas`
+- `:Optimal`: an accepted step that is not bounded by the trust-region (see `tol_tr_dual`) has
+  `|ΔJ| ≤ tol_opt` and `χ ≤ tol_feas` (`:ratio`); or the reference is a feasible stationary point
+  of the subproblem (`:null`); or `J0 ≤ tol_J0` with `χ ≤ tol_feas` (`:tol_J0`); or, with
+  `small_step_convergence = true`, the small-step test passes (`:small_step`). The test that
+  fired is stored in `solution.info[:converged_by]`
 - `:Stalled` / `:Feasible`: a step is rejected while the trust-region is already at its lower
   bound, so the subproblem cannot change; the last accepted reference is returned, with status
   `:Feasible` if it satisfies `χ ≤ tol_feas` and `:Stalled` otherwise
@@ -342,6 +353,8 @@ function solve!(
     tol_ΔL::Float64 = 1e-8,
     tol_ΔL_null::Float64 = 1e-3,
     max_null_steps::Int = 10,
+    tol_tr_dual::Float64 = tol_opt,
+    small_step_convergence::Bool = false,
 )
     @assert prob.ng == length(algo.λ) "Number of non-convex equality constraints mismatch between problem and algorithm"
     @assert prob.nh == length(algo.μ) "Number of non-convex inequality constraints mismatch between problem and algorithm"
@@ -523,7 +536,9 @@ function solve!(
         χ_ref = constraint_violation(prob, g_dyn_ref, g_ref, h_ref)
 
         # classify step
-        tr_active = trust_region_active(algo, _x, _u, x_ref, u_ref)
+        # the trust-region counts as active only if the step is on its boundary and (with duals)
+        # its multipliers bound a model decrease above tol_tr_dual; read before the model changes
+        tr_active = trust_region_limiting(algo, prob, _x, _u, x_ref, u_ref; tol_dual = tol_tr_dual)
         rho_i, step_kind = classify_step(ΔJ, ΔL, J_ref, ref_feasible, ref_is_initial_guess, tr_active;
                                          tol_ΔL = tol_ΔL, tol_abs = tol_opt, tol_ΔL_null = tol_ΔL_null)
         if step_kind == :unresolved && trust_region_at_ceiling(algo)
@@ -573,8 +588,14 @@ function solve!(
         converged_ratio = step_kind == :ratio && accept && !tr_active && (abs(ΔJ) <= tol_opt) && (χ <= tol_feas)
         converged_null  = step_kind == :stationary && (tol_opt >= 0) && (χ_ref <= tol_feas)   # tol_opt < 0 disables convergence
         reached_J0      = (J0_rec <= tol_J0) && (χ_rec <= tol_feas)
-        if converged_ratio || converged_null || reached_J0
+        # opt-in small-step test for a step bounded by the trust-region (not a stationarity certificate)
+        converged_small = small_step_convergence && step_kind == :ratio && accept && tr_active &&
+                          (abs(ΔJ) <= tol_opt) && (ΔL <= tol_opt) && (χ <= tol_feas)
+        if converged_ratio || converged_null || reached_J0 || converged_small
             solution.status = :Optimal
+            solution.info[:converged_by] = converged_ratio ? :ratio :
+                                           converged_null  ? :null  :
+                                           reached_J0      ? :tol_J0 : :small_step
             if !isnothing(callback)
                 callback(algo, solution, it, J0_rec, χ_rec)
             end
@@ -700,6 +721,9 @@ function solve!(
     if verbosity > 0
         println()
         @printf("   Status                   : %s\n", solution.status)
+        if haskey(solution.info, :converged_by)
+            @printf("   Converged by             : %s\n", solution.info[:converged_by])
+        end
         @printf("   Iterations               : %d\n", solution.n_iter)
         @printf("   Total CPU time           : %1.2f sec\n", tcpu_end - tcpu_start)
         if solution.n_iter > 0
