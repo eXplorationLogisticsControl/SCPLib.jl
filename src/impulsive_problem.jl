@@ -233,7 +233,7 @@ function ImpulsiveProblem(
 
     # check if ∇g_noncvx is provided
     if !isnothing(g_noncvx) && isnothing(∇g_noncvx)
-        ∇g_noncvx = function (x,u)
+        ∇g_noncvx = function (lincache, x, u)
             return ForwardDiff.jacobian(z -> g_noncvx(lincache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end
@@ -241,7 +241,7 @@ function ImpulsiveProblem(
 
     # check if ∇h_noncvx is provided
     if !isnothing(h_noncvx) && isnothing(∇h_noncvx)
-        ∇h_noncvx = function (x,u)
+        ∇h_noncvx = function (lincache, x, u)
             return ForwardDiff.jacobian(z -> h_noncvx(lincache, unpack_flattened_variables(prob, z)...),
                                         stack_flatten_variables(prob, x, u))
         end

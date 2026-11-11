@@ -10,6 +10,51 @@ if !@isdefined SCPLib
 end
 
 
+function test_impulsive_default_nonconvex_gradients_accept_cache_argument()
+    N = 3
+    times = LinRange(0.0, 1.0, N)
+    x_ref = ones(1, N)
+    u_ref = ones(1, N - 1)
+
+    function eom!(dx, x, pu, t)
+        dx[1] = 0.0
+        return
+    end
+
+    g_noncvx(cache, x, u) = [x[1, end]^2 + u[1, 1]]
+    h_noncvx(cache, x, u) = [3 * x[1, 2]]
+
+    prob = SCPLib.ImpulsiveProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        (x, u) -> sum(u),
+        times,
+        x_ref,
+        u_ref;
+        dfdu = (x, u, t) -> ones(1, 1),
+        ng = 1,
+        g_noncvx = g_noncvx,
+        nh = 1,
+        h_noncvx = h_noncvx,
+    )
+
+    # default ForwardDiff gradients use the documented (lincache, x, u) signature
+    @test applicable(prob.∇g_noncvx, prob.lincache, x_ref, u_ref)
+    @test applicable(prob.∇h_noncvx, prob.lincache, x_ref, u_ref)
+    @test !applicable(prob.∇g_noncvx, x_ref, u_ref)
+    @test !applicable(prob.∇h_noncvx, x_ref, u_ref)
+
+    _, g_ref, h_ref = SCPLib.set_linearized_constraints!(prob, x_ref, u_ref)
+
+    # flattened variables are [x[:,1]; x[:,2]; x[:,3]; u[:,1]; u[:,2]]
+    @test g_ref ≈ [2.0]
+    @test h_ref ≈ [3.0]
+    @test prob.lincache.∇g ≈ [0.0 0.0 2.0 1.0 0.0]
+    @test prob.lincache.∇h ≈ [0.0 3.0 0.0 0.0 0.0]
+end
+
+
 # -------------------- setup parameters -------------------- #
 struct ControlParams_impulsive_custom_linearized_constraints
     μ::Float64
@@ -191,4 +236,5 @@ function test_scvxstar_impulsive_custom_linearized_constraints(;verbosity::Int =
     end
 end
 
+test_impulsive_default_nonconvex_gradients_accept_cache_argument()
 test_scvxstar_impulsive_custom_linearized_constraints(verbosity = verbosity, get_plot=get_plot)
