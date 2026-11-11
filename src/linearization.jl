@@ -44,8 +44,8 @@ function set_impulsive_dynamics_cache!(lincache::MultipleShootingCache, x_ref, u
         lincache.Φ_B[:,:,k] = lincache.Φ_A[:,:,k] * dfdu(x_ref[:,k], u_ref[:,k], sol.t[1])
         lincache.Φ_c[:,k]   = xf_aug[1:nx] - lincache.Φ_A[:,:,k] * x_ref[:,k] - lincache.Φ_B[:,:,k] * u_ref[:,k]
     end
-end1n1
-  
+end
+
 
 """
 Set the mixed-control cache.
