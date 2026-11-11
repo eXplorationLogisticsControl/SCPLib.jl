@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Impulsive control with variable time · SCPLib.jl</title><meta name="title" content="Impulsive control with variable time · SCPLib.jl"/><meta property="og:title" content="Impulsive control with variable time · SCPLib.jl"/><meta property="twitter:title" content="Impulsive control with variable time · SCPLib.jl"/><meta name="description" content="Documentation for SCPLib.jl."/><meta property="og:description" content="Documentation for SCPLib.jl."/><meta property="twitter:description" content="Documentation for SCPLib.jl."/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.63.2/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><a class="docs-logo" href="../index.html"><img src="../assets/logo.png" alt="SCPLib.jl logo"/></a><div class="docs-package-name"><span class="docs-autofit"><a href="../index.html">SCPLib.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../index.html">Home</a></li><li><span class="tocitem">Tutorials</span><ul><li><a class="tocitem" href="../ocp_basic_cr3bp.html">Basic OCP</a></li><li><a class="tocitem" href="../ocp_ncvx.html">Non-convex path constraints</a></li></ul></li><li><span class="tocitem">Advanced</span><ul><li><a class="tocitem" href="set_linearized_constraints.html">User-defined linearized constraints</a></li><li class="is-active"><a class="tocitem" href="impulsive_control_variable_time.html">Impulsive control with variable time</a><ul class="internal"><li><a class="tocitem" href="#Problem-formulation"><span>Problem formulation</span></a></li><li><a class="tocitem" href="#Implementation"><span>Implementation</span></a></li><li><a class="tocitem" href="#Solving-with-SCvx*"><span>Solving with SCvx*</span></a></li><li><a class="tocitem" href="#Results"><span>Results</span></a></li></ul></li></ul></li><li><span class="tocitem">Examples</span><ul><li><a class="tocitem" href="../examples/example_brachistochrone.html">Brachistochrone</a></li><li><a class="tocitem" href="../examples/example_hypersensitive.html">Hypersensitive</a></li><li><a class="tocitem" href="../examples/example_supersonic.html">Supersonic time-to-climb</a></li><li><a class="tocitem" href="../examples/example_spaceshuttle.html">Space shuttle reentry</a></li><li><a class="tocitem" href="../examples/example_dionysus.html">Dionysus problem</a></li></ul></li><li><span class="tocitem">API</span><ul><li><a class="tocitem" href="../api_algorithms.html">API: Algorithms</a></li><li><a class="tocitem" href="../api_problems.html">API: Problems &amp; Dynamics</a></li></ul></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li><a class="is-disabled">Advanced</a></li><li class="is-active"><a href="impulsive_control_variable_time.html">Impulsive control with variable time</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href="impulsive_control_variable_time.html">Impulsive control with variable time</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/eXplorationLogisticsControl/SCPLib.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/eXplorationLogisticsControl/SCPLib.jl/blob/https://github.com/eXplorationLogisticsControl/SCPLib.jl/blob/{commit}{path}/docs/literate/advanced/impulsive_control_variable_time.jl" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="Impulsive-control-with-variable-time"><a class="docs-heading-anchor" href="#Impulsive-control-with-variable-time">Impulsive control with variable time</a><a id="Impulsive-control-with-variable-time-1"></a><a class="docs-heading-anchor-permalink" href="#Impulsive-control-with-variable-time" title="Permalink"></a></h1><p>This page walks through <a href="https://github.com/eXplorationLogisticsControl/SCPLib.jl/blob/main/examples/cr3bp/ex_scvxstar_cr3bp_impulsive_freetf.jl"><code>examples/cr3bp/ex_scvxstar_cr3bp_impulsive_freetf.jl</code></a>: a transfer between two libration point orbits (LPOs) in the circular restricted three-body problem (CR3BP), flown with impulsive maneuvers only, with a free time of flight.</p><p>Impulses alone cannot make the time of flight a decision variable: the time spent on each coast arc has to be a control that acts <em>during</em> the coast. The problem is therefore posed as a <a href="../api_problems.html#Main.SCPLib.MixedProblem-Tuple{Any, Function, Any, Function, Any, Any, Any}"><code>MixedProblem</code></a>, which combines</p><ul><li>a <strong>continuous</strong> control, held constant on each segment, that enters the coast dynamics, and</li><li>an <strong>impulsive</strong> control, applied as an instantaneous jump at each node.</li></ul><p>Here, the only continuous control is a time-dilation factor, and the impulsive control is the <span>$\Delta \boldsymbol{v}$</span>.</p><div class="admonition is-info" id="Why-not-ImpulsiveProblem?-2a08cf42de446498"><header class="admonition-header">Why not `ImpulsiveProblem`?<a class="admonition-anchor" href="#Why-not-ImpulsiveProblem?-2a08cf42de446498" title="Permalink"></a></header><div class="admonition-body"><p><code>ImpulsiveProblem</code> linearizes each segment as <span>$\Phi_B = \Phi_A \, \partial \boldsymbol{x}^+ / \partial \boldsymbol{u}$</span>, i.e. it assumes the control only enters through the jump at the start of the segment. A control that also enters the coast (such as a time dilation) would be missing from the linearization, so the convex subproblems would not see how the time of flight affects the dynamics.</p></div></div><div class="admonition is-success" id="Running-this-page-9604348d1aced922"><header class="admonition-header">Running this page<a class="admonition-anchor" href="#Running-this-page-9604348d1aced922" title="Permalink"></a></header><div class="admonition-body"><p>This page is generated with <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a> from <code>docs/literate/advanced/impulsive_control_variable_time.jl</code>, which is a runnable script:</p><pre><code class="nohighlight hljs">julia --project=examples docs/literate/advanced/impulsive_control_variable_time.jl</code></pre><p>Running it solves the problem and regenerates the figure shown at the end of this page.</p></div></div><h2 id="Problem-formulation"><a class="docs-heading-anchor" href="#Problem-formulation">Problem formulation</a><a id="Problem-formulation-1"></a><a class="docs-heading-anchor-permalink" href="#Problem-formulation" title="Permalink"></a></h2><h3 id="Time-dilated-dynamics"><a class="docs-heading-anchor" href="#Time-dilated-dynamics">Time-dilated dynamics</a><a id="Time-dilated-dynamics-1"></a><a class="docs-heading-anchor-permalink" href="#Time-dilated-dynamics" title="Permalink"></a></h3><p>The physical time <span>$t$</span> is replaced by an independent variable <span>$\tau \in [0, 1]$</span>, discretized into <span>$N$</span> nodes <span>$\tau_1, \ldots, \tau_N$</span>. On segment <span>$k$</span> (<span>$\tau \in [\tau_k, \tau_{k+1}]$</span>), the physical time advances at the rate <span>$s_k = \mathrm{d}t / \mathrm{d}\tau$</span>, so that the state <span>$\boldsymbol{x} = [\boldsymbol{r}^T, \boldsymbol{v}^T, t]^T \in \mathbb{R}^7$</span> evolves according to</p><p class="math-container">\[\frac{\mathrm{d}\boldsymbol{x}}{\mathrm{d}\tau} = s_k \, \boldsymbol{g}(\boldsymbol{x}) ,
+\quad
+\boldsymbol{g}(\boldsymbol{x}) =
+\begin{bmatrix}
+    \boldsymbol{f}_{\mathrm{CR3BP}}(\boldsymbol{r}, \boldsymbol{v}) \\ 1
+\end{bmatrix} ,\]</p><p>where <span>$\boldsymbol{f}_{\mathrm{CR3BP}}$</span> is the natural (uncontrolled) CR3BP vector field. The physical time is carried as the 7th state, so the time of flight is <span>$t_N - t_1$</span>.</p><h3 id="Controls"><a class="docs-heading-anchor" href="#Controls">Controls</a><a id="Controls-1"></a><a class="docs-heading-anchor-permalink" href="#Controls" title="Permalink"></a></h3><ul><li>The continuous control is <span>$\boldsymbol{u}^{c}_k = s_k \in \mathbb{R}$</span> (<code>nuc = 1</code>), defined on the segments <span>$k = 1, \ldots, N-1$</span>.</li><li>The impulsive control is <span>$\boldsymbol{u}^{i}_k = [\Delta \boldsymbol{v}_k^T, \Gamma_k]^T \in \mathbb{R}^4$</span> (<code>nui = 4</code>), defined on all nodes <span>$k = 1, \ldots, N$</span>, including an arrival burn at node <span>$N$</span>. <span>$\Gamma_k$</span> is a slack variable for the impulse magnitude.</li></ul><p>Each segment first applies the jump, then coasts:</p><p class="math-container">\[\boldsymbol{x}_k^+ = \boldsymbol{x}_k + B \, \boldsymbol{u}^{i}_k ,
+\quad
+B = \begin{bmatrix} 0_{3\times 3} &amp; 0_{3 \times 1} \\ I_3 &amp; 0_{3 \times 1} \\ 0_{1\times 3} &amp; 0 \end{bmatrix} ,
+\quad
+\boldsymbol{x}_{k+1} = \boldsymbol{x}_k^+ + \int_{\tau_k}^{\tau_{k+1}} s_k \, \boldsymbol{g}(\boldsymbol{x}) \, \mathrm{d}\tau .\]</p><h3 id="Optimal-control-problem"><a class="docs-heading-anchor" href="#Optimal-control-problem">Optimal control problem</a><a id="Optimal-control-problem-1"></a><a class="docs-heading-anchor-permalink" href="#Optimal-control-problem" title="Permalink"></a></h3><p class="math-container">\[\begin{aligned}
+    \min_{\boldsymbol{x}, s, \Delta \boldsymbol{v}, \Gamma}
+    \quad&amp; \sum_{k=1}^{N} \Gamma_k
+    \\ \text{s.t.}\quad&amp;
+    \boldsymbol{x}_{k+1} = \boldsymbol{\phi}\left( \boldsymbol{x}_k + B \boldsymbol{u}^{i}_k, s_k \right)
+    \quad k=1,\ldots,N-1
+    \\&amp;
+    \boldsymbol{r}_1 = \boldsymbol{r}_0 , \quad \boldsymbol{v}_1 = \boldsymbol{v}_0 , \quad t_1 = 0
+    \\&amp;
+    \boldsymbol{r}_N = \boldsymbol{r}_f , \quad \boldsymbol{v}_N + \Delta \boldsymbol{v}_N = \boldsymbol{v}_f
+    \\&amp;
+    \| \Delta \boldsymbol{v}_k \|_2 \leq \Gamma_k \leq \Delta v_{\max} \quad k=1,\ldots,N
+    \\&amp;
+    s_{\min} \leq s_k \leq s_{\max} \quad k=1,\ldots,N-1
+    \\&amp;
+    t_{f,\min} \leq t_N \leq t_{f,\max}
+\end{aligned}\]</p><p>where <span>$\boldsymbol{\phi}$</span> is the flow of the time-dilated dynamics over one segment. Since <span>$\Gamma_k$</span> is minimized, <span>$\Gamma_k = \| \Delta \boldsymbol{v}_k \|_2$</span> at the optimum, so the objective is the total <span>$\Delta v$</span>. The dilation of each segment is free within its bounds, so the transfer can spend more physical time on some arcs than on others.</p><h3 id="The-control-matrix-of-a-MixedProblem"><a class="docs-heading-anchor" href="#The-control-matrix-of-a-MixedProblem">The control matrix of a <code>MixedProblem</code></a><a id="The-control-matrix-of-a-MixedProblem-1"></a><a class="docs-heading-anchor-permalink" href="#The-control-matrix-of-a-MixedProblem" title="Permalink"></a></h3><p>On nodes <span>$k = 1, \ldots, N-1$</span>, the control is stacked as <span>$\boldsymbol{u}_k = [\boldsymbol{u}^{c}_k; \boldsymbol{u}^{i}_k] \in \mathbb{R}^{5}$</span>. At node <span>$N$</span>, only the impulsive part exists. SCPLib keeps the control as a square <code>(nuc + nui, N)</code> matrix, and the unused continuous entries <code>u[1:nuc, N]</code> hold <code>NaN</code>:</p><p class="math-container">\[U =
+\begin{bmatrix}
+    s_1 &amp; s_2 &amp; \cdots &amp; s_{N-1} &amp; \texttt{NaN} \\
+    \Delta \boldsymbol{v}_1 &amp; \Delta \boldsymbol{v}_2 &amp; \cdots &amp; \Delta \boldsymbol{v}_{N-1} &amp; \Delta \boldsymbol{v}_N \\
+    \Gamma_1 &amp; \Gamma_2 &amp; \cdots &amp; \Gamma_{N-1} &amp; \Gamma_N
+\end{bmatrix}\]</p><p>The reference control <code>u_ref</code> passed to the constructor must follow this layout, and the solution returned by the algorithms does as well. Propagation, linearization and trust-region updates never read the <code>NaN</code> entries. In the JuMP model, <code>prob.model[:uc]</code> (size <code>(nuc, N-1)</code>) and <code>prob.model[:ui]</code> (size <code>(nui, N)</code>) are the decision variables, and <code>prob.model[:u]</code> is the stacked matrix above.</p><h3 id="Linearization"><a class="docs-heading-anchor" href="#Linearization">Linearization</a><a id="Linearization-1"></a><a class="docs-heading-anchor-permalink" href="#Linearization" title="Permalink"></a></h3><p>Linearizing segment <span>$k$</span> about the reference gives <span>$\boldsymbol{x}_{k+1} \approx \Phi_{A,k} \boldsymbol{x}_k + \Phi_{B,k} \boldsymbol{u}_k + \boldsymbol{\Phi}_{c,k}$</span>, with</p><p class="math-container">\[\Phi_{B,k} = \begin{bmatrix} \Phi_{B,k}^{c} &amp; \Phi_{A,k} B \end{bmatrix} ,\]</p><p>where <span>$\Phi_{A,k}$</span> is the state transition matrix of the coast (started after the jump), and <span>$\Phi^{c}_{B,k}$</span> is the sensitivity of the end of the coast to the continuous control. Both are integrated along the coast with</p><p class="math-container">\[\frac{\mathrm{d}\Phi_A}{\mathrm{d}\tau} = s_k \frac{\partial \boldsymbol{g}}{\partial \boldsymbol{x}} \Phi_A ,
+\quad
+\frac{\mathrm{d}\Phi^{c}_B}{\mathrm{d}\tau} = s_k \frac{\partial \boldsymbol{g}}{\partial \boldsymbol{x}} \Phi^{c}_B + \boldsymbol{g}(\boldsymbol{x}) ,
+\quad
+\Phi_A(\tau_k) = I_7, \quad \Phi^{c}_B(\tau_k) = 0_{7 \times 1} .\]</p><p>The term <span>$\boldsymbol{g}(\boldsymbol{x}) = \partial (s_k \boldsymbol{g}) / \partial s_k$</span> is what lets the subproblem trade time of flight against <span>$\Delta v$</span>.</p><h2 id="Implementation"><a class="docs-heading-anchor" href="#Implementation">Implementation</a><a id="Implementation-1"></a><a class="docs-heading-anchor-permalink" href="#Implementation" title="Permalink"></a></h2><h3 id="Setup"><a class="docs-heading-anchor" href="#Setup">Setup</a><a id="Setup-1"></a><a class="docs-heading-anchor-permalink" href="#Setup" title="Permalink"></a></h3><p>We start with the imports. In the examples, SCPLib is loaded by including its source; with SCPLib installed as a package, use</p><pre><code class="language-julia hljs">using SCPLib</code></pre><p>instead.</p><pre><code class="language-julia hljs">using CairoMakie
+using Clarabel
+using JuMP
+using LinearAlgebra
+using OrdinaryDiffEq</code></pre><p>We define the physical parameters and the canonical units of the Earth-Moon system.</p><pre><code class="language-julia hljs">struct ControlParams
+    μ::Float64
+end
+
+μ = 1.215058560962404e-02
+DU = 389703     # km
+TU = 382981     # sec
+MU = 500.0      # kg
+VU = DU/TU      # km/s
+params = ControlParams(μ)</code></pre><h3 id="Dynamics"><a class="docs-heading-anchor" href="#Dynamics">Dynamics</a><a id="Dynamics-1"></a><a class="docs-heading-anchor-permalink" href="#Dynamics" title="Permalink"></a></h3><p>The vector field <span>$\boldsymbol{g}(\boldsymbol{x})$</span> is the natural CR3BP vector field, with the physical time rate <span>$\mathrm{d}t/\mathrm{d}t = 1$</span> appended as the 7th component.</p><pre><code class="language-julia hljs">function cr3bp_field!(g, x, μ)
+    xx, yy, zz = x[1], x[2], x[3]
+    vx, vy, vz = x[4], x[5], x[6]
+    r1 = sqrt((xx + μ)^2 + yy^2 + zz^2)
+    r2 = sqrt((xx - 1 + μ)^2 + yy^2 + zz^2)
+    g[1] = vx
+    g[2] = vy
+    g[3] = vz
+    g[4] =  2*vy + xx - ((1 - μ)/r1^3)*(μ + xx) + (μ/r2^3)*(1 - μ - xx)
+    g[5] = -2*vx + yy - ((1 - μ)/r1^3)*yy - (μ/r2^3)*yy
+    g[6] = -((1 - μ)/r1^3)*zz - (μ/r2^3)*zz
+    g[7] = 1.0
+    return g
+end</code></pre><p>The coast dynamics <code>eom!</code> has the same signature as for the other problem types, <code>eom!(dx, x, (; params, u), t)</code>, but for a <code>MixedProblem</code> the <code>u</code> it receives is <strong>only the continuous slice</strong> <span>$\boldsymbol{u}^{c}_k$</span> (here, <span>$s_k$</span>).</p><pre><code class="language-julia hljs">function eom!(dx, x, pu, t)
+    (; params, u) = pu
+    cr3bp_field!(dx, x, params.μ)
+    dx[1:7] .*= u[1]
+    return
+end</code></pre><p>The jump is defined by <code>dfdu(x, u_i, t)</code>, which returns the <code>(nx, nui)</code> matrix <span>$B$</span>: the first three impulsive entries are added to the velocity, while <span>$\Gamma$</span> and the time are unchanged.</p><pre><code class="language-julia hljs">function dfdu(x, u_i, t)
+    return [zeros(3, 4); I(3) zeros(3, 1); zeros(1, 4)]
+end</code></pre><p>Optionally, we provide the augmented coast dynamics <code>eom_aug!</code>, which integrates the state together with <span>$\Phi_A$</span> and <span>$\Phi^{c}_B$</span>. The augmented state is <span>$[\boldsymbol{x}; \mathrm{vec}(\Phi_A); \mathrm{vec}(\Phi^{c}_B)]$</span>, where <span>$\Phi^{c}_B$</span> has <code>nuc</code> columns; the impulsive block <span>$\Phi_A B$</span> is assembled by SCPLib and is not part of this ODE. If <code>eom_aug!</code> is not given, it is constructed from <code>eom!</code> with ForwardDiff.</p><pre><code class="language-julia hljs">function eom_aug!(dx, xaug, pu, t)
+    (; params, u) = pu
+    s = u[1]
+    x = @view(xaug[1:7])
+    g = zeros(eltype(xaug), 7)
+    cr3bp_field!(g, x, params.μ)
+    dx[1:7] = s .* g
+
+    # Jacobian of the CR3BP vector field
+    xx, yy, zz = x[1], x[2], x[3]
+    r1vec = [xx + params.μ, yy, zz]
+    r2vec = [xx - 1 + params.μ, yy, zz]
+    G1 = (1 - params.μ) / norm(r1vec)^5 * (3*r1vec*r1vec&#39; - norm(r1vec)^2*I(3))
+    G2 = params.μ / norm(r2vec)^5 * (3*r2vec*r2vec&#39; - norm(r2vec)^2*I(3))
+    Omega = [0.0 2.0 0.0; -2.0 0.0 0.0; 0.0 0.0 0.0]
+    A6 = [zeros(3, 3) I(3); G1 + G2 + diagm([1.0, 1.0, 0.0]) Omega]
+    Ag = zeros(eltype(xaug), 7, 7)
+    Ag[1:6, 1:6] = A6
+    A = s * Ag
+
+    # variational equations of Φ_A and of the continuous Φ_B
+    Φ = reshape(@view(xaug[8:56]), 7, 7)
+    ΦB = @view(xaug[57:63])
+    dx[8:56] = reshape(A * Φ, 49)
+    dx[57:63] = A * ΦB + g
+    return
+end</code></pre><h3 id="Boundary-conditions"><a class="docs-heading-anchor" href="#Boundary-conditions">Boundary conditions</a><a id="Boundary-conditions-1"></a><a class="docs-heading-anchor-permalink" href="#Boundary-conditions" title="Permalink"></a></h3><p>The transfer departs from and arrives on two LPOs, given by an initial state and a period each. We propagate them for plotting and for building the initial guess.</p><pre><code class="language-julia hljs">rv0 = [1.0809931218390707E+00,
+    0.0000000000000000E+00,
+    -2.0235953267405354E-01,
+    1.0157158264396639E-14,
+    -1.9895001215078018E-01,
+    7.2218178975912707E-15]
+period_0 = 2.3538670417546639E+00
+
+rvf = [1.1648780946517576,
+    0.0,
+    -1.1145303634437023E-1,
+    0.0,
+    -2.0191923237095796E-1,
+    0.0]
+period_f = 3.3031221822879884
+
+coast! = function (dx, x, p, t)
+    cr3bp_field!(dx, x, μ)
+    dx[7] = 0.0
+end
+sol_lpo0 = solve(ODEProblem(coast!, [rv0; 0.0], (0.0, period_0), nothing), Tsit5(); reltol = 1e-12, abstol = 1e-12)
+sol_lpof = solve(ODEProblem(coast!, [rvf; 0.0], (0.0, period_f), nothing), Tsit5(); reltol = 1e-12, abstol = 1e-12)</code></pre><h3 id="Objective"><a class="docs-heading-anchor" href="#Objective">Objective</a><a id="Objective-1"></a><a class="docs-heading-anchor-permalink" href="#Objective" title="Permalink"></a></h3><p>The objective is <span>$\sum_k \Gamma_k$</span>, the last row of the control matrix. It is called both with the JuMP variables and with numerical arrays; it only reads the impulsive row, so the <code>NaN</code> in <code>u[1, N]</code> never enters it.</p><pre><code class="language-julia hljs">function objective(x, u)
+    return sum(u[size(u, 1), k] for k in 1:size(u, 2))
+end</code></pre><h3 id="Problem"><a class="docs-heading-anchor" href="#Problem">Problem</a><a id="Problem-1"></a><a class="docs-heading-anchor-permalink" href="#Problem" title="Permalink"></a></h3><p>We use <span>$N = 21$</span> nodes. The time of flight and each segment&#39;s dilation are bounded to <span>$[2, 4]$</span> TU. The cap on each impulse, <span>$\Delta v_{\max}$</span>, is the nondimensional value of the 0.35 N / 500 kg thrust acceleration bound of the continuous-thrust CR3BP examples (<span>$\approx 0.26$</span> VU).</p><pre><code class="language-julia hljs">N = 21
+nx = 7
+nuc = 1                             # [s]
+nui = 4                             # [Δvx, Δvy, Δvz, Γ]
+nu = nuc + nui
+times = LinRange(0.0, 1.0, N)       # τ grid
+tf_guess = 3.0
+tf_span = [2.0, 4.0]
+
+thrust = 0.35    # N
+Δv_max = thrust/MU/1e3 / (VU/TU)</code></pre><p>The initial guess blends the two LPOs node by node, with a uniform dilation equal to the guessed time of flight and no impulses. Note the <code>NaN</code> in the continuous row at node <code>N</code>; the constructor asserts this layout.</p><pre><code class="language-julia hljs">x_along_lpo0 = sol_lpo0(LinRange(0.0, period_0, N))
+x_along_lpof = sol_lpof(LinRange(0.0, period_f, N))
+x_ref = zeros(nx, N)
+for (i, alpha) in enumerate(LinRange(0, 1, N))
+    x_ref[1:6, i] = (1 - alpha)*x_along_lpo0[1:6, i] + alpha*x_along_lpof[1:6, i]
+end
+x_ref[7, :] = LinRange(0.0, tf_guess, N)
+
+u_ref = zeros(nu, N)
+u_ref[1, 1:N-1] .= tf_guess
+u_ref[1, N] = NaN                   # no dilation at the arrival node</code></pre><p>The <code>MixedProblem</code> constructor takes the numbers of continuous and impulsive controls, <code>nuc</code> and <code>nui</code>, and the jump matrix <code>dfdu</code>, in addition to the arguments of the other problem types.</p><pre><code class="language-julia hljs">prob = SCPLib.MixedProblem(
+    Clarabel.Optimizer,
+    eom!,
+    params,
+    objective,
+    times,
+    x_ref,
+    u_ref;
+    nuc = nuc,
+    nui = nui,
+    dfdu = dfdu,
+    eom_aug! = eom_aug!,
+    ode_method = Vern7(),
+)
+set_silent(prob.model)</code></pre><h3 id="Convex-constraints"><a class="docs-heading-anchor" href="#Convex-constraints">Convex constraints</a><a id="Convex-constraints-1"></a><a class="docs-heading-anchor-permalink" href="#Convex-constraints" title="Permalink"></a></h3><p>Convex constraints are added to <code>prob.model</code> directly. Constraints on the continuous control use <code>prob.model[:uc]</code> (segments <code>1:N-1</code>), and constraints on the impulsive control use <code>prob.model[:ui]</code> (nodes <code>1:N</code>).</p><p>The initial epoch is pinned to zero, so the final clock <span>$t_N$</span> is the time of flight. The final velocity is matched <em>after</em> the arrival burn <span>$\Delta \boldsymbol{v}_N$</span>.</p><pre><code class="language-julia hljs">@constraint(prob.model, constraint_initial_rv, prob.model[:x][1:6, 1] .== rv0)
+@constraint(prob.model, constraint_initial_time, prob.model[:x][7, 1] == 0.0)
+@constraint(prob.model, constraint_final_r, prob.model[:x][1:3, end] .== rvf[1:3])
+@constraint(prob.model, constraint_final_v, prob.model[:x][4:6, end] + prob.model[:ui][1:3, end] .== rvf[4:6])</code></pre><p>The impulse magnitude is bounded through the second-order cone <span>$\|\Delta \boldsymbol{v}_k\|_2 \leq \Gamma_k$</span>.</p><pre><code class="language-julia hljs">@constraint(prob.model, constraint_associate_control[k in 1:N],
+    [prob.model[:ui][4, k], prob.model[:ui][1:3, k]...] in SecondOrderCone())
+@constraint(prob.model, constraint_control_magnitude[k in 1:N],
+    prob.model[:ui][4, k] &lt;= Δv_max)</code></pre><p>Finally, we bound the time of flight and the dilation of each segment. The dilations are not forced to be equal across segments.</p><pre><code class="language-julia hljs">@constraint(prob.model, constraint_dilation_lb[k in 1:N-1], prob.model[:uc][1, k] &gt;= tf_span[1])
+@constraint(prob.model, constraint_dilation_ub[k in 1:N-1], prob.model[:uc][1, k] &lt;= tf_span[2])
+@constraint(prob.model, constraint_tf_lb, prob.model[:x][7, end] &gt;= tf_span[1])
+@constraint(prob.model, constraint_tf_ub, prob.model[:x][7, end] &lt;= tf_span[2])</code></pre><h2 id="Solving-with-SCvx*"><a class="docs-heading-anchor" href="#Solving-with-SCvx*">Solving with SCvx*</a><a id="Solving-with-SCvx*-1"></a><a class="docs-heading-anchor-permalink" href="#Solving-with-SCvx*" title="Permalink"></a></h2><p>We solve with <code>SCvxStar</code> using the <span>$\ell_1$</span> penalty and a state trust-region set per component (tighter on position than on velocity and time).</p><div class="admonition is-info" id="Capping-the-penalty-weight-6b3d6e765bdffdee"><header class="admonition-header">Capping the penalty weight<a class="admonition-anchor" href="#Capping-the-penalty-weight-6b3d6e765bdffdee" title="Permalink"></a></header><div class="admonition-body"><p>SCvx* increases the penalty weight <span>$w$</span> until the constraint violation <span>$\chi$</span> is driven down. Once <span>$\chi$</span> reaches the accuracy of the subproblem solver, a weight that keeps growing makes the penalty term, and therefore the merit function, dominated by solver noise: steps get rejected, and the run stalls until <code>maxiter</code> (with status <code>:Feasible</code>, at the same <span>$\Delta v$</span>). Capping the weight with <code>w_max</code> keeps the merit function resolvable, and the run converges to <code>:Optimal</code>.</p></div></div><pre><code class="language-julia hljs">Δ0 = [0.05, 0.05, 0.05, 0.1, 0.1, 0.1, 0.1]
+algo = SCPLib.SCvxStar(nx, N; w0 = 1e4, Δ0 = Δ0, l1_penalty = true, w_max = 1e6)
+
+solution = SCPLib.solve!(algo, prob, x_ref, u_ref;
+    verbosity = 1, maxiter = 100, tol_opt = 1e-5, tol_feas = 1e-6)</code></pre><p>The solver ends with</p><pre><code class="nohighlight hljs">   Status                   : Optimal
+   Iterations               : 72
+   Objective                : 1.9226e-01
+   Max constraint violation : 7.6298e-10 (tol: 1.0000e-06)</code></pre><p>Like the reference, the returned control keeps the <code>NaN</code> in <code>solution.u[1, N]</code>. We propagate the solution to check the dynamics defects, and convert the results to physical units.</p><pre><code class="language-julia hljs">sols_opt, g_dynamics_opt = SCPLib.get_trajectory(prob, solution.x, solution.u)
+Δv_norms = [norm(solution.u[2:4, k]) for k in 1:N]
+Δv_total = objective(solution.x, solution.u)
+tof = solution.x[7, end]
+println(&quot;status         = $(solution.status)&quot;)
+println(&quot;total Δv       = $(Δv_total) VU = $(Δv_total * VU * 1e3) m/s&quot;)
+println(&quot;time of flight = $(tof) TU = $(tof * TU / 86400) days&quot;)
+println(&quot;max |g_dyn|    = $(maximum(abs, g_dynamics_opt))&quot;)</code></pre><pre><code class="nohighlight hljs">status         = Optimal
+total Δv       = 0.19226375525058237 VU = 195.63832726014527 m/s
+time of flight = 2.929244967784754 TU = 12.984319062583017 days
+max |g_dyn|    = 7.629787635021756e-10</code></pre><h2 id="Results"><a class="docs-heading-anchor" href="#Results">Results</a><a id="Results-1"></a><a class="docs-heading-anchor-permalink" href="#Results" title="Permalink"></a></h2><p>The figure below shows, clockwise from the top left:</p><ul><li>the transfer (black, red after an impulse) between the departure (blue) and arrival (green) LPOs, with the impulse locations as red dots;</li><li>the constraint violation <span>$\chi$</span>, change in the merit function <span>$|\Delta J|$</span>, trust-region radius, and penalty weight <span>$w$</span> over the iterations, with accepted steps in green and rejected steps in red;</li><li>the impulses <span>$\Delta \boldsymbol{v}_k$</span> and <span>$\Gamma_k$</span> and the dilation <span>$s_k$</span>, against physical time.</li></ul><p>The optimal transfer uses three burns: at departure, once mid-transfer, and at arrival. The dilation varies from segment to segment, so the nodes, which are uniform in <span>$\tau$</span>, are not uniform in physical time.</p><pre><code class="language-julia hljs">fig = Figure(size=(1400, 800))
+
+# trajectory: departure/arrival LPOs, transfer arcs (red after an impulse), impulse locations
+ax3d = Axis3(fig[1, 1]; aspect=:data, xlabel=&quot;x&quot;, ylabel=&quot;y&quot;, zlabel=&quot;z&quot;)
+lines!(ax3d, Array(sol_lpo0)[1, :], Array(sol_lpo0)[2, :], Array(sol_lpo0)[3, :], color=:blue)
+lines!(ax3d, Array(sol_lpof)[1, :], Array(sol_lpof)[2, :], Array(sol_lpof)[3, :], color=:green)
+arc_colors = [Δv_norms[i] &gt; 1e-6 ? :red : :black for i in 1:N-1]
+for (i, _sol) in enumerate(sols_opt)
+    lines!(ax3d, Array(_sol)[1, :], Array(_sol)[2, :], Array(_sol)[3, :], color=arc_colors[i])
+end
+burn_nodes = findall(&gt;(1e-6), Δv_norms)
+scatter!(ax3d, solution.x[1, burn_nodes], solution.x[2, burn_nodes], solution.x[3, burn_nodes],
+    color=:red, markersize=8)
+
+# controls, against physical time: impulses at the nodes, dilation per segment
+gl_u = fig[2, 1] = GridLayout()
+t_nodes = solution.x[7, :]
+ax_u = Axis(gl_u[1, 1]; ylabel=&quot;Impulse&quot;)
+for i in 1:3
+    stem!(ax_u, t_nodes, solution.u[1+i, :], label=&quot;Δv[$i]&quot;)
+end
+scatter!(ax_u, t_nodes, solution.u[5, :], label=&quot;Γ&quot;, color=:black, marker=:hline, markersize=14)
+axislegend(ax_u, position=:cc)
+ax_s = Axis(gl_u[2, 1]; xlabel=&quot;Time&quot;, ylabel=&quot;Dilation&quot;)
+stairs!(ax_s, t_nodes, [solution.u[1, 1:N-1]; solution.u[1, N-1]], step=:post, color=:black)
+linkxaxes!(ax_u, ax_s)
+hidexdecorations!(ax_u, grid=false)
+
+# iterate information (rejected steps have ΔJ = 0, which is not shown on the log scale)
+n_iter = length(solution.info[:accept])
+colors_accept = [solution.info[:accept][i] ? :green : :red for i in 1:n_iter]
+ax_χ = Axis(fig[1, 2]; xlabel=&quot;Iteration&quot;, ylabel=&quot;χ&quot;, yscale=log10)
+scatterlines!(ax_χ, 1:n_iter, solution.info[:χ], color=colors_accept, marker=:circle, markersize=7)
+
+ax_w = Axis(fig[2, 2]; xlabel=&quot;Iteration&quot;, ylabel=&quot;w&quot;, yscale=log10)
+scatterlines!(ax_w, 1:n_iter, solution.info[:w], color=colors_accept, marker=:circle, markersize=7)
+
+ax_J = Axis(fig[1, 3]; xlabel=&quot;Iteration&quot;, ylabel=&quot;ΔJ&quot;, yscale=log10)
+abs_ΔJ = [v == 0 ? NaN : abs(v) for v in solution.info[:ΔJ]]
+scatterlines!(ax_J, 1:n_iter, abs_ΔJ, color=colors_accept, marker=:circle, markersize=7)
+
+ax_Δ = Axis(fig[2, 3]; xlabel=&quot;Iteration&quot;, ylabel=&quot;trust region radius&quot;, yscale=log10)
+scatterlines!(ax_Δ, 1:n_iter, [minimum(val) for val in solution.info[:Δ]], color=colors_accept, marker=:circle, markersize=7)</code></pre><p><img src="../assets/cr3bp_impulsive_variable_time.png" alt="Impulsive, variable-time CR3BP transfer"/></p><hr/><p><em>This page was generated using <a href="https://github.com/fredrikekre/Literate.jl">Literate.jl</a>.</em></p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="set_linearized_constraints.html">« User-defined linearized constraints</a><a class="docs-footer-nextpage" href="../examples/example_brachistochrone.html">Brachistochrone »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.19.0 on <span class="colophon-date" title="Monday 9 November 2026 22:59">Monday 9 November 2026</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
