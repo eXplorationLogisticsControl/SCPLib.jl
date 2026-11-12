@@ -57,10 +57,8 @@ function delete_noncvx_referencs!(prob::OptimalControlProblem, references::Vecto
 end
 
 
-"""
-Names that `solve!` registers in `prob.model`, in addition to the user's entries in
-`prob.model_nl_references`. `reset_solver_model!` removes these at the start of each solve.
-"""
+# Names that `solve!` registers in `prob.model`, in addition to the user's entries in
+# `prob.model_nl_references`. `reset_solver_model!` removes these at the start of each solve.
 const SOLVER_REFERENCES = [
     :constraint_dynamics,
     :constraint_g_noncvx,
@@ -75,7 +73,7 @@ const SOLVER_REFERENCES = [
 ]
 
 
-"""Key in `prob.model.ext` that holds the unnamed variables and constraints added by `solve!`"""
+# Key in `prob.model.ext` that holds the unnamed variables and constraints added by `solve!`
 const SOLVER_OBJECTS_KEY = :SCPLib_solver_objects
 
 
