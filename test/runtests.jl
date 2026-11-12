@@ -71,3 +71,7 @@ end
 @testset "Globalization" begin
     include("test_scp_globalization.jl")
 end
+
+@testset "Repeated solve" begin
+    include("test_repeated_solve.jl")
+end

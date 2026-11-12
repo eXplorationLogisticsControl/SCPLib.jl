@@ -375,6 +375,9 @@ function solve!(
     mask_unused_control_trust_region!(algo, prob)
     tcpu_start = time()
 
+    # remove what an earlier `solve!` on this problem added to the model
+    reset_solver_model!(prob)
+
     # check whether the initial guess satisfies the convex constraints (before any linearized or
     # trust-region constraints are added); if not, the first step is a restoration step
     ref_feasible = reference_convex_feasible(prob, x_ref, u_ref; atol = max(tol_feas, sqrt(eps())))
@@ -383,11 +386,11 @@ function solve!(
 
     # append slack variable for l1 penalty term
     if algo.l1_penalty
-        slacks_L1 = Dict(
+        slacks_L1 = track_solver_object!(prob, Dict(
             :slack_gdyn => @variable(prob.model),
             :slack_gnoncvx => prob.ng > 0 ? @variable(prob.model) : nothing,
             :slack_hnoncvx => prob.nh > 0 ? @variable(prob.model) : nothing,
-        )
+        ))
     else
         slacks_L1 = nothing
     end
@@ -435,12 +438,8 @@ function solve!(
     variable_primal = Dict()
     constraint_solution = Dict()
 
-    # append trust-region constraints references for nonlinear program
-    if algo.use_trustregion_control
-        for ref in (:constraint_trust_region_u_lb, :constraint_trust_region_u_ub)
-            ref in prob.model_nl_references || push!(prob.model_nl_references, ref)
-        end
-    end
+    # constraints re-created at each re-linearization (incl. trust-region constraints)
+    nl_references = linearization_references(prob, algo)
 
     if algo.l1_penalty
         l1_penalty_references = [:constraint_slack_gdyn]
@@ -457,7 +456,7 @@ function solve!(
         # re-set non-convex expression according to reference
         if flag_reference
             if it > 1
-                delete_noncvx_referencs!(prob, prob.model_nl_references)
+                delete_noncvx_referencs!(prob, nl_references)
             end
             g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
             set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints

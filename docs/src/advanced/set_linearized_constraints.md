@@ -45,6 +45,8 @@ If `ng > 0` or `nh > 0`, the callback must also emit `:constraint_g_noncvx` and/
 
 SCvx*, SCvx, ProxLinear, and FixedTRW delete `prob.model_nl_references` before each accepted re-linearization (`delete_noncvx_referencs!`). That list always includes `:constraint_dynamics`. The callback **must** register a JuMP constraint with that name, otherwise the next iteration cannot delete the previous linearization.
 
+Each `solve!` also starts by removing every constraint that an earlier `solve!` left in `prob.model`, including the names in `prob.model_nl_references`, so the same problem can be solved again (with the same or another algorithm). Constraints that the callback adds without a name are not removed.
+
 `delete_noncvx_referencs!` accepts a single `ConstraintRef` or any iterable container of refs, so both of these work:
 
 ```julia

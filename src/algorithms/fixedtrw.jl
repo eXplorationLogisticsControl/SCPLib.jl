@@ -139,6 +139,10 @@ function solve!(
 )
     tcpu_start = time()
 
+    # remove what an earlier `solve!` on this problem added to the model
+    reset_solver_model!(prob)
+    nl_references = linearization_references(prob, algo)
+
     # re-tune initial penalty weight if not provided
     if isnothing(algo.w)
         algo.w = 1/tol_feas * 10
@@ -174,7 +178,7 @@ function solve!(
         tcpu_start_iter = time()
         # re-set non-convex expression according to reference
         if it > 1
-            delete_noncvx_referencs!(prob, prob.model_nl_references)
+            delete_noncvx_referencs!(prob, nl_references)
         end
         g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
         set_trust_region_constraints!(algo, prob, x_ref, u_ref)   # if ref is updated, we need to update trust region constraints

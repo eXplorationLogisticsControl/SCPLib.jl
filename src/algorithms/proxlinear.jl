@@ -57,29 +57,38 @@ function add_proxlinear_slacks!(algo::ProxLinear, prob::OptimalControlProblem)
     # L1 penalty on dynamics constraints
     ξ_dyn = prob.model[:ξ_dyn]
     ϵ_noncvx_dyn = @variable(prob.model, [1:size(ξ_dyn,1), 1:size(ξ_dyn,2)])
-    @constraint(prob.model, ϵ_noncvx_dyn .>= 0.0)
-    @constraint(prob.model, ξ_dyn .<=  ϵ_noncvx_dyn)
-    @constraint(prob.model, ξ_dyn .>= -ϵ_noncvx_dyn)
+    track_solver_object!(prob, @constraint(prob.model, ϵ_noncvx_dyn .>= 0.0))
+    track_solver_object!(prob, @constraint(prob.model, ξ_dyn .<=  ϵ_noncvx_dyn))
+    track_solver_object!(prob, @constraint(prob.model, ξ_dyn .>= -ϵ_noncvx_dyn))
 
     # L1 penalty on non-convex equality constraints
     if prob.ng > 0
         ϵ_noncvx_g = @variable(prob.model)          # slack for L1 norm of non-convex equality constraints violation
         _g_noncvx = vec(prob.model[:ξ])             # stacked non-convex equality constraints violations
-        @constraint(prob.model, ϵ_noncvx_g >= 0)
-        @constraint(prob.model,
+        track_solver_object!(prob, @constraint(prob.model, ϵ_noncvx_g >= 0))
+        track_solver_object!(prob, @constraint(prob.model,
             [ϵ_noncvx_g; _g_noncvx]
             in MOI.NormOneCone(1 + prob.ng)
-        )
+        ))
     else
         ϵ_noncvx_g = 0.0
     end
 
-    return Dict{Symbol,Any}(
+    # tracked as a whole, so the proximal constraint it holds at the end of a solve is deleted too
+    return track_solver_object!(prob, Dict{Symbol,Any}(
         :ϵ_proximal => @variable(prob.model),
         :ϵ_noncvx_dyn => ϵ_noncvx_dyn,
         :ϵ_noncvx_g => ϵ_noncvx_g,
         :constraint_proximal => nothing,
-    )
+    ))
+end
+
+
+"""Prox-linear uses a proximal term instead of trust-region constraints, so it re-creates none"""
+function linearization_references(prob::OptimalControlProblem, algo::ProxLinear)
+    trust_region_references = (:constraint_trust_region_x_lb, :constraint_trust_region_x_ub,
+                               :constraint_trust_region_u_lb, :constraint_trust_region_u_ub)
+    return filter(ref -> ref ∉ trust_region_references, prob.model_nl_references)
 end
 
 
@@ -208,6 +217,9 @@ function solve!(
     warmstart_primal::Bool = false,
     warmstart_dual::Bool = false,
 )
+    # remove what an earlier `solve!` on this problem added to the model
+    reset_solver_model!(prob)
+
     # initialize algorithm hyperparameters
     flag_reference    = true    # at initial iteraiton, we need to update reference
     J0_ref = 1e12
@@ -240,9 +252,8 @@ function solve!(
     variable_primal = Dict()
     constraint_solution = Dict()
 
-    # remove constraint_trust_region_x_lb and constraint_trust_region_x_ub
-    filter!(e->e≠:constraint_trust_region_x_lb, prob.model_nl_references)
-    filter!(e->e≠:constraint_trust_region_x_ub, prob.model_nl_references)
+    # constraints re-created at each re-linearization (no trust-region constraints)
+    nl_references = linearization_references(prob, algo)
 
     # subproblem slack variables, created once
     slacks = add_proxlinear_slacks!(algo, prob)
@@ -252,7 +263,7 @@ function solve!(
         # re-set non-convex expression according to reference
         if flag_reference
             if it > 1
-                delete_noncvx_referencs!(prob, prob.model_nl_references)
+                delete_noncvx_referencs!(prob, nl_references)
             end
             g_dyn_ref, g_ref, h_ref = set_linearized_constraints!(prob, x_ref, u_ref)
         end

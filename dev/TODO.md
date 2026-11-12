@@ -15,7 +15,8 @@ multiplier/penalty/δ updates, and the trust-region update logic.
 
 ## Major
 
-- [ ] **`warmstart_dual=true` crashes (M6).** `src/utils.jl:89-91`,
+- [x] **`warmstart_dual=true` crashes (M6).** Fixed: `set_optimal_start_values` skips
+  deleted references; covered by `test/test_repeated_solve.jl`. `src/utils.jl:89-91`,
   `src/algorithms/scvxstar.jl:483-485, 618-620`, `src/algorithms/scvx.jl:334-336`.
   Constraint references saved at an accepted step are deleted when the model is
   re-linearized, and the next iteration then sets dual start values on them.
@@ -39,7 +40,9 @@ multiplier/penalty/δ updates, and the trust-region update logic.
 
 ## Medium
 
-- [ ] **`solve!` cannot be called twice on the same problem (m2).**
+- [x] **`solve!` cannot be called twice on the same problem (m2).** Fixed: each `solve!`
+  starts with `reset_solver_model!`, and the algorithms build their reference lists locally
+  (`linearization_references`) instead of changing `prob.model_nl_references`.
   `src/algorithms/scvxstar.jl:458-463`: on `it == 1` nothing is deleted, so leftover
   `constraint_dynamics` collides ("An object of name constraint_dynamics is already
   attached"). `src/algorithms/proxlinear.jl:244-245` permanently removes entries from
@@ -103,7 +106,8 @@ multiplier/penalty/δ updates, and the trust-region update logic.
 
 ## Weak tests
 
-- [ ] The warm-start tests never exercise warm-starting (see M6 above).
+- [x] The warm-start tests never exercise warm-starting (see M6 above).
+  `test/test_repeated_solve.jl` now warm-starts after an accepted step for every algorithm.
 - [ ] `test/test_mixed_problem.jl:199` accepts `:Solving` as a final status.
 - [ ] The J0 regression check in `test/test_scvxstar_impulsive_u_bias.jl:169` is commented
   out.
