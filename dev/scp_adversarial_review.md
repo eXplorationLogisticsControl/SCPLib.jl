@@ -7,6 +7,13 @@ Repo state reviewed: `main` @ 9ee12ec (plus uncommitted docs changes). No repo f
 > **Fix status (2026-11-03):** C1 and M1 are fixed on branch `debug/scvxstar-inequality-linearization` (commit `1cc087c`). Tests are in `test/test_scvxstar_inequality_linearization.jl`, and the full suite passes (81/81). See the **Resolution** notes under C1 and M1.
 >
 > **Fix status (2026-11-03, second pass):** M2, M4 and M10 are fixed, M9 is mitigated (opt-in fixed and documented, default unchanged by decision), and M3 is fixed too, because the corrected ratio test needs it (see the M2 note). Tests are in `test/test_scp_globalization.jl`, and the full suite passes (158/158). An adversarial review of this pass found 2 high-severity defects in the first design, which were fixed (see "Adversarial review" under M10). Four regression constants were re-baselined; each one is justified in the **Resolution** notes. All other findings are still open.
+>
+> **Fix status (2026-11-11, branch `cursor/critical-bug-resolution-8f41` after merging `main` @ 4f86dce):** each open finding was re-checked against the source. The full suite passes (452/452).
+> - **C2** is fixed in `05c519c`.
+> - **M7** is partly fixed: the forward-backward crash in `tune_initial_penalty_weight!` was fixed in `2b027a3`.
+> - **M8** is partly fixed: a rejected candidate is no longer returned (`2330d5c`).
+> - **m14** is partly fixed: forward-backward with ng/nh > 0 no longer crashes (`2b027a3`).
+> - The remaining findings are still open. They are tracked, together with new findings from a second review, in `dev/TODO.md`.
 
 Repro scripts (run from the repo root with `julia --project=. <script>`):
 
@@ -23,15 +30,15 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
 | ID | Sev | Status | Location | One-liner |
 |---|---|---|---|---|
 | C1 | Critical | FIXED | nlconstraints.jl:93 | Inequalities are linearized as `max(h(z̄),0) + ∇h Δz ≤ ζ`, not `h(z̄) + ∇h Δz ≤ ζ`. Inactive constraints become one-sided barriers, which causes false "Optimal" (SCvx*, SCvx, ProxLinear). |
-| C2 | Critical (latent) | CONFIRMED | linearization.jl:88 | Forward-backward ∂g/∂x₁ has the wrong sign. The test hides it with a sign-flipped FD and `maximum(err)` without `abs`. |
+| C2 | Critical (latent) | FIXED (`05c519c`) | linearization.jl:88 | Forward-backward ∂g/∂x₁ has the wrong sign. The test hides it with a sign-flipped FD and `maximum(err)` without `abs`. |
 | M1 | Major (Critical with C1) | FIXED | scvxstar.jl:429,502 | μ is updated with clipped h⁺, so μ never decreases. Complementarity is violated (Oguri uses μ ← max(0, μ + w h)). |
 | M2 | Major | FIXED | scvxstar.jl:438; scvx.jl:277; fixedtrw.jl:218 | ρ = ΔJ/ΔL with ΔL<0 and ΔJ<0 gives ρ ≫ 1, so a merit-increasing step is accepted and the TR expands. ΔL≈0 forces ρ=1. |
 | M3 | Major | FIXED | nlconstraints.jl:67-70 | Forward-backward: the linearized match-point is a hard equality and ξ_dyn is a free, decoupled variable. Predicted penalty = −‖λ‖²/(2w), which corrupts ρ. Artificial infeasibility is possible. |
 | M4 | Major | FIXED | scvx.jl:91-95,70-78; proxlinear.jl:60-91 | SCvx and ProxLinear add new slack variables and cones every iteration and never delete them. The model grows linearly. ProxLinear also builds the ϵ_g slacks twice. |
 | M5 | Major | CONFIRMED (value) | scvxstar.jl:242-243, 52 | The auto-tuned w is about 10/χ₀, so w = 1e9 for a feasible guess. w_max = 1e16 by default, which makes the QP terribly conditioned. Contributes to C1 false convergence. |
 | M6 | Major | CONFIRMED | utils.jl:76-83; scvxstar.jl:391,492 | `warmstart_dual=true` crashes with KeyError because it sets dual starts on constraints deleted at re-linearization. |
-| M7 | Major | CONFIRMED (FB) / LIKELY | scvx.jl:266; proxlinear.jl:268; fixedtrw.jl:207; scvxstar.jl:227 | SCvx, ProxLinear and FixedTRW ignore `fun_get_trajectory` and `shooting_method`. The `tune_initial_penalty_weight!` call crashes for forward-backward. The merit is inconsistent with the custom J_ref. |
-| M8 | Major | LIKELY | scvxstar.jl:459; scvx.jl:298; fixedtrw.jl:238 | The returned solution is the last candidate even when it was rejected, so the status describes a rejected point. CPFailed at iteration 1 returns zeros. |
+| M7 | Major | PARTLY FIXED (auto-tune, `2b027a3`); rest CONFIRMED | scvx.jl:266; proxlinear.jl:268; fixedtrw.jl:207; scvxstar.jl:227 | SCvx, ProxLinear and FixedTRW ignore `fun_get_trajectory` and `shooting_method`. The `tune_initial_penalty_weight!` call crashes for forward-backward. The merit is inconsistent with the custom J_ref. |
+| M8 | Major | PARTLY FIXED (`2330d5c`); CPFailed-at-it-1 open | scvxstar.jl:459; scvx.jl:298; fixedtrw.jl:238 | The returned solution is the last candidate even when it was rejected, so the status describes a rejected point. CPFailed at iteration 1 returns zeros. |
 | M9 | Major/Design | MITIGATED | trust_region.jl:46-56; scvxstar.jl:72-76 | Default TR covers only x, not u, tf-dilation or slacks. The TR-convergence argument (ρ→1 as Δ→0) does not hold, so the algorithm can stall or accept with an inaccurate model. |
 | M10 | Major/Design | FIXED | scvxstar.jl:472; scvx.jl:314 | The stopping test uses absolute \|ΔJ\| on the candidate, even when rejected or with tiny Δ. It can declare "Optimal" at non-stationary points. |
 | M11 | Major/Design | LIKELY | impulsive_problem.jl:64,77; linearization.jl:41-43 | The impulsive jump is `x + dfdu(x,u,t)·u`, and Φ_B = Φ_A·dfdu. This is only correct for jumps that are linear in u and independent of x. |
@@ -49,7 +56,7 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
 | m11 | Minor | LIKELY | scvxstar.jl:462-470 | `n_iter` is incremented only when `store_iterates=true`. |
 | m12 | Design | LIKELY | scvxstar.jl:124-132 | The `l1_penalty` option adds √w‖·‖₁ to Oguri's AL, which changes the multiplier fixed point. |
 | m13 | Design | LIKELY | impulsive_problem.jl:295 | With Nu=N, the final impulse u[:,N] appears in no dynamics constraint. The user must hand-code it. |
-| m14 | Minor | LIKELY | problems/quadcopter.jl:35-38 | `quadcopter_dfdx` gives NaN at v=0. |
+| m14 | Minor | PARTLY FIXED (FB ng/nh, `2b027a3`); rest LIKELY | problems/quadcopter.jl:35-38 | `quadcopter_dfdx` gives NaN at v=0. |
 
 ---
 
@@ -100,6 +107,7 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
 - **Masking in test:** `test/test_scvxstar_forwardbackward.jl:145` multiplies the FD by −1 ("forward segment has minus sign"). Line 173 uses `@test maximum(err) < 1e-6` without `abs`, which passes for arbitrarily large negative errors.
 - **Consequence:** any forward-backward problem with free or partially free initial state (departure on a manifold, free phasing) gets the wrong descent model. ρ becomes negative or random, the TR collapses, and the result is CPFailed or a wrong answer.
 - **Fix:** negate line 303. Fix the test to use the raw FD and `maximum(abs.(err))`.
+- **Resolution (FIXED, `05c519c`):** `linearization.jl` now sets `∇g_dyn[1:nx,1:nx] = -prod(reverse(Φ_A_list[1:Nu_fwd]))`. In `test_scvxstar_forwardbackward.jl` the FD reference no longer carries the compensating minus sign, and the check is `maximum(abs.(err)) < 1e-6`. A new test, `test_forwardbackward_initial_state_jacobian_sign`, checks a scalar `ẋ = x + u` problem against the closed form ∂g/∂x₁ = −e^0.5 and ∂g/∂x_N = e^−0.5.
 
 ---
 
@@ -163,7 +171,7 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - Once λ_dyn ≠ 0 (after the first multiplier update), ΔL is overstated by ‖λ‖²/(2w) every iteration, so ρ is biased low, causing spurious rejections and TR collapse.
   - The hard equality also makes the subproblem infeasible when Δ is small or the bounds are tight.
 - **Fix:** `g_ref + ∇g_dyn Δz == ξ_dyn[:,1]`.
-- **Resolution (FIXED, together with M2):** applied as proposed in `nlconstraints.jl`. Without it, the corrected ratio test (M2) cannot converge on forward-backward problems (see the M2 note). Forward-backward also needs `use_trustregion_control = true` when both x nodes are fixed, because the x-TR is then vacuous. `test_scvxstar_forwardbackward.jl` now sets it. C2 (wrong sign of ∂g/∂x₁) is still open; it is masked in the test because x₁ is fixed.
+- **Resolution (FIXED, together with M2):** applied as proposed in `nlconstraints.jl`. Without it, the corrected ratio test (M2) cannot converge on forward-backward problems (see the M2 note). Forward-backward also needs `use_trustregion_control = true` when both x nodes are fixed, because the x-TR is then vacuous. `test_scvxstar_forwardbackward.jl` now sets it. C2 (wrong sign of ∂g/∂x₁) was still open at the time; it has since been fixed in `05c519c`.
 
 ### M4: Model growth in SCvx and ProxLinear
 
@@ -216,6 +224,9 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - When the user supplies `set_dynamics_cache!`/`fun_get_trajectory` (custom propagation or lincache layout), J_ref is built from the user's g_dyn_ref while J uses the library's default propagation. The merit is inconsistent, so ρ is meaningless (or it crashes for custom lincache layouts).
   - Forward-backward plus SCvx/ProxLinear/FixedTRW crashes: `ξ_dyn` is nx×1 but `ϵ_noncvx_dyn` is nx×(N−1) in ProxLinear, and `get_trajectory` indexes N columns.
 - **Fix:** factor out a single `evaluate_nonlinear_constraints(prob, x, u)` used by every algorithm and by the auto-tune.
+- **Resolution (PARTLY FIXED, `2b027a3`):**
+  - **Fixed:** `tune_initial_penalty_weight!` (`scvxstar.jl:239-264`) now calls `get_trajectory_forwardbackward` for forward-backward problems and `prob.fun_get_trajectory` when one is set. The test is `test_forwardbackward_penalty_tuning_uses_forwardbackward_trajectory`.
+  - **Still open (re-confirmed 2026-11-11):** SCvx, FixedTRW and ProxLinear (`scvx.jl:362`, `fixedtrw.jl:207`, `proxlinear.jl:291`) still always call the multiple-shooting `get_trajectory`. With a custom propagator, a counting `fun_get_trajectory` was called 0 times by these algorithms (and 2 times by SCvx*). SCvx with `:forwardbackward` gives `BoundsError [1:1, 3]`.
 
 ### M8: The returned iterate can be a rejected candidate
 
@@ -226,6 +237,9 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - If the last iteration is rejected, the user receives a point with a worse merit than x_ref, with status `:Feasible`/`:MaxIterReached` describing that rejected point.
   - On `:CPFailed` at iteration 1, `solution.x`/`u` are zeros (`SCvxStarSolution` constructor).
 - **Fix:** copy into `solution` only on accept (or on convergence); on CPFailed return x_ref/u_ref.
+- **Resolution (PARTLY FIXED, `2330d5c`):**
+  - **Fixed:** SCvx* and SCvx now record the candidate only for an accepted step, or for a feasible candidate that meets `tol_J0`. Otherwise they record the reference (see "Rejected candidate at maxiter" under M10).
+  - **Still open:** a `:CPFailed` at iteration 1 breaks before anything is copied into `solution`, so `solution.x`/`u` keep their zero initialisation (`SCvxStarSolution`, `scvxstar.jl:207`).
 
 ### M9: The default trust region does not cover all decision variables
 
@@ -340,7 +354,7 @@ Notation: z = (x,u), z̄ = reference, z* = subproblem solution, h⁺ = max(0,h).
   - Vector Δ0 is labelled `:NodeDependent` (it is state-dependent).
   - `Base.show(::SCvxStar)` with `w=nothing` errors in `@printf`.
   - `solve!` overwrites the caller's `x_ref`/`u_ref` in place (including through an `Adjoint`).
-  - A forward-backward problem with ng/nh>0 crashes in `stack_flatten_variables` (expects N columns of x).
+  - ~~A forward-backward problem with ng/nh>0 crashes in `stack_flatten_variables` (expects N columns of x).~~ **FIXED (`2b027a3`):** `stack_flatten_variables`/`unpack_flattened_variables` use 2 state columns for forward-backward. The test is `test_forwardbackward_nonconvex_constraints_use_endpoint_state_shape`.
 
 ---
 
