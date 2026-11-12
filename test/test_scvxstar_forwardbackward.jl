@@ -11,6 +11,9 @@ using Test
 if !@isdefined SCPLib
     include(joinpath(@__DIR__, "../src/SCPLib.jl"))
 end
+if !@isdefined verbosity
+    verbosity = 0
+end
 
 seed = 1234
 Random.seed!(seed)
@@ -74,6 +77,34 @@ function test_forwardbackward_nonconvex_constraints_use_endpoint_state_shape()
     @test h_ref === nothing
     @test size(prob.lincache.∇g) == (1, 4)
     @test prob.lincache.∇g == [0.0 1.0 1.0 1.0]
+end
+
+
+function test_forwardbackward_initial_state_jacobian_sign()
+    function eom!(dx, x, pu, t)
+        dx[1] = x[1] + pu.u[1]
+        return
+    end
+
+    times = [0.0, 0.5, 1.0]
+    x_ref = reshape([1.0, exp(1.0)], 1, 2)
+    u_ref = zeros(1, 2)
+    prob = SCPLib.ContinuousProblem(
+        Clarabel.Optimizer,
+        eom!,
+        nothing,
+        (x, u) -> sum(u),
+        times,
+        x_ref,
+        u_ref;
+        shooting_method = :forwardbackward,
+    )
+
+    sols, _ = SCPLib.get_trajectory_augmented_forwardbackward(prob, x_ref, u_ref)
+    SCPLib.set_continuous_dynamics_cache!(prob.lincache, x_ref, u_ref, sols)
+
+    @test prob.lincache.∇g_dyn[1, 1] ≈ -exp(0.5) atol = 1e-10
+    @test prob.lincache.∇g_dyn[1, 2] ≈ exp(-0.5) atol = 1e-10
 end
 
 
@@ -228,7 +259,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
         _, _g_pls = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_pls, u_ref)
         _, _g_min = SCPLib.get_trajectory_augmented_forwardbackward(prob, x0_ptrb_min, u_ref)
 
-        ∇g_dyn_fd[:,i] = -(_g_pls - _g_min) / (2e-6)    # forward segment has minus sign
+        ∇g_dyn_fd[:,i] = (_g_pls - _g_min) / (2e-6)
     end
 
     for i in 1:6
@@ -257,7 +288,7 @@ function test_scvxstar_forwardbackward(;verbosity::Int = 0)
 
     # error in gradients
     err = prob.lincache.∇g_dyn - ∇g_dyn_fd
-    @test maximum(err) < 1e-6
+    @test maximum(abs.(err)) < 1e-6
 
 
     # ------------------------------------------------------------------------------------------------------------------------ #
@@ -294,5 +325,6 @@ end
 
 test_forwardbackward_penalty_tuning_uses_forwardbackward_trajectory()
 test_forwardbackward_nonconvex_constraints_use_endpoint_state_shape()
+test_forwardbackward_initial_state_jacobian_sign()
 test_forwardbackward_nonconvex_gradient_accepts_cache_argument()
 test_scvxstar_forwardbackward(verbosity = verbosity)
