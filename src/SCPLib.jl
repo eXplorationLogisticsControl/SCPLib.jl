@@ -21,6 +21,7 @@ include("continuous_problem.jl")
 include("impulsive_problem.jl")
 include("mixed_problem.jl")
 include("nlconstraints.jl")
+include("linear_dynamics.jl")
 include("trust_region.jl")
 
 include("algorithms/scvx.jl")
@@ -38,6 +39,7 @@ export ContinuousProblem
 export ImpulsiveProblem
 export MixedProblem
 export get_trajectory, get_trajectory_augmented
+export set_linear_dynamics!
 export stack_flatten_variables, unpack_flattened_variables
 
 export SCvx, SCvxSolution

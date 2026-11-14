@@ -79,3 +79,7 @@ end
 @testset "Custom dynamics defects" begin
     include("test_fun_get_trajectory_all_algorithms.jl")
 end
+
+@testset "Linear dynamics" begin
+    include("test_linear_dynamics.jl")
+end

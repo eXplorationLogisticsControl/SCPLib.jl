@@ -33,6 +33,20 @@ Pages   = [
 ]
 ```
 
+## Linear dynamics
+
+For linear (affine) dynamics, `set_linear_dynamics!` computes the multiple-shooting matrices once,
+so that `solve!` does no ODE propagation. Non-convex path and boundary constraints are given as
+usual through `g_noncvx`/`h_noncvx`.
+
+```@autodocs
+Modules = [SCPLib]
+Order   = [:function, :type, :struct]
+Pages   = [
+  "linear_dynamics.jl",
+]
+```
+
 ## Equations of motion
 
 ```@autodocs
