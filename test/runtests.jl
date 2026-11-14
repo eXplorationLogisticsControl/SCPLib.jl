@@ -75,3 +75,7 @@ end
 @testset "Repeated solve" begin
     include("test_repeated_solve.jl")
 end
+
+@testset "Custom dynamics defects" begin
+    include("test_fun_get_trajectory_all_algorithms.jl")
+end

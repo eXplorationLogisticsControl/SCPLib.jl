@@ -265,7 +265,10 @@ See `set_dynamics_cache!` for more details.
 - `ode_method`: method for the ODE solver
 - `ode_reltol`: relative tolerance for the ODE solver
 - `ode_abstol`: absolute tolerance for the ODE solver
-- `fun_get_trajectory::Union{Function,Nothing}`: user-defined function to get the trajectory
+- `fun_get_trajectory::Union{Function,Nothing}`: user-defined function `(prob, x, u) -> (sols, g_dynamics)`
+  that evaluates the dynamics defects `g_dynamics` (an `nx`-by-`N-1` `Matrix{Float64}`) in place of ODE
+  propagation; all algorithms use it for the merit function and the constraint violation. It must be
+  consistent with the dynamics model of `set_dynamics_cache!` (see `get_dynamics_defects`)
 - `set_dynamics_cache!::Union{Function,Nothing}`: user-defined function to set the dynamics cache
 - `set_linearized_constraints!::Union{Function,Nothing}`: optional override for `set_linearized_constraints!`.
   Signature: `(prob, x_ref, u_ref) -> (g_dynamics_ref, g_ref, h_ref)`. Must register JuMP name

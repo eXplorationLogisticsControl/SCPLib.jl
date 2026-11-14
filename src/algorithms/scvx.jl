@@ -250,6 +250,7 @@ function solve!(
     tol_tr_dual::Float64 = tol_opt,
     small_step_convergence::Bool = false,
 )
+    @assert prob.shooting_method == :multiple "SCvx supports only shooting_method = :multiple (got :$(prob.shooting_method))"
     ensure_trust_region_control!(algo, prob)
     clamp_trust_region!(algo)
     if algo.use_trustregion_control
@@ -360,7 +361,7 @@ function solve!(
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
 
         # evaluate nonlinear constraints
-        _, g_dynamics = get_trajectory(prob, _x, _u)
+        g_dynamics = get_dynamics_defects(prob, _x, _u)
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 

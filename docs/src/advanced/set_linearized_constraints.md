@@ -105,6 +105,8 @@ end
 
 `ImpulsiveProblem` also accepts a custom `lincache` object (any `AbstractLinearizationCache`). Pair that with `set_dynamics_cache!` and `fun_get_trajectory` when the default STM layout `Φ_A[:,:,k]` is the wrong size.
 
+`fun_get_trajectory(prob, x, u) -> (sols, g_dynamics)` replaces the ODE propagation that evaluates the dynamics defects of a candidate solution. All algorithms (`SCvxStar`, `SCvx`, `FixedTRWSCP`, `ProxLinear`) use it for the merit function and the constraint violation. The defects of the reference come from `set_dynamics_cache!`, so the two hooks must use the same dynamics model.
+
 ## Notes
 
 - Forward–backward shooting uses a single match-point constraint and `prob.lincache.∇g_dyn`, not the per-interval product. A callback for `shooting_method = :forwardbackward` must emit that form.

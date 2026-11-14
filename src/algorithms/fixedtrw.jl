@@ -137,6 +137,7 @@ function solve!(
     store_iterates::Bool = true,
     callback::Union{Nothing,Function} = nothing,
 )
+    @assert prob.shooting_method == :multiple "FixedTRWSCP supports only shooting_method = :multiple (got :$(prob.shooting_method))"
     tcpu_start = time()
 
     # remove what an earlier `solve!` on this problem added to the model
@@ -208,7 +209,7 @@ function solve!(
         _ζ = prob.nh > 0 ? value.(prob.model[:ζ]) : nothing
 
         # evaluate nonlinear constraints
-        _, g_dynamics = get_trajectory(prob, _x, _u)
+        g_dynamics = get_dynamics_defects(prob, _x, _u)
         g_noncvx = prob.ng > 0 ? prob.g_noncvx(prob.lincache, _x, _u) : nothing
         h_noncvx = prob.nh > 0 ? max.(prob.h_noncvx(prob.lincache, _x, _u), 0) : nothing
 

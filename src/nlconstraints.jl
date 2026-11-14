@@ -51,6 +51,30 @@ end
 
 
 """
+    get_dynamics_defects(prob, x, u)
+
+Dynamics defects of `(x, u)`, used by the algorithms for the merit function and the constraint
+violation. Uses `prob.fun_get_trajectory(prob, x, u)` (which returns `(sols, g_dynamics)`) when it
+is set, otherwise propagates `prob.eom!` according to `prob.shooting_method`.
+
+The defects of the reference come from `set_dynamics_cache!` (or `prob.set_dynamics_cache!`), and
+the ratio test compares the two: a custom `fun_get_trajectory` must use the same dynamics model.
+"""
+function get_dynamics_defects(prob::OptimalControlProblem, x, u)
+    if !isnothing(prob.fun_get_trajectory)
+        _, g_dynamics = prob.fun_get_trajectory(prob, x, u)
+    elseif prob.shooting_method == :multiple
+        _, g_dynamics = get_trajectory(prob, x, u)
+    elseif prob.shooting_method == :forwardbackward
+        _, g_dynamics = get_trajectory_forwardbackward(prob, x, u)
+    else
+        @error "Invalid shooting method: $(prob.shooting_method)"
+    end
+    return g_dynamics
+end
+
+
+"""
 Set linearized constraints for non-convex constraints
 """
 function set_linearized_constraints!(
