@@ -221,14 +221,18 @@ end
 
 
 function test_linear_dynamics_converges()
-    # the obstacle (path constraint) and the final circle (boundary constraint) are both active
+    # the obstacle (path constraint) and the final circle (boundary constraint) are both active.
+    # With the default w_max = 1e16, the penalty weight and the multiplier of the convex boundary
+    # constraint grow on steps that are small only because the trust region is small, and SCvx*
+    # stalls at a non-optimal feasible point (J0 ≈ 2.658); capping w avoids this.
     nx, N = LINDYN_NX, LINDYN_N
     prob, x_ref, u_ref, eom_calls = make_lindyn_problem(; frozen = true)
     calls_before = eom_calls[]
-    sol = SCPLib.solve!(SCPLib.SCvxStar(nx, N; ng = 1, nh = N, w0 = 1e2), prob, copy(x_ref), copy(u_ref);
+    sol = SCPLib.solve!(SCPLib.SCvxStar(nx, N; ng = 1, nh = N, w0 = 1e2, w_max = 1e3), prob, copy(x_ref), copy(u_ref);
                         maxiter = 100, verbosity = 0)
     @test eom_calls[] == calls_before
-    @test sol.status in (:Optimal, :Feasible)
+    @test sol.status == :Optimal
+    @test sol.info[:J0][end] ≈ 2.152926 rtol = 1e-5    # optimum (also reached with beta = 1.2, w_max ∈ {1e5, 1e6})
     @test sol.info[:χ][end] <= 1e-6
     @test maximum(abs, SCPLib.get_dynamics_defects(prob, sol.x, sol.u)) <= 1e-6
     h = prob.h_noncvx(prob.lincache, sol.x, sol.u)
